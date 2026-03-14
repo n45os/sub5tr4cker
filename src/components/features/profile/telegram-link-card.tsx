@@ -58,7 +58,14 @@ export function TelegramLinkCard({
     setLoading(true);
     try {
       const res = await fetch("/api/telegram/link", { method: "DELETE" });
-      const json = await res.json();
+      let json: { error?: { message?: string } };
+      try {
+        json = await res.json();
+      } catch {
+        setError(res.ok ? "Something went wrong. Try again." : "Failed to disconnect.");
+        setLoading(false);
+        return;
+      }
 
       if (!res.ok) {
         setError(json.error?.message ?? "Failed to disconnect.");

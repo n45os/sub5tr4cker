@@ -11,6 +11,11 @@ export interface IUser extends Document {
     username: string | null;
     linkedAt: Date | null;
   };
+  /** short code for Telegram deep link (start param allows only A-Za-z0-9_- and max 64 chars) */
+  telegramLinkCode: {
+    code: string;
+    expiresAt: Date;
+  } | null;
   notificationPreferences: {
     email: boolean;
     telegram: boolean;
@@ -32,6 +37,10 @@ const userSchema = new Schema<IUser>(
       username: { type: String, default: null },
       linkedAt: { type: Date, default: null },
     },
+    telegramLinkCode: {
+      code: { type: String, default: null },
+      expiresAt: { type: Date, default: null },
+    },
     notificationPreferences: {
       email: { type: Boolean, default: true },
       telegram: { type: Boolean, default: false },
@@ -46,6 +55,10 @@ const userSchema = new Schema<IUser>(
 );
 
 userSchema.index({ "telegram.chatId": 1 }, { sparse: true, unique: true });
+userSchema.index(
+  { "telegramLinkCode.code": 1 },
+  { sparse: true, unique: true }
+);
 
 export const User =
   mongoose.models.User || mongoose.model<IUser>("User", userSchema);

@@ -1,7 +1,7 @@
+import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
-import { createLinkToken } from "@/lib/tokens";
 import { getBot } from "@/lib/telegram/bot";
 import { getSetting } from "@/lib/settings/service";
 import { User } from "@/models";
@@ -15,30 +15,39 @@ export async function DELETE() {
     );
   }
 
-  await dbConnect();
-  const user = await User.findByIdAndUpdate(
-    session.user.id,
-    {
-      $set: {
-        "telegram.chatId": null,
-        "telegram.username": null,
-        "telegram.linkedAt": null,
-        "notificationPreferences.telegram": false,
+  try {
+    await dbConnect();
+    // use $unset so sparse unique index on telegram.chatId doesn't get duplicate null
+    const user = await User.findByIdAndUpdate(
+      session.user.id,
+      {
+        $unset: {
+          "telegram.chatId": "",
+          "telegram.username": "",
+          "telegram.linkedAt": "",
+        },
+        $set: { "notificationPreferences.telegram": false },
       },
-    },
-    { new: true }
-  ).lean();
+      { returnDocument: "after" }
+    ).lean();
 
-  if (!user) {
+    if (!user) {
+      return NextResponse.json(
+        { error: { code: "NOT_FOUND", message: "User not found" } },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      data: { unlinked: true },
+    });
+  } catch (error) {
+    console.error("telegram unlink error:", error);
     return NextResponse.json(
-      { error: { code: "NOT_FOUND", message: "User not found" } },
-      { status: 404 }
+      { error: { code: "INTERNAL_ERROR", message: "Failed to unlink Telegram" } },
+      { status: 500 }
     );
   }
-
-  return NextResponse.json({
-    data: { unlinked: true },
-  });
 }
 
 export async function POST() {
@@ -62,9 +71,16 @@ export async function POST() {
     const bot = await getBot();
     const me = await bot.api.getMe();
     const username = me.username || "sub5tr4ckerBot";
-    const linkToken = await createLinkToken(session.user.id, 15);
-    const baseUrl = "https://t.me";
-    const deepLink = `${baseUrl}/${username}?start=link_${linkToken}`;
+    // Telegram start param allows only A-Za-z0-9_ and max 64 chars; use short code
+    const code = crypto.randomBytes(8).toString("hex");
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await dbConnect();
+    await User.findByIdAndUpdate(session.user.id, {
+      $set: { telegramLinkCode: { code, expiresAt } },
+    });
+
+    const deepLink = `https://t.me/${username}?start=link_${code}`;
 
     return NextResponse.json({
       data: {

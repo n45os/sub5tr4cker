@@ -82,6 +82,7 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [savingTab, setSavingTab] = useState<SettingsTabId | null>(null);
   const [testing, setTesting] = useState<"email" | "telegram" | null>(null);
+  const [webhookLoading, setWebhookLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const groupedByTab = useMemo(
@@ -159,6 +160,30 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
     }
   }
 
+  async function registerWebhook() {
+    setMessage(null);
+    setWebhookLoading(true);
+    try {
+      const response = await fetch("/api/telegram/set-webhook", {
+        method: "POST",
+      });
+      const json = await response.json();
+
+      if (!response.ok) {
+        setMessage(json.error?.message ?? "Failed to register webhook.");
+        return;
+      }
+
+      setMessage(
+        "Webhook registered. Telegram will now send updates (e.g. when users open your bot link) to this app."
+      );
+    } catch {
+      setMessage("Failed to register webhook.");
+    } finally {
+      setWebhookLoading(false);
+    }
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <Card className="border-border/70">
@@ -216,6 +241,16 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
                             <Send className="size-4" />
                           )}
                           Send test email
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => registerWebhook()}
+                          disabled={webhookLoading}
+                        >
+                          {webhookLoading ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : null}
+                          Register webhook
                         </Button>
                         <Button
                           variant="outline"

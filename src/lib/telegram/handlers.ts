@@ -1,34 +1,40 @@
 import { Bot, Context } from "grammy";
 import { dbConnect } from "@/lib/db/mongoose";
 import { BillingPeriod, User, Group } from "@/models";
-import { verifyInviteLinkToken, verifyLinkToken } from "@/lib/tokens";
+import { verifyInviteLinkToken } from "@/lib/tokens";
 import { getSetting } from "@/lib/settings/service";
 import { enqueueTask } from "@/lib/tasks/queue";
 import { runNotificationTasks } from "@/jobs/run-notification-tasks";
 
 // register all bot handlers
 export function registerHandlers(bot: Bot): void {
-  // /start command — handles deep links for account linking
+  // /start command — handles deep links for account linking (payload may have leading space)
   bot.command("start", async (ctx) => {
-    const payload = ctx.match;
+    const raw = typeof ctx.match === "string" ? ctx.match : "";
+    const payload = raw.trim();
 
-    if (payload?.startsWith("link_")) {
-      const linkToken = payload.replace("link_", "");
-      await handleAccountLink(ctx, linkToken);
-      return;
+    try {
+      if (payload.startsWith("link_")) {
+        const code = payload.replace("link_", "").trim();
+        await handleAccountLink(ctx, code);
+        return;
+      }
+
+      if (payload.startsWith("invite_")) {
+        const token = payload.replace("invite_", "").trim();
+        await handleInviteLink(ctx, token);
+        return;
+      }
+
+      await ctx.reply(
+        "Welcome to sub5tr4cker!\n\n" +
+          "I help you manage shared subscription payments.\n\n" +
+          "Link your account from the sub5tr4cker web app to get started."
+      );
+    } catch (err) {
+      console.error("telegram /start handler error:", err);
+      await ctx.reply("Something went wrong. Please try again or generate a new link from the app.").catch(() => {});
     }
-
-    if (payload?.startsWith("invite_")) {
-      const token = payload.replace("invite_", "");
-      await handleInviteLink(ctx, token);
-      return;
-    }
-
-    await ctx.reply(
-      "Welcome to sub5tr4cker!\n\n" +
-        "I help you manage shared subscription payments.\n\n" +
-        "Link your account from the sub5tr4cker web app to get started."
-    );
   });
 
   // callback query handler for inline buttons
@@ -192,14 +198,8 @@ async function handleAdminReject(
 
 async function handleAccountLink(
   ctx: Context,
-  linkToken: string
+  code: string
 ): Promise<void> {
-  const payload = await verifyLinkToken(linkToken);
-  if (!payload) {
-    await ctx.reply("This link has expired or is invalid. Generate a new one from the sub5tr4cker app.");
-    return;
-  }
-
   await dbConnect();
   const chatId = ctx.chat?.id;
   const username = ctx.from?.username ?? null;
@@ -208,19 +208,35 @@ async function handleAccountLink(
     return;
   }
 
-  const user = await User.findByIdAndUpdate(
-    payload.userId,
+  if (!code || code.length < 8) {
+    await ctx.reply(
+      "Invalid link. Generate a new one from the app Profile page."
+    );
+    return;
+  }
+
+  const now = new Date();
+  const user = await User.findOneAndUpdate(
     {
-      "telegram.chatId": chatId,
-      "telegram.username": username,
-      "telegram.linkedAt": new Date(),
-      "notificationPreferences.telegram": true,
+      "telegramLinkCode.code": code,
+      "telegramLinkCode.expiresAt": { $gt: now },
     },
-    { new: true }
+    {
+      $set: {
+        "telegram.chatId": chatId,
+        "telegram.username": username,
+        "telegram.linkedAt": now,
+        "notificationPreferences.telegram": true,
+      },
+      $unset: { telegramLinkCode: "" },
+    },
+    { returnDocument: "after" }
   );
 
   if (!user) {
-    await ctx.reply("User not found. Please try again from the app.");
+    await ctx.reply(
+      "This link has expired or is invalid. Generate a new one from the app Profile page."
+    );
     return;
   }
 

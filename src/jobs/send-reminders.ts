@@ -3,6 +3,10 @@ import { BillingPeriod, Group, User } from "@/models";
 import { sendNotification } from "@/lib/notifications/service";
 import { paymentConfirmationKeyboard } from "@/lib/telegram/keyboards";
 import { getConfirmationUrl } from "@/lib/tokens";
+import {
+  buildPaymentReminderEmailHtml,
+  buildPaymentReminderTelegramText,
+} from "@/lib/email/templates/payment-reminder";
 
 // send payment reminders for unpaid billing periods
 export async function sendReminders(): Promise<void> {
@@ -20,6 +24,7 @@ export async function sendReminders(): Promise<void> {
   for (const period of periods) {
     const group = await Group.findById(period.group);
     if (!group || !group.isActive) continue;
+    if (group.notifications?.remindersEnabled === false) continue;
 
     // check grace period
     const graceDays = group.billing.gracePeriodDays || 3;
@@ -73,14 +78,14 @@ async function sendReminderToMember(
   const user = member?.user ? await User.findById(member.user) : null;
 
   const confirmUrl = payment.confirmationToken
-    ? getConfirmationUrl(payment.confirmationToken)
+    ? await getConfirmationUrl(payment.confirmationToken)
     : null;
 
   const paymentLink = group.payment.link;
   const currency = period.currency || "€";
 
   // build email HTML
-  const emailHtml = buildReminderEmailHtml({
+  const emailHtml = buildPaymentReminderEmailHtml({
     memberName: payment.memberNickname,
     groupName: group.name,
     periodLabel: period.periodLabel,
@@ -113,77 +118,17 @@ async function sendReminderToMember(
       type: "payment_reminder",
       subject: `Pay your ${group.service.name} share — ${period.periodLabel}`,
       emailHtml,
-      telegramText:
-        `💳 *Payment Reminder*\n\n` +
-        `${payment.memberNickname}, you owe *${payment.amount.toFixed(2)}${currency}*\n` +
-        `for *${group.name}* — ${period.periodLabel}\n\n` +
-        (paymentLink ? `Pay: ${paymentLink}\n\n` : "") +
-        `Tap below to confirm once paid.`,
+      telegramText: buildPaymentReminderTelegramText({
+        memberName: payment.memberNickname,
+        groupName: group.name,
+        periodLabel: period.periodLabel,
+        amount: payment.amount,
+        currency,
+        paymentLink,
+      }),
       telegramKeyboard: keyboard,
       groupId: group._id.toString(),
       billingPeriodId: period._id.toString(),
     }
   );
-}
-
-function buildReminderEmailHtml(params: {
-  memberName: string;
-  groupName: string;
-  periodLabel: string;
-  amount: number;
-  currency: string;
-  paymentPlatform: string;
-  paymentLink: string | null;
-  confirmUrl: string | null;
-  ownerName: string;
-  extraText: string | null;
-}): string {
-  // basic email template — will be replaced with React Email in phase 2
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .header { background: #3b82f6; color: #fff; padding: 24px; text-align: center; }
-        .header h1 { margin: 0; font-size: 20px; }
-        .body { padding: 24px; }
-        .amount { font-size: 28px; font-weight: bold; color: #1e293b; text-align: center; margin: 20px 0; }
-        .btn { display: inline-block; background: #3b82f6; color: #fff; text-decoration: none; padding: 12px 32px; border-radius: 6px; font-weight: 600; }
-        .btn-confirm { background: #22c55e; }
-        .footer { padding: 16px 24px; background: #f8fafc; color: #94a3b8; font-size: 12px; text-align: center; }
-        .cta { text-align: center; margin: 24px 0; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>Payment Reminder</h1>
-        </div>
-        <div class="body">
-          <p>Hi ${params.memberName},</p>
-          <p>You owe for <strong>${params.groupName}</strong> — ${params.periodLabel}:</p>
-          <div class="amount">${params.amount.toFixed(2)}${params.currency}</div>
-          ${params.paymentLink ? `
-            <div class="cta">
-              <a href="${params.paymentLink}" class="btn">Pay via ${params.paymentPlatform}</a>
-            </div>
-          ` : ""}
-          ${params.confirmUrl ? `
-            <div class="cta">
-              <a href="${params.confirmUrl}" class="btn btn-confirm">I've Paid</a>
-            </div>
-          ` : ""}
-          ${params.extraText ? `<p style="color: #64748b; font-size: 13px;">${params.extraText}</p>` : ""}
-          <p>Thank you!</p>
-        </div>
-        <div class="footer">
-          <p>Sent by SubsTrack</p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
 }

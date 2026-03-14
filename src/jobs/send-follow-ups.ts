@@ -1,7 +1,10 @@
 import { dbConnect } from "@/lib/db/mongoose";
 import { BillingPeriod, Group, User } from "@/models";
 import { sendNotification } from "@/lib/notifications/service";
-import { adminVerificationKeyboard } from "@/lib/telegram/keyboards";
+import {
+  buildAdminFollowUpEmailHtml,
+  buildAdminFollowUpTelegramText,
+} from "@/lib/email/templates/admin-follow-up";
 
 // send follow-up reminders:
 // - nudge members who still haven't paid
@@ -19,6 +22,7 @@ export async function sendFollowUps(): Promise<void> {
   for (const period of periods) {
     const group = await Group.findById(period.group);
     if (!group || !group.isActive) continue;
+    if (group.notifications?.followUpsEnabled === false) continue;
 
     // remind admin about unverified member confirmations
     await nudgeAdminForConfirmations(group, period);
@@ -52,29 +56,20 @@ async function nudgeAdminForConfirmations(
   const admin = await User.findById(group.admin);
   if (!admin) return;
 
-  const memberList = unverified
-    .map(
-      (p: { memberNickname: string; amount: number }) =>
-        `• ${p.memberNickname} — ${p.amount.toFixed(2)}${period.currency}`
-    )
-    .join("\n");
+  const templateParams = {
+    groupName: group.name,
+    periodLabel: period.periodLabel,
+    currency: period.currency,
+    unverifiedMembers: unverified.map(
+      (payment: { memberNickname: string; amount: number }) => ({
+        memberNickname: payment.memberNickname,
+        amount: payment.amount,
+      })
+    ),
+  };
 
-  const emailHtml = `
-    <p>Hi,</p>
-    <p>The following members say they've paid for <strong>${group.name}</strong> — ${period.periodLabel}:</p>
-    <pre>${memberList}</pre>
-    <p>Please verify their payments in the dashboard.</p>
-  `;
-
-  const telegramText =
-    `📋 <b>Payments awaiting your verification</b>\n\n` +
-    `<b>${group.name}</b> — ${period.periodLabel}\n\n` +
-    unverified
-      .map(
-        (p: { memberNickname: string; amount: number }) =>
-          `• ${p.memberNickname} — ${p.amount.toFixed(2)}${period.currency}`
-      )
-      .join("\n");
+  const emailHtml = buildAdminFollowUpEmailHtml(templateParams);
+  const telegramText = buildAdminFollowUpTelegramText(templateParams);
 
   await sendNotification(
     {

@@ -109,11 +109,7 @@ async function handleMemberConfirm(
   }
 }
 
-async function handleSnooze(
-  ctx: Context,
-  _periodId: string,
-  _memberId: string
-): Promise<void> {
+async function handleSnooze(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery?.({
     text: "OK, I'll remind you again later.",
   });
@@ -195,7 +191,7 @@ async function handleAccountLink(
   ctx: Context,
   linkToken: string
 ): Promise<void> {
-  const payload = verifyLinkToken(linkToken);
+  const payload = await verifyLinkToken(linkToken);
   if (!payload) {
     await ctx.reply("This link has expired or is invalid. Generate a new one from the SubsTrack app.");
     return;

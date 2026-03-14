@@ -74,9 +74,25 @@ Get full group details. Admin sees everything, members see limited info.
 
 Update group settings. Admin only.
 
+The editable payload covers general details, billing configuration, payment
+instructions, and the values used by the dashboard edit flow.
+
 ### `DELETE /api/groups/[groupId]`
 
 Deactivate (soft delete) a group. Admin only.
+
+### `PATCH /api/groups/[groupId]/notifications`
+
+Update per-group notification toggles. Admin only.
+
+**Body:**
+```json
+{
+  "remindersEnabled": true,
+  "followUpsEnabled": true,
+  "priceChangeEnabled": true
+}
+```
 
 ## Members
 
@@ -201,6 +217,18 @@ Manually trigger notifications for a group. Admin only.
 
 List notifications for the authenticated user. Supports pagination.
 
+### `GET /api/notifications?groupId=<id>&limit=<n>`
+
+List recent notifications for a specific group.
+
+### `GET /api/notifications/templates`
+
+Return the notification template registry, including email and Telegram previews.
+
+### `GET /api/notifications/templates/[type]/preview`
+
+Return a single template preview with HTML, Telegram text, and variable metadata.
+
 ## Price Changes
 
 ### `POST /api/groups/[groupId]/price`
@@ -270,6 +298,25 @@ Update profile and notification preferences.
   }
 }
 ```
+
+## App Settings
+
+### `GET /api/settings`
+
+List the runtime settings stored in MongoDB.
+
+### `PATCH /api/settings`
+
+Bulk update runtime settings.
+
+### `POST /api/settings/test-email`
+
+Send a test email to the authenticated user.
+
+### `POST /api/settings/test-telegram`
+
+Send a test Telegram message to the authenticated user if their Telegram account
+is already linked.
 
 ## Member Requests (Phase 2)
 

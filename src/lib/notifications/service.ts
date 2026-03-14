@@ -1,7 +1,10 @@
 import { sendEmail } from "@/lib/email/client";
 import { sendTelegramMessage } from "@/lib/telegram/send";
 import { isTelegramEnabled } from "@/lib/telegram/bot";
-import { buildPriceChangeEmailHtml } from "@/lib/email/templates/price-change";
+import {
+  buildPriceChangeEmailHtml,
+  buildPriceChangeTelegramText,
+} from "@/lib/email/templates/price-change";
 import { InlineKeyboard } from "grammy";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Notification, NotificationType, User } from "@/models";
@@ -46,10 +49,11 @@ export async function sendNotification(
   };
 
   const shouldSendEmail = target.preferences?.email !== false;
+  const telegramEnabled = await isTelegramEnabled();
   const shouldSendTelegram =
     target.preferences?.telegram !== false &&
     target.telegramChatId &&
-    isTelegramEnabled();
+    telegramEnabled;
 
   // send email
   if (shouldSendEmail && target.email) {
@@ -172,12 +176,13 @@ export async function sendPriceChangeAnnouncements(
     newPrice,
     currency,
   });
-  const telegramText =
-    `📢 <b>Price update</b>\n\n` +
-    `<b>${groupName}</b> (${serviceName})\n\n` +
-    `Previous: <s>${previousPrice.toFixed(2)}${currency}</s>\n` +
-    `New: <b>${newPrice.toFixed(2)}${currency}</b>\n\n` +
-    `Your next billing cycle will use the new amount.`;
+  const telegramText = buildPriceChangeTelegramText({
+    groupName,
+    serviceName,
+    oldPrice: previousPrice,
+    newPrice,
+    currency,
+  });
 
   const targets = new Map<string, PriceChangeTarget>();
 

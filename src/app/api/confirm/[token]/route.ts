@@ -4,17 +4,20 @@ import { dbConnect } from "@/lib/db/mongoose";
 import { BillingPeriod, Group, User } from "@/models";
 import { sendAdminConfirmationRequest } from "@/lib/telegram/send";
 import { adminVerificationKeyboard } from "@/lib/telegram/keyboards";
+import { getSetting } from "@/lib/settings/service";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params;
-  const payload = verifyConfirmationToken(token);
+  const payload = await verifyConfirmationToken(token);
+  const appUrl =
+    (await getSetting("general.appUrl")) || new URL(_request.url).origin;
 
   if (!payload) {
     return NextResponse.redirect(
-      new URL("/confirmed?error=invalid", process.env.APP_URL || "http://localhost:3000")
+      new URL("/confirmed?error=invalid", appUrl)
     );
   }
 
@@ -23,7 +26,7 @@ export async function GET(
   const period = await BillingPeriod.findById(payload.periodId);
   if (!period) {
     return NextResponse.redirect(
-      new URL("/confirmed?error=not_found", process.env.APP_URL || "http://localhost:3000")
+      new URL("/confirmed?error=not_found", appUrl)
     );
   }
 
@@ -32,7 +35,7 @@ export async function GET(
   );
   if (!payment) {
     return NextResponse.redirect(
-      new URL("/confirmed?error=not_found", process.env.APP_URL || "http://localhost:3000")
+      new URL("/confirmed?error=not_found", appUrl)
     );
   }
 
@@ -41,7 +44,7 @@ export async function GET(
     return NextResponse.redirect(
       new URL(
         `/confirmed?group=${payload.groupId}&period=${period.periodLabel}&already=true`,
-        process.env.APP_URL || "http://localhost:3000"
+        appUrl
       )
     );
   }
@@ -75,7 +78,7 @@ export async function GET(
   return NextResponse.redirect(
     new URL(
       `/confirmed?group=${group?.name || ""}&period=${period.periodLabel}&success=true`,
-      process.env.APP_URL || "http://localhost:3000"
+      appUrl
     )
   );
 }

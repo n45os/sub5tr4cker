@@ -37,6 +37,11 @@ export interface IGroup extends Document {
     instructions: string | null;
     stripeAccountId: string | null;
   };
+  notifications: {
+    remindersEnabled: boolean;
+    followUpsEnabled: boolean;
+    priceChangeEnabled: boolean;
+  };
   members: IGroupMember[];
   announcements: {
     notifyOnPriceChange: boolean;
@@ -100,6 +105,11 @@ const groupSchema = new Schema<IGroup>(
       link: { type: String, default: null },
       instructions: { type: String, default: null },
       stripeAccountId: { type: String, default: null },
+    },
+    notifications: {
+      remindersEnabled: { type: Boolean, default: true },
+      followUpsEnabled: { type: Boolean, default: true },
+      priceChangeEnabled: { type: Boolean, default: true },
     },
     members: [groupMemberSchema],
     announcements: {

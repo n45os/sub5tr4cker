@@ -167,6 +167,11 @@ export async function POST(request: NextRequest) {
       instructions: body.payment.instructions ?? null,
       stripeAccountId: null,
     },
+    notifications: {
+      remindersEnabled: true,
+      followUpsEnabled: true,
+      priceChangeEnabled: true,
+    },
     members,
     isActive: true,
   });
@@ -178,6 +183,7 @@ export async function POST(request: NextRequest) {
       service: group.service,
       billing: group.billing,
       payment: group.payment,
+      notifications: group.notifications,
       members: group.members.map((m: IGroupMember) => ({
         _id: m._id.toString(),
         email: m.email,

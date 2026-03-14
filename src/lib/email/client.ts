@@ -1,15 +1,20 @@
 import { Resend } from "resend";
+import { getSetting } from "@/lib/settings/service";
 
 let resend: Resend | null = null;
+let resendKey: string | null = null;
 
-function getResend(): Resend {
-  if (!resend) {
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
-      throw new Error("RESEND_API_KEY environment variable is not defined");
-    }
-    resend = new Resend(apiKey);
+async function getResend(): Promise<Resend> {
+  const apiKey = await getSetting("email.apiKey");
+  if (!apiKey) {
+    throw new Error("email.apiKey setting is not configured");
   }
+
+  if (!resend || resendKey !== apiKey) {
+    resend = new Resend(apiKey);
+    resendKey = apiKey;
+  }
+
   return resend;
 }
 
@@ -24,8 +29,10 @@ interface SendEmailParams {
 export async function sendEmail(
   params: SendEmailParams
 ): Promise<{ id: string } | null> {
-  const client = getResend();
-  const from = params.from || process.env.EMAIL_FROM || "SubsTrack <noreply@substrack.app>";
+  const client = await getResend();
+  const defaultFrom =
+    (await getSetting("email.fromAddress")) || "SubsTrack <noreply@substrack.app>";
+  const from = params.from || defaultFrom;
 
   try {
     const result = await client.emails.send({

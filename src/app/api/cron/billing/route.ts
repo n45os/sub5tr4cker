@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkBillingPeriods } from "@/jobs/check-billing-periods";
+import { getSetting } from "@/lib/settings/service";
 
 export async function POST(request: NextRequest) {
   const secret = request.headers.get("x-cron-secret");
-  if (secret !== process.env.CRON_SECRET) {
+  const expectedSecret = await getSetting("security.cronSecret");
+  if (secret !== expectedSecret) {
     return NextResponse.json(
       { error: { code: "UNAUTHORIZED", message: "Invalid cron secret" } },
       { status: 401 }

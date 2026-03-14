@@ -1,7 +1,10 @@
 {
   "name": "subs-track",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
+  "bin": {
+    "substrack": "./dist/cli/index.js"
+  },
   "scripts": {
     "dev": "next dev -p 3054",
     "build": "next build",
@@ -11,14 +14,18 @@
     "lint": "eslint",
     "cron": "tsx src/jobs/runner.ts",
     "cron:billing": "tsx -e \"import('./src/jobs/check-billing-periods').then(m => m.checkBillingPeriods())\"",
-    "cron:reminders": "tsx -e \"import('./src/jobs/send-reminders').then(m => m.sendReminders())\""
+    "cron:reminders": "tsx -e \"import('./src/jobs/send-reminders').then(m => m.sendReminders())\"",
+    "setup": "tsx src/cli/index.ts setup",
+    "configure": "tsx src/cli/index.ts configure"
   },
   "dependencies": {
     "@auth/mongodb-adapter": "^3.11.1",
     "@base-ui/react": "^1.3.0",
+    "@clack/prompts": "^1.1.0",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "commander": "^14.0.3",
     "grammy": "^1.41.1",
     "gray-matter": "^4.0.3",
     "jsonwebtoken": "^9.0.3",

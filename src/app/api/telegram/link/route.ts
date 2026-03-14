@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { createLinkToken } from "@/lib/tokens";
 import { getBot } from "@/lib/telegram/bot";
+import { getSetting } from "@/lib/settings/service";
 
 export async function POST() {
   const session = await auth();
@@ -12,7 +13,8 @@ export async function POST() {
     );
   }
 
-  if (!process.env.TELEGRAM_BOT_TOKEN) {
+  const token = await getSetting("telegram.botToken");
+  if (!token) {
     return NextResponse.json(
       { error: { code: "SERVICE_UNAVAILABLE", message: "Telegram is not configured" } },
       { status: 503 }
@@ -20,12 +22,12 @@ export async function POST() {
   }
 
   try {
-    const bot = getBot();
+    const bot = await getBot();
     const me = await bot.api.getMe();
     const username = me.username || "SubsTrackBot";
-    const token = createLinkToken(session.user.id, 15);
+    const linkToken = await createLinkToken(session.user.id, 15);
     const baseUrl = "https://t.me";
-    const deepLink = `${baseUrl}/${username}?start=link_${token}`;
+    const deepLink = `${baseUrl}/${username}?start=link_${linkToken}`;
 
     return NextResponse.json({
       data: {

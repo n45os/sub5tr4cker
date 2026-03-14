@@ -1,11 +1,23 @@
-// build HTML body for price-change announcement emails
-export function buildPriceChangeEmailHtml(params: {
+export interface PriceChangeTemplateParams {
   groupName: string;
   serviceName: string;
   oldPrice: number;
   newPrice: number;
   currency: string;
-}): string {
+}
+
+export const priceChangeSampleParams: PriceChangeTemplateParams = {
+  groupName: "Family YouTube Premium",
+  serviceName: "YouTube Premium",
+  oldPrice: 23.99,
+  newPrice: 27.99,
+  currency: "EUR",
+};
+
+// build HTML body for price-change announcement emails
+export function buildPriceChangeEmailHtml(
+  params: PriceChangeTemplateParams
+): string {
   return `
     <!DOCTYPE html>
     <html>
@@ -44,4 +56,16 @@ export function buildPriceChangeEmailHtml(params: {
     </body>
     </html>
   `;
+}
+
+export function buildPriceChangeTelegramText(
+  params: PriceChangeTemplateParams
+): string {
+  return (
+    `📢 <b>Price update</b>\n\n` +
+    `<b>${params.groupName}</b> (${params.serviceName})\n\n` +
+    `Previous: <s>${params.oldPrice.toFixed(2)}${params.currency}</s>\n` +
+    `New: <b>${params.newPrice.toFixed(2)}${params.currency}</b>\n\n` +
+    `Your next billing cycle will use the new amount.`
+  );
 }

@@ -82,6 +82,12 @@ A subscription group managed by an admin.
     stripeAccountId: string | null,       // for Stripe integration (phase 2)
   },
 
+  notifications: {
+    remindersEnabled: boolean,            // default: true
+    followUpsEnabled: boolean,            // default: true
+    priceChangeEnabled: boolean,          // default: true
+  },
+
   // members (embedded for performance — groups rarely exceed 20 members)
   members: [{
     user: ObjectId | null,                // ref: User (null if email-only)
@@ -219,6 +225,27 @@ Log of all notifications sent. Useful for debugging and user history.
 ```
 
 **Indexes**: `recipient`, `group`, `type`, `createdAt` (TTL index optional — auto-delete after 90 days)
+
+## Settings
+
+Runtime configuration stored in MongoDB so app operators can manage integrations
+from the dashboard instead of editing env files.
+
+```typescript
+{
+  _id: ObjectId,
+  key: string,                            // e.g. "email.apiKey"
+  value: string | null,                   // encrypted for secret values when saved from the app
+  category: 'general' | 'email' | 'telegram' | 'security' | 'cron',
+  isSecret: boolean,
+  label: string,
+  description: string,
+  createdAt: Date,
+  updatedAt: Date,
+}
+```
+
+**Indexes**: `key` (unique), `category`
 
 ## MemberRequest
 

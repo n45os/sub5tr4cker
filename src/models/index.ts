@@ -12,3 +12,6 @@ export type { IPriceHistory } from "./price-history";
 
 export { Notification } from "./notification";
 export type { INotification, NotificationType } from "./notification";
+
+export { Settings } from "./settings";
+export type { ISettings } from "./settings";

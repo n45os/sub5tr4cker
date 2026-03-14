@@ -5,11 +5,7 @@ import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group, BillingPeriod } from "@/models";
 import type { IGroupMember, IMemberPayment } from "@/models";
-import {
-  calculateShares,
-  formatPeriodLabel,
-  getPeriodDates,
-} from "@/lib/billing/calculator";
+import { calculateShares } from "@/lib/billing/calculator";
 import { createConfirmationToken } from "@/lib/tokens";
 
 const createPeriodSchema = z.object({
@@ -195,18 +191,20 @@ export async function POST(
     );
   }
 
-  const payments = shares.map((share) => ({
-    memberId: share.memberId,
-    memberEmail: share.email,
-    memberNickname: share.nickname,
-    amount: share.amount,
-    status: "pending" as const,
-    confirmationToken: createConfirmationToken(
-      share.memberId,
-      "", // periodId filled after create
-      groupId
-    ),
-  }));
+  const payments = await Promise.all(
+    shares.map(async (share) => ({
+      memberId: share.memberId,
+      memberEmail: share.email,
+      memberNickname: share.nickname,
+      amount: share.amount,
+      status: "pending" as const,
+      confirmationToken: await createConfirmationToken(
+        share.memberId,
+        "", // periodId filled after create
+        groupId
+      ),
+    }))
+  );
 
   const period = await BillingPeriod.create({
     group: groupId,
@@ -219,7 +217,7 @@ export async function POST(
   });
 
   for (const payment of period.payments) {
-    payment.confirmationToken = createConfirmationToken(
+    payment.confirmationToken = await createConfirmationToken(
       payment.memberId.toString(),
       period._id.toString(),
       groupId

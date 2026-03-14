@@ -1,14 +1,54 @@
-import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import { CalendarDays, CreditCard, Pencil, Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GroupNotificationsPanel } from "@/components/features/notifications/group-notifications-panel";
+import { cn } from "@/lib/utils";
+import { getServerBaseUrl } from "@/lib/server-url";
 
 interface GroupDetail {
   _id: string;
   name: string;
   description: string | null;
   service: { name: string; icon: string | null; url: string | null };
-  billing: Record<string, unknown>;
-  payment: Record<string, unknown>;
+  billing: {
+    mode: "equal_split" | "fixed_amount" | "variable";
+    currentPrice: number;
+    currency: string;
+    cycleDay: number;
+    cycleType: "monthly" | "yearly";
+    adminIncludedInSplit: boolean;
+    fixedMemberAmount: number | null;
+    gracePeriodDays: number;
+  };
+  payment: {
+    platform: string;
+    link: string | null;
+    instructions: string | null;
+  };
+  notifications: {
+    remindersEnabled: boolean;
+    followUpsEnabled: boolean;
+    priceChangeEnabled: boolean;
+  };
   role: string;
   members: Array<{
     _id: string;
@@ -32,12 +72,23 @@ interface BillingPeriodItem {
   isFullyPaid: boolean;
 }
 
+interface NotificationItem {
+  _id: string;
+  type: string;
+  channel: string;
+  status: string;
+  subject: string | null;
+  preview: string;
+  recipientEmail: string;
+  createdAt: string;
+}
+
 async function getGroup(
   groupId: string,
   cookieHeader: string
 ): Promise<GroupDetail | null> {
-  const base = process.env.APP_URL || "http://localhost:3000";
-  const res = await fetch(`${base}/api/groups/${groupId}`, {
+  const baseUrl = await getServerBaseUrl();
+  const res = await fetch(`${baseUrl}/api/groups/${groupId}`, {
     headers: { cookie: cookieHeader },
     cache: "no-store",
   });
@@ -50,9 +101,9 @@ async function getBillingPeriods(
   groupId: string,
   cookieHeader: string
 ): Promise<BillingPeriodItem[]> {
-  const base = process.env.APP_URL || "http://localhost:3000";
+  const baseUrl = await getServerBaseUrl();
   const res = await fetch(
-    `${base}/api/groups/${groupId}/billing?limit=3`,
+    `${baseUrl}/api/groups/${groupId}/billing?limit=6`,
     {
       headers: { cookie: cookieHeader },
       cache: "no-store",
@@ -61,6 +112,24 @@ async function getBillingPeriods(
   if (!res.ok) return [];
   const json = await res.json();
   return json.data?.periods ?? [];
+}
+
+async function getNotifications(
+  groupId: string,
+  cookieHeader: string
+): Promise<NotificationItem[]> {
+  const baseUrl = await getServerBaseUrl();
+  const res = await fetch(`${baseUrl}/api/notifications?groupId=${groupId}&limit=12`, {
+    headers: { cookie: cookieHeader },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    return [];
+  }
+
+  const json = await res.json();
+  return json.data?.notifications ?? [];
 }
 
 export default async function GroupDetailPage({
@@ -72,9 +141,10 @@ export default async function GroupDetailPage({
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
 
-  const [group, periods] = await Promise.all([
+  const [group, periods, notifications] = await Promise.all([
     getGroup(groupId, cookieHeader),
     getBillingPeriods(groupId, cookieHeader),
+    getNotifications(groupId, cookieHeader),
   ]);
 
   if (!group) notFound();
@@ -82,104 +152,275 @@ export default async function GroupDetailPage({
   const currentPeriod = periods[0];
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <Link
-        href="/dashboard"
-        className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-      >
-        ← Back to groups
-      </Link>
-      <div className="mt-4 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-            {group.name}
-          </h1>
-          <p className="mt-1 text-zinc-500 dark:text-zinc-400">
-            {group.service.icon} {group.service.name}
-          </p>
-          <span className="mt-2 inline-block rounded bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-            {group.role}
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-8">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-          Members
-        </h2>
-        <ul className="mt-2 rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          {group.members.map((m) => (
-            <li
-              key={m._id}
-              className="flex items-center justify-between border-b border-zinc-100 px-4 py-3 last:border-0 dark:border-zinc-800"
-            >
-              <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                {m.nickname}
-              </span>
-              <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                {m.email}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="mt-8">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-          Billing periods
-        </h2>
-        {!currentPeriod ? (
-          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-            No billing periods yet. They are created automatically on the cycle
-            day, or you can create one manually for variable billing.
-          </p>
-        ) : (
-          <div className="mt-2 space-y-4">
-            {periods.map((p) => (
-              <div
-                key={p._id}
-                className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                    {p.periodLabel}
-                  </span>
-                  <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                    {p.totalPrice} {(group.billing.currency as string) || "EUR"}{" "}
-                    {p.isFullyPaid && "· Fully paid"}
-                  </span>
-                </div>
-                <ul className="mt-3 space-y-1">
-                  {p.payments.map((pay) => (
-                    <li
-                      key={pay.memberId}
-                      className="flex items-center justify-between text-sm"
-                    >
-                      <span className="text-zinc-700 dark:text-zinc-300">
-                        {pay.memberNickname}
-                      </span>
-                      <span className="text-zinc-600 dark:text-zinc-400">
-                        {pay.amount} ·{" "}
-                        <span
-                          className={
-                            pay.status === "confirmed" || pay.status === "waived"
-                              ? "text-green-600 dark:text-green-400"
-                              : pay.status === "member_confirmed"
-                                ? "text-amber-600 dark:text-amber-400"
-                                : "text-zinc-500 dark:text-zinc-400"
-                          }
-                        >
-                          {pay.status.replace("_", " ")}
-                        </span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Badge variant="outline">
+              {group.service.icon || "ST"} {group.service.name}
+            </Badge>
+            <Badge variant={group.role === "admin" ? "default" : "secondary"}>
+              {group.role}
+            </Badge>
           </div>
-        )}
+          <div>
+            <h2 className="text-3xl font-semibold tracking-tight">{group.name}</h2>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              {group.description ||
+                "No extra description yet. Use the edit view to add payment notes, account context, or membership rules."}
+            </p>
+          </div>
+        </div>
+
+        {group.role === "admin" ? (
+          <Link
+            href={`/dashboard/groups/${groupId}/edit`}
+            className={cn(buttonVariants({ variant: "outline" }))}
+          >
+            <Pencil className="size-4" />
+            Edit group
+          </Link>
+        ) : null}
       </div>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Current price</CardDescription>
+            <CardTitle className="text-3xl">
+              {group.billing.currentPrice} {group.billing.currency}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
+            <CreditCard className="size-4" />
+            {group.billing.mode.replace("_", " ")}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Members</CardDescription>
+            <CardTitle className="text-3xl">{group.members.length}</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Users className="size-4" />
+            Active participants
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Cycle cadence</CardDescription>
+            <CardTitle className="text-3xl capitalize">
+              {group.billing.cycleType}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
+            <CalendarDays className="size-4" />
+            Day {group.billing.cycleDay} of each cycle
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Open billing periods</CardDescription>
+            <CardTitle className="text-3xl">
+              {periods.filter((period) => !period.isFullyPaid).length}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            {currentPeriod
+              ? `Latest period: ${currentPeriod.periodLabel}`
+              : "No billing periods yet"}
+          </CardContent>
+        </Card>
+      </section>
+
+      <Tabs defaultValue="overview" className="gap-6">
+        <TabsList variant="line" className="w-full justify-start overflow-x-auto">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="members">Members</TabsTrigger>
+          <TabsTrigger value="billing">Billing</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+          <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
+            <Card>
+              <CardHeader>
+                <CardTitle>Billing setup</CardTitle>
+                <CardDescription>
+                  A quick summary of how this group is configured today.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl border bg-muted/35 p-4">
+                  <p className="text-sm text-muted-foreground">Payment platform</p>
+                  <p className="mt-2 font-medium capitalize">
+                    {group.payment.platform.replace("_", " ")}
+                  </p>
+                </div>
+                <div className="rounded-xl border bg-muted/35 p-4">
+                  <p className="text-sm text-muted-foreground">Grace period</p>
+                  <p className="mt-2 font-medium">
+                    {group.billing.gracePeriodDays} day
+                    {group.billing.gracePeriodDays !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <div className="rounded-xl border bg-muted/35 p-4">
+                  <p className="text-sm text-muted-foreground">Admin in split</p>
+                  <p className="mt-2 font-medium">
+                    {group.billing.adminIncludedInSplit ? "Included" : "Excluded"}
+                  </p>
+                </div>
+                <div className="rounded-xl border bg-muted/35 p-4">
+                  <p className="text-sm text-muted-foreground">Payment link</p>
+                  <p className="mt-2 line-clamp-2 font-medium">
+                    {group.payment.link || "No payment link configured"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>What happens next</CardTitle>
+                <CardDescription>
+                  The billing workflow currently attached to this group.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <div className="rounded-xl border p-4">
+                  Billing periods use the {group.billing.cycleType} cycle and start on
+                  day {group.billing.cycleDay}.
+                </div>
+                <div className="rounded-xl border p-4">
+                  Members are reminded after the {group.billing.gracePeriodDays}-day grace
+                  window if their payment is still pending.
+                </div>
+                <div className="rounded-xl border p-4">
+                  {currentPeriod
+                    ? `The latest tracked cycle is ${currentPeriod.periodLabel}.`
+                    : "Create or wait for the first billing period to unlock payment tracking."}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="members">
+          <Card>
+            <CardHeader>
+              <CardTitle>Members</CardTitle>
+              <CardDescription>
+                Everyone currently included in this subscription split.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nickname</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Custom amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {group.members.map((member) => (
+                    <TableRow key={member._id}>
+                      <TableCell className="font-medium">{member.nickname}</TableCell>
+                      <TableCell>{member.email}</TableCell>
+                      <TableCell className="capitalize">{member.role}</TableCell>
+                      <TableCell>
+                        {member.customAmount
+                          ? `${member.customAmount} ${group.billing.currency}`
+                          : "Auto split"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="billing">
+          {!currentPeriod ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>No billing periods yet</CardTitle>
+                <CardDescription>
+                  Periods are created automatically on the configured cycle day, or
+                  manually for variable billing.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {periods.map((period) => (
+                <Card key={period._id}>
+                  <CardHeader className="flex flex-row items-start justify-between gap-4">
+                    <div>
+                      <CardTitle>{period.periodLabel}</CardTitle>
+                      <CardDescription>
+                        {period.totalPrice} {group.billing.currency}
+                      </CardDescription>
+                    </div>
+                    <Badge variant={period.isFullyPaid ? "default" : "secondary"}>
+                      {period.isFullyPaid ? "Fully paid" : "In progress"}
+                    </Badge>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Member</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {period.payments.map((payment) => (
+                          <TableRow key={payment.memberId}>
+                            <TableCell className="font-medium">
+                              {payment.memberNickname}
+                            </TableCell>
+                            <TableCell>
+                              {payment.amount} {group.billing.currency}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  payment.status === "confirmed" ||
+                                  payment.status === "waived"
+                                    ? "default"
+                                    : payment.status === "member_confirmed"
+                                      ? "secondary"
+                                      : "outline"
+                                }
+                                className="capitalize"
+                              >
+                                {payment.status.replace("_", " ")}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <GroupNotificationsPanel
+            groupId={groupId}
+            isAdmin={group.role === "admin"}
+            initialPreferences={group.notifications}
+            recentNotifications={notifications}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

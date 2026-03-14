@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-03-18
+
+### Added
+- Added a redesigned shadcn/ui dashboard shell with a collapsible sidebar, richer overview cards, tabbed group detail pages, and a reusable group create/edit form.
+- Added a full runtime settings system backed by MongoDB, including the `Settings` model, `/api/settings` endpoints, dashboard settings page, and test delivery endpoints for email and Telegram.
+- Added a notification template registry, template preview pages, notification preview APIs, per-group notification toggles, and recent delivery logs in the group dashboard.
+- Added `pnpm setup`, `pnpm configure`, and the new `substrack` CLI scaffolding built with `@clack/prompts` and `commander` for first-time configuration.
+
+### Changed
+- Moved runtime configuration for app URL, email, Telegram, and token/cron secrets out of direct env lookups and into the settings service with env fallback support.
+- Updated reminder, follow-up, and price-change flows to reuse centralized email/Telegram template builders and respect per-group notification toggles.
+- Refreshed setup and environment docs to reflect the bootstrap-only `.env.local` approach and the new onboarding command flow.
+
 ## [0.3.0] - 2026-03-18
 
 ### Added

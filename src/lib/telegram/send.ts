@@ -12,10 +12,10 @@ interface SendTelegramMessageParams {
 export async function sendTelegramMessage(
   params: SendTelegramMessageParams
 ): Promise<number | null> {
-  if (!isTelegramEnabled()) return null;
+  if (!(await isTelegramEnabled())) return null;
 
   try {
-    const bot = getBot();
+    const bot = await getBot();
     const result = await bot.api.sendMessage(params.chatId, params.text, {
       parse_mode: params.parseMode ?? "HTML",
       reply_markup: params.keyboard,

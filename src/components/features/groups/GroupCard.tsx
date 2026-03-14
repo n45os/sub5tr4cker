@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { ArrowRight, CalendarDays, Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
 export interface GroupCardData {
   _id: string;
@@ -12,34 +15,70 @@ export interface GroupCardData {
 }
 
 export function GroupCard({ group }: { group: GroupCardData }) {
+  const roleLabel = group.role === "admin" ? "Owner" : "Member";
+  const healthLabel =
+    group.unpaidCount > 0 ? `${group.unpaidCount} unpaid` : "Up to date";
+
   return (
     <Link
       href={`/dashboard/groups/${group._id}`}
-      className="block rounded-lg border border-zinc-200 bg-white p-4 transition hover:border-zinc-300 hover:shadow dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+      className="block transition-transform duration-200 hover:-translate-y-0.5"
     >
-      <div className="flex items-start justify-between">
-        <span className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
-          {group.name}
-        </span>
-        <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-          {group.role}
-        </span>
-      </div>
-      <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-        {group.service.icon} {group.service.name}
-      </p>
-      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-        {group.memberCount} member{group.memberCount !== 1 ? "s" : ""} ·{" "}
-        {group.billing.currentPrice} {group.billing.currency}
-        {group.unpaidCount > 0 && (
-          <span className="ml-1 text-amber-600 dark:text-amber-400">
-            · {group.unpaidCount} unpaid
+      <Card className="h-full border-border/70 shadow-sm transition-shadow hover:shadow-md">
+        <CardHeader className="gap-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm text-muted-foreground">
+                {group.service.icon || "ST"} {group.service.name}
+              </p>
+              <CardTitle className="mt-1 text-xl">{group.name}</CardTitle>
+            </div>
+            <Badge variant={group.role === "admin" ? "default" : "secondary"}>
+              {roleLabel}
+            </Badge>
+          </div>
+        </CardHeader>
+
+        <CardContent className="grid gap-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border bg-muted/40 p-3">
+              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                Price
+              </p>
+              <p className="mt-2 text-lg font-semibold">
+                {group.billing.currentPrice} {group.billing.currency}
+              </p>
+            </div>
+            <div className="rounded-xl border bg-muted/40 p-3">
+              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                Status
+              </p>
+              <p className="mt-2 text-lg font-semibold">{healthLabel}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between rounded-xl border bg-background px-3 py-2 text-sm text-muted-foreground">
+            <span className="flex items-center gap-2">
+              <Users className="size-4" />
+              {group.memberCount} member{group.memberCount !== 1 ? "s" : ""}
+            </span>
+            <span className="flex items-center gap-2">
+              <CalendarDays className="size-4" />
+              {group.nextBillingDate}
+            </span>
+          </div>
+        </CardContent>
+
+        <CardFooter className="justify-between">
+          <span className="text-sm text-muted-foreground">
+            {group.billing.mode.replace("_", " ")}
           </span>
-        )}
-      </p>
-      <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-        Next billing: {group.nextBillingDate}
-      </p>
+          <span className="inline-flex items-center gap-2 text-sm font-medium">
+            Open group
+            <ArrowRight className="size-4" />
+          </span>
+        </CardFooter>
+      </Card>
     </Link>
   );
 }

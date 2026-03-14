@@ -105,6 +105,14 @@ export async function GET(
     service: group.service,
     billing: group.billing,
     payment: group.payment,
+    notifications: {
+      remindersEnabled: group.notifications?.remindersEnabled ?? true,
+      followUpsEnabled: group.notifications?.followUpsEnabled ?? true,
+      priceChangeEnabled:
+        group.notifications?.priceChangeEnabled ??
+        group.announcements?.notifyOnPriceChange ??
+        true,
+    },
     isActive: group.isActive,
     role: access,
     members: group.members
@@ -211,7 +219,11 @@ export async function PATCH(
   const priceChanged =
     body.billing?.currentPrice !== undefined &&
     previousPrice !== group.billing.currentPrice;
-  if (priceChanged && group.announcements?.notifyOnPriceChange) {
+  if (
+    priceChanged &&
+    (group.notifications?.priceChangeEnabled ??
+      group.announcements?.notifyOnPriceChange)
+  ) {
     try {
       await sendPriceChangeAnnouncements(group, {
         previousPrice,
@@ -232,6 +244,7 @@ export async function PATCH(
       service: group.service,
       billing: group.billing,
       payment: group.payment,
+      notifications: group.notifications,
     },
   });
 }

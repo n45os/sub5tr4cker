@@ -47,21 +47,23 @@ async function createPeriodIfDue(
 
   const periodLabel = formatPeriodLabel(start);
 
-  const payments = shares.map((share) => {
-    const token = createConfirmationToken(
+  const payments = await Promise.all(
+    shares.map(async (share) => {
+      const token = await createConfirmationToken(
       share.memberId,
       "pending", // will be updated after creation with actual period ID
       group._id.toString()
-    );
-    return {
-      memberId: share.memberId,
-      memberEmail: share.email,
-      memberNickname: share.nickname,
-      amount: share.amount,
-      status: "pending" as const,
-      confirmationToken: token,
-    };
-  });
+      );
+      return {
+        memberId: share.memberId,
+        memberEmail: share.email,
+        memberNickname: share.nickname,
+        amount: share.amount,
+        status: "pending" as const,
+        confirmationToken: token,
+      };
+    })
+  );
 
   const period = await BillingPeriod.create({
     group: group._id,
@@ -75,7 +77,7 @@ async function createPeriodIfDue(
 
   // update confirmation tokens with the actual period ID
   for (const payment of period.payments) {
-    payment.confirmationToken = createConfirmationToken(
+    payment.confirmationToken = await createConfirmationToken(
       payment.memberId.toString(),
       period._id.toString(),
       group._id.toString()

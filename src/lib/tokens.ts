@@ -1,6 +1,5 @@
 import crypto from "crypto";
-
-const SECRET = process.env.CONFIRMATION_SECRET || "dev-secret-change-me";
+import { getSetting } from "@/lib/settings/service";
 
 interface ConfirmationPayload {
   memberId: string;
@@ -9,12 +8,26 @@ interface ConfirmationPayload {
   exp: number;
 }
 
-export function createConfirmationToken(
+async function getConfirmationSecret() {
+  return (
+    (await getSetting("security.confirmationSecret")) || "dev-secret-change-me"
+  );
+}
+
+async function getTelegramLinkSecret() {
+  return (
+    (await getSetting("security.telegramLinkSecret")) ||
+    (await getSetting("security.confirmationSecret")) ||
+    "dev-secret-change-me"
+  );
+}
+
+export async function createConfirmationToken(
   memberId: string,
   periodId: string,
   groupId: string,
   expiresInDays = 7
-): string {
+): Promise<string> {
   const payload: ConfirmationPayload = {
     memberId,
     periodId,
@@ -23,24 +36,26 @@ export function createConfirmationToken(
   };
 
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const secret = await getConfirmationSecret();
   const signature = crypto
-    .createHmac("sha256", SECRET)
+    .createHmac("sha256", secret)
     .update(data)
     .digest("base64url");
 
   return `${data}.${signature}`;
 }
 
-export function verifyConfirmationToken(
+export async function verifyConfirmationToken(
   token: string
-): ConfirmationPayload | null {
+): Promise<ConfirmationPayload | null> {
   const parts = token.split(".");
   if (parts.length !== 2) return null;
 
   const [data, signature] = parts;
+  const secret = await getConfirmationSecret();
 
   const expectedSignature = crypto
-    .createHmac("sha256", SECRET)
+    .createHmac("sha256", secret)
     .update(data)
     .digest("base64url");
 
@@ -59,37 +74,41 @@ export function verifyConfirmationToken(
   }
 }
 
-export function getConfirmationUrl(token: string): string {
-  const baseUrl = process.env.APP_URL || "http://localhost:3000";
+export async function getConfirmationUrl(token: string): Promise<string> {
+  const baseUrl =
+    (await getSetting("general.appUrl")) || "http://localhost:3054";
   return `${baseUrl}/api/confirm/${token}`;
 }
-
-const LINK_SECRET = process.env.TELEGRAM_LINK_SECRET || process.env.CONFIRMATION_SECRET || "dev-secret-change-me";
 
 export interface LinkPayload {
   userId: string;
   exp: number;
 }
 
-export function createLinkToken(userId: string, expiresInMinutes = 15): string {
+export async function createLinkToken(
+  userId: string,
+  expiresInMinutes = 15
+): Promise<string> {
   const payload: LinkPayload = {
     userId,
     exp: Date.now() + expiresInMinutes * 60 * 1000,
   };
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const secret = await getTelegramLinkSecret();
   const signature = crypto
-    .createHmac("sha256", LINK_SECRET)
+    .createHmac("sha256", secret)
     .update(data)
     .digest("base64url");
   return `${data}.${signature}`;
 }
 
-export function verifyLinkToken(token: string): LinkPayload | null {
+export async function verifyLinkToken(token: string): Promise<LinkPayload | null> {
   const parts = token.split(".");
   if (parts.length !== 2) return null;
   const [data, signature] = parts;
+  const secret = await getTelegramLinkSecret();
   const expectedSignature = crypto
-    .createHmac("sha256", LINK_SECRET)
+    .createHmac("sha256", secret)
     .update(data)
     .digest("base64url");
   if (signature !== expectedSignature) return null;

@@ -53,16 +53,19 @@ cd subs-track
 # install dependencies
 pnpm install
 
-# copy environment variables
-cp .env.example .env.local
-
-# edit .env.local with your values (see Environment Variables below)
+# bootstrap the app
+pnpm setup
 
 # run the development server
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+`pnpm setup` writes the bootstrap `.env.local` values and seeds the remaining
+runtime settings into MongoDB.
+
+If you prefer npm scripts, `npm run setup` and `npm run configure` work too.
+
+Open [http://localhost:3054](http://localhost:3054).
 
 ### Documentation
 
@@ -81,24 +84,26 @@ docker-compose up -d
 ```
 
 This starts:
-- The Next.js app on port 3000
-- MongoDB on port 27017
+- The Next.js app on port 3054
+- MongoDB on port 25417
 - The cron job runner
 
 ### Environment Variables
 
-See `.env.example` for the full list. Key variables:
+Only bootstrap values stay in `.env.local`. Runtime settings such as `APP_URL`,
+`RESEND_API_KEY`, `EMAIL_FROM`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
+`CONFIRMATION_SECRET`, and `CRON_SECRET` now live in MongoDB and are managed from
+the dashboard settings page.
+
+Bootstrap variables:
 
 | Variable | Description |
 |----------|-------------|
 | `MONGODB_URI` | MongoDB connection string |
 | `NEXTAUTH_SECRET` | Random secret for Auth.js sessions |
-| `NEXTAUTH_URL` | Your app URL (e.g., `http://localhost:3000`) |
-| `RESEND_API_KEY` | Resend API key for sending emails |
-| `EMAIL_FROM` | Sender email address |
-| `TELEGRAM_BOT_TOKEN` | Telegram bot token from BotFather |
-| `CRON_SECRET` | Secret for protecting cron API endpoints |
-| `CONFIRMATION_SECRET` | HMAC secret for "I paid" confirmation links |
+| `GOOGLE_CLIENT_ID` | Optional Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Optional Google OAuth client secret |
+| `NODE_ENV` | Runtime mode (`development` or `production`) |
 
 ## Project Structure
 

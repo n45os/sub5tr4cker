@@ -41,6 +41,7 @@ export interface MemberRow {
   customAmount: number | null;
   /** when false, member has not linked an account (invite not accepted) */
   hasAccount?: boolean;
+  acceptedAt?: string | null;
 }
 
 export interface PeriodPaymentRow {
@@ -394,8 +395,17 @@ export function GroupMembersPanel({
                               </Button>
                             )}
                           </div>
+                        ) : member.acceptedAt ? (
+                          <Badge
+                            variant="outline"
+                            className="border-emerald-200 bg-emerald-50 text-emerald-700"
+                          >
+                            Accepted {formatDate(member.acceptedAt)}
+                          </Badge>
                         ) : (
-                          <span className="text-muted-foreground">—</span>
+                          <Badge variant="outline" className="font-normal">
+                            Account linked
+                          </Badge>
                         )}
                       </TableCell>
                       <TableCell className="capitalize">{member.role}</TableCell>

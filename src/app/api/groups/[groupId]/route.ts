@@ -129,6 +129,9 @@ export async function GET(
         role: m.role,
         customAmount: m.customAmount,
         hasAccount: !!m.user,
+        acceptedAt: m.acceptedAt
+          ? (m.acceptedAt as Date).toISOString()
+          : null,
       })),
   };
 

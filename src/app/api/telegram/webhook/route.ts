@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Update } from "grammy";
 import { getBot } from "@/lib/telegram/bot";
 import { getSetting } from "@/lib/settings/service";
 
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const bot = await getBot();
-    await bot.handleUpdate(update);
+    await bot.handleUpdate(update as Update);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("telegram webhook error:", error);

@@ -6,11 +6,11 @@ export interface IUser extends Document {
   emailVerified: Date | null;
   image: string | null;
   hashedPassword: string | null;
-  telegram: {
-    chatId: number | null;
+  telegram?: {
+    chatId: number;
     username: string | null;
     linkedAt: Date | null;
-  };
+  } | null;
   /** short code for Telegram deep link (start param allows only A-Za-z0-9_- and max 64 chars) */
   telegramLinkCode: {
     code: string;
@@ -33,13 +33,25 @@ const userSchema = new Schema<IUser>(
     image: { type: String, default: null },
     hashedPassword: { type: String, default: null },
     telegram: {
-      chatId: { type: Number, default: null },
-      username: { type: String, default: null },
-      linkedAt: { type: Date, default: null },
+      type: new Schema(
+        {
+          chatId: { type: Number, required: true },
+          username: { type: String, default: null },
+          linkedAt: { type: Date, default: null },
+        },
+        { _id: false }
+      ),
+      default: undefined,
     },
     telegramLinkCode: {
-      code: { type: String, default: null },
-      expiresAt: { type: Date, default: null },
+      type: new Schema(
+        {
+          code: { type: String, required: true },
+          expiresAt: { type: Date, required: true },
+        },
+        { _id: false }
+      ),
+      default: undefined,
     },
     notificationPreferences: {
       email: { type: Boolean, default: true },

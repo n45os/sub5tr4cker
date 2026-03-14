@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - **Webhook handler resilience** — `POST /api/telegram/webhook` now validates malformed JSON payloads and adds explicit error handling around settings reads for clearer operational failures.
 - **Invite acceptance resilience** — `GET /api/invite/accept/[token]` is now wrapped in guarded error handling to return a user-facing HTML failure page instead of an uncaught 500.
 - **Settings decryption safety** — `decryptValue` now catches crypto decrypt failures and returns `null` instead of throwing, preventing app-wide 500 cascades when encrypted settings were written under a different secret key.
+- **Dashboard invite visibility** — Group dashboard now surfaces invite acceptance directly: member rows show `Accepted <date>` after acceptance, and the members summary card shows accepted invites count.
 
 ## [0.18.0] - 2026-03-18
 

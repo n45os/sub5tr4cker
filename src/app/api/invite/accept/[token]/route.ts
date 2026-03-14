@@ -6,7 +6,40 @@ import { getSetting } from "@/lib/settings/service";
 import {
   verifyInviteAcceptToken,
   createMagicLoginToken,
+  createInviteLinkToken,
+  createUnsubscribeToken,
+  getUnsubscribeUrl,
 } from "@/lib/tokens";
+import { sendNotification } from "@/lib/notifications/service";
+import { buildTelegramWelcomeEmailHtml } from "@/lib/email/templates/group-invite";
+import { getBot, isTelegramEnabled } from "@/lib/telegram/bot";
+
+function buildBillingSummary(group: {
+  billing: {
+    cycleType: "monthly" | "yearly";
+    currentPrice: number;
+    currency: string;
+    mode: "equal_split" | "fixed_amount" | "variable";
+    fixedMemberAmount?: number | null;
+  };
+}): string {
+  const { billing } = group;
+  const cycle = billing.cycleType === "yearly" ? "year" : "month";
+  const price = `${billing.currentPrice} ${billing.currency}`;
+  if (billing.mode === "equal_split") {
+    return `${price} per ${cycle}, equal split`;
+  }
+  if (billing.mode === "fixed_amount" && billing.fixedMemberAmount != null) {
+    return `${billing.fixedMemberAmount} ${billing.currency} per member per ${cycle}`;
+  }
+  return `${price} per ${cycle} (variable)`;
+}
+
+function isPublicAppUrl(appUrl: string | null): boolean {
+  if (!appUrl || !appUrl.trim()) return false;
+  const u = appUrl.trim().toLowerCase();
+  return !u.startsWith("http://localhost") && !u.startsWith("https://localhost");
+}
 
 function buildHtml(title: string, message: string, appUrl: string): string {
   return `<!DOCTYPE html>
@@ -82,33 +115,133 @@ export async function GET(
       );
     }
 
-    const normalizedEmail = (member.email as string).toLowerCase().trim();
-    let user = await User.findOne({ email: normalizedEmail });
-    if (!user) {
-      user = await User.create({
-        name: (member.nickname as string).trim() || normalizedEmail,
-        email: normalizedEmail,
-        hashedPassword: null,
-        notificationPreferences: {
-          email: true,
-          telegram: false,
-          reminderFrequency: "every_3_days",
+    const rawEmail = typeof member.email === "string" ? member.email.trim() : "";
+    if (!rawEmail) {
+      return new NextResponse(
+        buildHtml(
+          "Invite unavailable",
+          "This invite is missing an email address. Ask the group admin to resend your invite.",
+          appUrl
+        ),
+        { status: 400, headers: { "content-type": "text/html; charset=utf-8" } }
+      );
+    }
+
+    const normalizedEmail = rawEmail.toLowerCase();
+    const nickname =
+      typeof member.nickname === "string" ? member.nickname.trim() : "";
+
+    // atomic find-or-create: avoids duplicate key races on telegramLinkCode
+    const user = await User.findOneAndUpdate(
+      { email: normalizedEmail },
+      {
+        $setOnInsert: {
+          name: nickname || normalizedEmail,
+          email: normalizedEmail,
+          hashedPassword: null,
+          notificationPreferences: {
+            email: true,
+            telegram: false,
+            reminderFrequency: "every_3_days",
+          },
         },
-      });
-    }
+      },
+      { upsert: true, returnDocument: "after" }
+    );
 
-    if (!member.user || member.user.toString() !== user._id.toString()) {
-      member.user = user._id;
-    }
-    if (!member.acceptedAt) {
-      member.acceptedAt = new Date();
-    }
-    await group.save();
+    await Group.updateOne(
+      { _id: group._id, "members._id": member._id },
+      {
+        $set: {
+          "members.$.user": user._id,
+          "members.$.acceptedAt": new Date(),
+        },
+      }
+    );
 
-    const magicToken = await createMagicLoginToken(user._id.toString());
+    // send welcome email with magic sign-in link + Telegram instructions
     const baseUrl = appUrl.replace(/\/$/, "");
-    const callbackUrl = `${baseUrl}/invite-callback?token=${encodeURIComponent(magicToken)}&groupId=${encodeURIComponent(payload.groupId)}`;
-    return NextResponse.redirect(callbackUrl, 302);
+    try {
+      const magicToken = await createMagicLoginToken(user._id.toString());
+      const magicLoginUrl = `${baseUrl}/invite-callback?token=${encodeURIComponent(magicToken)}&groupId=${encodeURIComponent(payload.groupId)}`;
+      const groupIdStr = group._id.toString();
+      const sendEmail = !member.unsubscribedFromEmail;
+      const unsubscribeUrl = sendEmail
+        ? await getUnsubscribeUrl(
+            await createUnsubscribeToken(
+              member._id.toString(),
+              groupIdStr
+            )
+          )
+        : null;
+
+      let telegramBotUsername: string | null = null;
+      let telegramInviteLink: string | null = null;
+      if (await isTelegramEnabled()) {
+        try {
+          const bot = await getBot();
+          const me = await bot.api.getMe();
+          telegramBotUsername = me.username ?? null;
+          if (telegramBotUsername) {
+            const inviteToken = await createInviteLinkToken(
+              member._id.toString(),
+              groupIdStr,
+              7
+            );
+            telegramInviteLink = `https://t.me/${telegramBotUsername}?start=invite_${inviteToken}`;
+          }
+        } catch {
+          // telegram not configured, skip
+        }
+      }
+
+      const admin = await User.findById(group.admin);
+      const emailHtml = buildTelegramWelcomeEmailHtml({
+        memberName: member.nickname,
+        groupName: group.name,
+        groupId: groupIdStr,
+        serviceName: group.service.name,
+        adminName: admin?.name ?? "The group admin",
+        billingSummary: buildBillingSummary(group),
+        paymentPlatform: group.payment.platform,
+        paymentLink: group.payment.link ?? null,
+        paymentInstructions: group.payment.instructions ?? null,
+        isPublic: isPublicAppUrl(appUrl),
+        appUrl: appUrl?.trim() || null,
+        telegramBotUsername,
+        telegramInviteLink,
+        unsubscribeUrl,
+        accentColor: group.service?.accentColor ?? null,
+        magicLoginUrl,
+      });
+
+      await sendNotification(
+        {
+          email: user.email,
+          telegramChatId: null,
+          userId: user._id.toString(),
+          preferences: { email: sendEmail, telegram: false },
+        },
+        {
+          type: "invite",
+          subject: `Welcome to ${group.name} — sign in to your dashboard`,
+          emailHtml,
+          telegramText: `Welcome to ${group.name}`,
+          groupId: groupIdStr,
+        }
+      );
+    } catch (emailError) {
+      console.error("invite accept welcome email failed:", emailError);
+    }
+
+    return new NextResponse(
+      buildHtml(
+        "Invite accepted!",
+        "You've joined the group. Check your email for a sign-in link to open the dashboard and manage your subscription.",
+        appUrl
+      ),
+      { status: 200, headers: { "content-type": "text/html; charset=utf-8" } }
+    );
   } catch (error) {
     console.error("invite accept handler failed:", error);
     return new NextResponse(

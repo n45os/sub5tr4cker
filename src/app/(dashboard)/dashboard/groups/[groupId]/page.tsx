@@ -54,6 +54,7 @@ interface GroupDetail {
     role: string;
     customAmount: number | null;
     hasAccount: boolean;
+    acceptedAt: string | null;
   }>;
 }
 
@@ -151,6 +152,7 @@ export default async function GroupDetailPage({
   if (!group) notFound();
 
   const currentPeriod = periods[0];
+  const acceptedCount = group.members.filter((m) => !!m.acceptedAt).length;
   const currentMemberId =
     (session?.user?.email &&
       group.members.find((m) => m.email === session.user.email)?._id) ??
@@ -215,7 +217,7 @@ export default async function GroupDetailPage({
           </CardHeader>
           <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
             <Users className="size-4" />
-            Active participants
+            {acceptedCount}/{group.members.length} accepted invites
           </CardContent>
         </Card>
         <Card>

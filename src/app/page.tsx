@@ -13,7 +13,13 @@ export default function Home() {
               href="/docs"
               className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
             >
-              Docs
+              Documentation
+            </Link>
+            <Link
+              href="/login"
+              className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            >
+              Sign in
             </Link>
           </nav>
         </div>
@@ -27,7 +33,7 @@ export default function Home() {
         </p>
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
           <Link
-            href="/docs/user-guide/getting-started"
+            href="/login"
             className="rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
             Get started

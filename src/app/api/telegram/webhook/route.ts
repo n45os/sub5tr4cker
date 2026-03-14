@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Update } from "grammy";
+import type { Update } from "grammy/types";
 import { getBot } from "@/lib/telegram/bot";
 import { getSetting } from "@/lib/settings/service";
 

@@ -14,6 +14,8 @@ export interface GroupInviteTemplateParams {
   isPublic: boolean;
   appUrl: string | null;
   telegramBotUsername: string | null;
+  /** optional; when set, invite email uses this deep link for Telegram (member-specific) */
+  telegramInviteLink?: string | null;
   /** optional; when set, footer includes unsubscribe link */
   unsubscribeUrl?: string | null;
   /** optional; hex accent for header and primary buttons */
@@ -47,7 +49,16 @@ export function buildGroupInviteEmailHtml(
     : null;
   const telegramSection =
     params.telegramBotUsername
-      ? `
+      ? params.telegramInviteLink
+        ? `
+        <div class="section">
+          <p class="section-title">Get updates via Telegram</p>
+          <p>Receive payment reminders and confirm payments from your phone.</p>
+          <div class="cta">
+            <a href="${params.telegramInviteLink}" class="btn">Get updates via Telegram</a>
+          </div>
+        </div>`
+        : `
         <div class="section">
           <p class="section-title">Get updates via Telegram</p>
           <p>Start a chat with <strong>@${params.telegramBotUsername}</strong> and send <code>/start</code> to receive payment reminders and confirm payments from your phone.</p>
@@ -63,7 +74,11 @@ export function buildGroupInviteEmailHtml(
         <div class="cta">
           <a href="${settingsUrl}" class="btn btn-secondary">Manage notifications</a>
         </div>
-        ${params.telegramBotUsername ? `<p class="hint">You can also link Telegram via the app: start a chat with @${params.telegramBotUsername} and send <code>/start</code>.</p>` : ""}`
+        ${params.telegramBotUsername
+          ? params.telegramInviteLink
+            ? `<p class="hint">You can also link Telegram via the app using the link above.</p>`
+            : `<p class="hint">You can also link Telegram via the app: start a chat with @${params.telegramBotUsername} and send <code>/start</code>.</p>`
+          : ""}`
       : "";
 
   const privateSection = !params.isPublic
@@ -148,6 +163,7 @@ export function buildGroupInviteTelegramText(
     | "paymentLink"
     | "paymentPlatform"
     | "telegramBotUsername"
+    | "telegramInviteLink"
     | "isPublic"
     | "appUrl"
   >
@@ -162,7 +178,9 @@ export function buildGroupInviteTelegramText(
   if (params.isPublic && params.appUrl) {
     text += `\nView group & manage notifications: ${params.appUrl.replace(/\/$/, "")}/dashboard\n`;
   }
-  if (params.telegramBotUsername) {
+  if (params.telegramInviteLink) {
+    text += `\nGet reminders here: ${params.telegramInviteLink}`;
+  } else if (params.telegramBotUsername) {
     text += `\nGet reminders here: start a chat with @${params.telegramBotUsername} and send /start`;
   }
   return text;

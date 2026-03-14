@@ -11,7 +11,11 @@ import {
   buildGroupInviteTelegramText,
 } from "@/lib/email/templates/group-invite";
 import { getBot } from "@/lib/telegram/bot";
-import { createUnsubscribeToken, getUnsubscribeUrl } from "@/lib/tokens";
+import {
+  createInviteLinkToken,
+  createUnsubscribeToken,
+  getUnsubscribeUrl,
+} from "@/lib/tokens";
 
 function buildBillingSummary(group: IGroup): string {
   const { billing } = group;
@@ -128,6 +132,16 @@ export async function POST(
       )
     : null;
 
+  let telegramInviteLink: string | null = null;
+  if (telegramBotUsername) {
+    const inviteToken = await createInviteLinkToken(
+      member._id.toString(),
+      groupIdStr,
+      7
+    );
+    telegramInviteLink = `https://t.me/${telegramBotUsername}?start=invite_${inviteToken}`;
+  }
+
   const params = {
     memberName: member.nickname,
     groupName: group.name,
@@ -141,6 +155,7 @@ export async function POST(
     isPublic,
     appUrl: normalizedAppUrl,
     telegramBotUsername,
+    telegramInviteLink,
     unsubscribeUrl,
     accentColor: group.service?.accentColor ?? null,
   };

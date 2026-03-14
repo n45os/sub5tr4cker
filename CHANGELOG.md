@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.15.0] - 2026-03-18
+
+### Added
+- **Member-specific Telegram invite link** — Invite emails (and Telegram invite messages) now include a clickable deep link (`t.me/Bot?start=invite_<token>`) that identifies the invited member. When the recipient opens the link and starts the bot, the bot links their Telegram to the correct account if they are already registered, or instructs them to register with the invited email and link from Settings.
+
 ## [0.14.0] - 2026-03-18
 
 ### Added

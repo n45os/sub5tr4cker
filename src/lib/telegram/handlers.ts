@@ -1,7 +1,8 @@
 import { Bot, Context } from "grammy";
 import { dbConnect } from "@/lib/db/mongoose";
 import { BillingPeriod, User, Group } from "@/models";
-import { verifyLinkToken } from "@/lib/tokens";
+import { verifyInviteLinkToken, verifyLinkToken } from "@/lib/tokens";
+import { getSetting } from "@/lib/settings/service";
 import { enqueueTask } from "@/lib/tasks/queue";
 import { runNotificationTasks } from "@/jobs/run-notification-tasks";
 
@@ -14,6 +15,12 @@ export function registerHandlers(bot: Bot): void {
     if (payload?.startsWith("link_")) {
       const linkToken = payload.replace("link_", "");
       await handleAccountLink(ctx, linkToken);
+      return;
+    }
+
+    if (payload?.startsWith("invite_")) {
+      const token = payload.replace("invite_", "");
+      await handleInviteLink(ctx, token);
       return;
     }
 
@@ -218,5 +225,64 @@ async function handleAccountLink(
 
   await ctx.reply(
     "✅ Account linked! You’ll receive payment reminders here when enabled for your groups."
+  );
+}
+
+async function handleInviteLink(ctx: Context, token: string): Promise<void> {
+  const payload = await verifyInviteLinkToken(token);
+  if (!payload) {
+    await ctx.reply(
+      "This invite link has expired or is invalid. Ask your group admin to send you a new invite."
+    );
+    return;
+  }
+
+  await dbConnect();
+  const chatId = ctx.chat?.id;
+  const username = ctx.from?.username ?? null;
+  if (!chatId) {
+    await ctx.reply("Could not get chat id.");
+    return;
+  }
+
+  const group = await Group.findById(payload.groupId);
+  if (!group || !group.isActive) {
+    await ctx.reply("This invite link is no longer valid.");
+    return;
+  }
+
+  const member = group.members.find(
+    (m: { _id: { toString: () => string }; isActive: boolean; leftAt: unknown }) =>
+      m._id.toString() === payload.memberId && m.isActive && !m.leftAt
+  );
+  if (!member) {
+    await ctx.reply("This invite link is no longer valid.");
+    return;
+  }
+
+  if (member.user) {
+    const user = await User.findByIdAndUpdate(
+      member.user,
+      {
+        "telegram.chatId": chatId,
+        "telegram.username": username,
+        "telegram.linkedAt": new Date(),
+      },
+      { new: true }
+    );
+    if (user) {
+      await ctx.reply(
+        "✅ Account linked! You’ll receive payment reminders here when enabled for your groups."
+      );
+      return;
+    }
+  }
+
+  const appUrl = await getSetting("general.appUrl");
+  const appHint = appUrl?.trim()
+    ? ` Register at ${appUrl.replace(/\/$/, "")} with the email you were invited with, then link Telegram from Settings.`
+    : " Register with the email you were invited with, then link Telegram from the app Settings.";
+  await ctx.reply(
+    "You’re not registered yet." + appHint
   );
 }

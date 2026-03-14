@@ -49,19 +49,24 @@ function decryptValue(value: string | null) {
     return value;
   }
 
-  const decipher = crypto.createDecipheriv(
-    "aes-256-gcm",
-    getEncryptionKey(),
-    Buffer.from(iv, "base64url")
-  );
-  decipher.setAuthTag(Buffer.from(tag, "base64url"));
+  try {
+    const decipher = crypto.createDecipheriv(
+      "aes-256-gcm",
+      getEncryptionKey(),
+      Buffer.from(iv, "base64url")
+    );
+    decipher.setAuthTag(Buffer.from(tag, "base64url"));
 
-  const decrypted = Buffer.concat([
-    decipher.update(Buffer.from(encrypted, "base64url")),
-    decipher.final(),
-  ]);
+    const decrypted = Buffer.concat([
+      decipher.update(Buffer.from(encrypted, "base64url")),
+      decipher.final(),
+    ]);
 
-  return decrypted.toString("utf8");
+    return decrypted.toString("utf8");
+  } catch (error) {
+    console.error("failed to decrypt setting value:", error);
+    return null;
+  }
 }
 
 function resolveFallbackValue(key: string) {

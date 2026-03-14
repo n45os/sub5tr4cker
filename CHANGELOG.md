@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.19.0] - 2026-03-18
+
+### Added
+- **Webhook diagnostics endpoint** — Added `GET /api/telegram/webhook-info` (auth-protected) to fetch Telegram `getWebhookInfo` details, including pending update count and Telegram's last delivery error data.
+- **Webhook status in settings UI** — Notifications settings now include a **Check webhook status** action and a webhook status panel (URL, pending updates, last error message/date) so admins can verify bot delivery health directly in the dashboard.
+- **Telegram welcome magic-link email** — Added `buildTelegramWelcomeEmailHtml` so members who join via Telegram invite link receive a styled onboarding email with a secure magic sign-in link to the group dashboard.
+
+### Changed
+- **Telegram invite deep-link onboarding** — `handleInviteLink` now auto-creates or links the member user, binds Telegram chat details, sets member acceptance, and sends a one-time welcome email with a magic login callback link.
+- **Webhook handler resilience** — `POST /api/telegram/webhook` now validates malformed JSON payloads and adds explicit error handling around settings reads for clearer operational failures.
+- **Invite acceptance resilience** — `GET /api/invite/accept/[token]` is now wrapped in guarded error handling to return a user-facing HTML failure page instead of an uncaught 500.
+- **Settings decryption safety** — `decryptValue` now catches crypto decrypt failures and returns `null` instead of throwing, preventing app-wide 500 cascades when encrypted settings were written under a different secret key.
+
 ## [0.18.0] - 2026-03-18
 
 ### Added

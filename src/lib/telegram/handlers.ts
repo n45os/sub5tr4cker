@@ -1,10 +1,44 @@
 import { Bot, Context } from "grammy";
 import { dbConnect } from "@/lib/db/mongoose";
 import { BillingPeriod, User, Group } from "@/models";
-import { verifyInviteLinkToken } from "@/lib/tokens";
+import {
+  verifyInviteLinkToken,
+  createMagicLoginToken,
+  createUnsubscribeToken,
+  getUnsubscribeUrl,
+} from "@/lib/tokens";
 import { getSetting } from "@/lib/settings/service";
 import { enqueueTask } from "@/lib/tasks/queue";
 import { runNotificationTasks } from "@/jobs/run-notification-tasks";
+import { sendNotification } from "@/lib/notifications/service";
+import { buildTelegramWelcomeEmailHtml } from "@/lib/email/templates/group-invite";
+
+function buildBillingSummary(group: {
+  billing: {
+    cycleType: "monthly" | "yearly";
+    currentPrice: number;
+    currency: string;
+    mode: "equal_split" | "fixed_amount" | "variable";
+    fixedMemberAmount?: number | null;
+  };
+}): string {
+  const { billing } = group;
+  const cycle = billing.cycleType === "yearly" ? "year" : "month";
+  const price = `${billing.currentPrice} ${billing.currency}`;
+  if (billing.mode === "equal_split") {
+    return `${price} per ${cycle}, equal split`;
+  }
+  if (billing.mode === "fixed_amount" && billing.fixedMemberAmount != null) {
+    return `${billing.fixedMemberAmount} ${billing.currency} per member per ${cycle}`;
+  }
+  return `${price} per ${cycle} (variable)`;
+}
+
+function isPublicAppUrl(appUrl: string | null): boolean {
+  if (!appUrl || !appUrl.trim()) return false;
+  const value = appUrl.trim().toLowerCase();
+  return !value.startsWith("http://localhost") && !value.startsWith("https://localhost");
+}
 
 // register all bot handlers
 export function registerHandlers(bot: Bot): void {
@@ -285,29 +319,113 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
     return;
   }
 
-  if (member.user) {
-    const user = await User.findByIdAndUpdate(
-      member.user,
-      {
-        "telegram.chatId": chatId,
-        "telegram.username": username,
-        "telegram.linkedAt": new Date(),
-      },
-      { new: true }
-    );
-    if (user) {
-      await ctx.reply(
-        "✅ Account linked! You’ll receive payment reminders here when enabled for your groups."
-      );
-      return;
-    }
+  const wasAccepted = !!member.acceptedAt;
+  const now = new Date();
+  const normalizedEmail = (member.email as string).toLowerCase().trim();
+  let user = member.user ? await User.findById(member.user) : null;
+  if (!user) {
+    user = await User.findOne({ email: normalizedEmail });
   }
 
-  const appUrl = await getSetting("general.appUrl");
-  const appHint = appUrl?.trim()
-    ? ` Register at ${appUrl.replace(/\/$/, "")} with the email you were invited with, then link Telegram from Settings.`
-    : " Register with the email you were invited with, then link Telegram from the app Settings.";
+  if (!user) {
+    user = await User.create({
+      name: (member.nickname as string).trim() || normalizedEmail,
+      email: normalizedEmail,
+      hashedPassword: null,
+      telegram: {
+        chatId,
+        username,
+        linkedAt: now,
+      },
+      notificationPreferences: {
+        email: true,
+        telegram: true,
+        reminderFrequency: "every_3_days",
+      },
+    });
+  } else {
+    user.telegram = {
+      chatId,
+      username,
+      linkedAt: now,
+    };
+    if (user.notificationPreferences) {
+      user.notificationPreferences.telegram = true;
+    }
+    await user.save();
+  }
+
+  if (!member.user || member.user.toString() !== user._id.toString()) {
+    member.user = user._id;
+  }
+  if (!member.acceptedAt) {
+    member.acceptedAt = now;
+  }
+  await group.save();
+
+  const shouldSendWelcomeEmail = !wasAccepted;
+  if (shouldSendWelcomeEmail) {
+    const appUrlSetting = await getSetting("general.appUrl");
+    const baseUrl = (appUrlSetting?.trim() || "http://localhost:3054").replace(
+      /\/$/,
+      ""
+    );
+    const magicToken = await createMagicLoginToken(user._id.toString());
+    const magicLoginUrl = `${baseUrl}/invite-callback?token=${encodeURIComponent(magicToken)}&groupId=${encodeURIComponent(group._id.toString())}`;
+    const sendEmail = !member.unsubscribedFromEmail;
+    const unsubscribeUrl = sendEmail
+      ? await getUnsubscribeUrl(
+          await createUnsubscribeToken(
+            member._id.toString(),
+            group._id.toString()
+          )
+        )
+      : null;
+
+    const admin = await User.findById(group.admin);
+    const emailHtml = buildTelegramWelcomeEmailHtml({
+      memberName: member.nickname,
+      groupName: group.name,
+      groupId: group._id.toString(),
+      serviceName: group.service.name,
+      adminName: admin?.name ?? "The group admin",
+      billingSummary: buildBillingSummary(group),
+      paymentPlatform: group.payment.platform,
+      paymentLink: group.payment.link ?? null,
+      paymentInstructions: group.payment.instructions ?? null,
+      isPublic: isPublicAppUrl(appUrlSetting),
+      appUrl: appUrlSetting?.trim() || null,
+      telegramBotUsername: null,
+      telegramInviteLink: null,
+      unsubscribeUrl,
+      accentColor: group.service?.accentColor ?? null,
+      magicLoginUrl,
+    });
+    await sendNotification(
+      {
+        email: user.email,
+        telegramChatId: null,
+        userId: user._id.toString(),
+        preferences: {
+          email: sendEmail,
+          telegram: false,
+        },
+      },
+      {
+        type: "invite",
+        subject: `Welcome to ${group.name}`,
+        emailHtml,
+        telegramText: `Welcome to ${group.name}`,
+        groupId: group._id.toString(),
+      }
+    );
+    await ctx.reply(
+      "✅ Account linked! Check your email for a secure sign-in link to open your dashboard."
+    );
+    return;
+  }
+
   await ctx.reply(
-    "You’re not registered yet." + appHint
+    "✅ Account linked! You’ll receive payment reminders here when enabled for your groups."
   );
 }

@@ -40,6 +40,13 @@ interface SettingsPageClientProps {
   settings: SettingItem[];
 }
 
+interface WebhookInfoState {
+  url: string;
+  pending_update_count: number;
+  last_error_date?: number;
+  last_error_message?: string;
+}
+
 // display groups: combine small categories so each tab has a meaningful set of fields
 type SettingsTabId = "general" | "notifications" | "security" | "plugins";
 
@@ -83,6 +90,8 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
   const [savingTab, setSavingTab] = useState<SettingsTabId | null>(null);
   const [testing, setTesting] = useState<"email" | "telegram" | null>(null);
   const [webhookLoading, setWebhookLoading] = useState(false);
+  const [webhookInfoLoading, setWebhookInfoLoading] = useState(false);
+  const [webhookInfo, setWebhookInfo] = useState<WebhookInfoState | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const groupedByTab = useMemo(
@@ -162,6 +171,7 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
 
   async function registerWebhook() {
     setMessage(null);
+    setWebhookInfo(null);
     setWebhookLoading(true);
     try {
       const response = await fetch("/api/telegram/set-webhook", {
@@ -181,6 +191,31 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
       setMessage("Failed to register webhook.");
     } finally {
       setWebhookLoading(false);
+    }
+  }
+
+  async function checkWebhookStatus() {
+    setMessage(null);
+    setWebhookInfoLoading(true);
+    try {
+      const response = await fetch("/api/telegram/webhook-info", {
+        method: "GET",
+      });
+      const json = await response.json();
+
+      if (!response.ok) {
+        setWebhookInfo(null);
+        setMessage(json.error?.message ?? "Failed to fetch webhook info.");
+        return;
+      }
+
+      setWebhookInfo(json.data ?? null);
+      setMessage("Fetched Telegram webhook status.");
+    } catch {
+      setWebhookInfo(null);
+      setMessage("Failed to fetch webhook info.");
+    } finally {
+      setWebhookInfoLoading(false);
     }
   }
 
@@ -205,6 +240,36 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
         <div className="rounded-xl border px-4 py-3 text-sm text-muted-foreground">
           {message}
         </div>
+      ) : null}
+      {webhookInfo ? (
+        <Card className="border-border/70">
+          <CardHeader>
+            <CardTitle className="text-base">Telegram webhook status</CardTitle>
+            <CardDescription>
+              Current webhook registration details reported by Telegram.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2 text-sm text-muted-foreground">
+            <p>
+              <span className="font-medium text-foreground">URL:</span>{" "}
+              {webhookInfo.url || "Not set"}
+            </p>
+            <p>
+              <span className="font-medium text-foreground">Pending updates:</span>{" "}
+              {webhookInfo.pending_update_count}
+            </p>
+            <p>
+              <span className="font-medium text-foreground">Last error:</span>{" "}
+              {webhookInfo.last_error_message || "None"}
+            </p>
+            <p>
+              <span className="font-medium text-foreground">Last error date:</span>{" "}
+              {webhookInfo.last_error_date
+                ? new Date(webhookInfo.last_error_date * 1000).toLocaleString()
+                : "N/A"}
+            </p>
+          </CardContent>
+        </Card>
       ) : null}
 
       <Tabs defaultValue="general" className="gap-6">
@@ -251,6 +316,16 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
                             <Loader2 className="size-4 animate-spin" />
                           ) : null}
                           Register webhook
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => checkWebhookStatus()}
+                          disabled={webhookInfoLoading}
+                        >
+                          {webhookInfoLoading ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : null}
+                          Check webhook status
                         </Button>
                         <Button
                           variant="outline"

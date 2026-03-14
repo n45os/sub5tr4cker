@@ -4,7 +4,23 @@ import { getSetting } from "@/lib/settings/service";
 
 export async function POST(request: NextRequest) {
   const secretToken = request.headers.get("x-telegram-bot-api-secret-token");
-  const expected = await getSetting("telegram.webhookSecret");
+
+  let expected: string | null = null;
+  try {
+    expected = await getSetting("telegram.webhookSecret");
+  } catch (error) {
+    console.error("telegram webhook settings read failed (webhook secret):", error);
+    return NextResponse.json(
+      {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Could not read Telegram webhook configuration",
+        },
+      },
+      { status: 500 }
+    );
+  }
+
   if (expected && secretToken !== expected) {
     return NextResponse.json(
       { error: { code: "UNAUTHORIZED", message: "Invalid webhook secret" } },
@@ -12,7 +28,22 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const token = await getSetting("telegram.botToken");
+  let token: string | null = null;
+  try {
+    token = await getSetting("telegram.botToken");
+  } catch (error) {
+    console.error("telegram webhook settings read failed (bot token):", error);
+    return NextResponse.json(
+      {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Could not read Telegram bot configuration",
+        },
+      },
+      { status: 500 }
+    );
+  }
+
   if (!token) {
     return NextResponse.json(
       { error: { code: "INTERNAL_ERROR", message: "Telegram not configured" } },
@@ -20,8 +51,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let update: unknown;
   try {
-    const update = await request.json();
+    update = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: "Invalid JSON payload" } },
+      { status: 400 }
+    );
+  }
+
+  try {
     const bot = await getBot();
     await bot.handleUpdate(update);
     return NextResponse.json({ ok: true });

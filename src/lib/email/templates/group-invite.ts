@@ -24,6 +24,11 @@ export interface GroupInviteTemplateParams {
   accentColor?: string | null;
 }
 
+export interface TelegramWelcomeTemplateParams
+  extends Omit<GroupInviteTemplateParams, "acceptInviteUrl"> {
+  magicLoginUrl: string;
+}
+
 export const groupInviteSampleParams: GroupInviteTemplateParams = {
   memberName: "Alex",
   groupName: "Family YouTube Premium",
@@ -156,6 +161,98 @@ export function buildGroupInviteEmailHtml(
           ${telegramSection}
           ${privateSection}
           ${publicCtas}
+        </div>
+        <div class="footer">
+          ${buildEmailFooterHtml({ unsubscribeUrl: params.unsubscribeUrl ?? null })}
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+export function buildTelegramWelcomeEmailHtml(
+  params: TelegramWelcomeTemplateParams
+): string {
+  const accent = getAccentColor(params.accentColor);
+  const settingsUrl =
+    params.isPublic && params.appUrl
+      ? `${params.appUrl.replace(/\/$/, "")}/dashboard/settings`
+      : null;
+  const telegramSection = params.telegramBotUsername
+    ? params.telegramInviteLink
+      ? `
+        <div class="section">
+          <p class="section-title">Telegram updates are enabled</p>
+          <p>Your Telegram account is now linked for payment reminders and confirmations.</p>
+          <div class="cta">
+            <a href="${params.telegramInviteLink}" class="btn btn-secondary">Open Telegram chat</a>
+          </div>
+        </div>`
+      : `
+        <div class="section">
+          <p class="section-title">Telegram updates are enabled</p>
+          <p>Your Telegram account is now linked with <strong>@${params.telegramBotUsername}</strong>.</p>
+        </div>`
+    : "";
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .header { background: ${accent}; color: #fff; padding: 24px; text-align: center; }
+        .header h1 { margin: 0; font-size: 20px; }
+        .body { padding: 24px; }
+        .section { margin: 20px 0; }
+        .section-title { font-weight: 600; color: #1e293b; margin-bottom: 8px; }
+        .btn { display: inline-block; background: ${accent}; color: #fff; text-decoration: none; padding: 12px 32px; border-radius: 6px; font-weight: 600; }
+        .btn-secondary { background: #64748b; }
+        .cta { text-align: center; margin: 16px 0; }
+        .hint { font-size: 13px; color: #64748b; text-align: center; margin-top: 8px; }
+        .footer { padding: 16px 24px; background: #f8fafc; color: #94a3b8; font-size: 12px; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        ${buildAutomatedMessageBadgeHtml()}
+        <div class="header">
+          <h1>Welcome to ${params.groupName}</h1>
+        </div>
+        <div class="body">
+          <p>Hi ${params.memberName},</p>
+          <p>Your Telegram account has been linked for <strong>${params.groupName}</strong> (${params.serviceName}).</p>
+          <p>Use the secure link below to sign into sub5tr4cker and open your group dashboard.</p>
+
+          <div class="cta">
+            <a href="${params.magicLoginUrl}" class="btn">Sign into sub5tr4cker</a>
+          </div>
+
+          <div class="section">
+            <p class="section-title">Billing</p>
+            <p>${params.billingSummary}</p>
+          </div>
+
+          ${params.paymentLink ? `
+          <div class="section">
+            <p class="section-title">How to pay</p>
+            <p>Pay via <strong>${params.paymentPlatform}</strong>: <a href="${params.paymentLink}">${params.paymentLink}</a></p>
+            ${params.paymentInstructions ? `<p style="color: #64748b; font-size: 14px;">${params.paymentInstructions}</p>` : ""}
+          </div>` : ""}
+
+          ${params.paymentInstructions && !params.paymentLink ? `
+          <div class="section">
+            <p class="section-title">Payment instructions</p>
+            <p>${params.paymentInstructions}</p>
+          </div>` : ""}
+
+          ${telegramSection}
+          ${settingsUrl ? `
+            <p class="hint">Manage notification channels: <a href="${settingsUrl}">${settingsUrl}</a></p>
+          ` : ""}
         </div>
         <div class="footer">
           ${buildEmailFooterHtml({ unsubscribeUrl: params.unsubscribeUrl ?? null })}

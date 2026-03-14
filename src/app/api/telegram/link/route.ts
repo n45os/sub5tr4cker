@@ -1,8 +1,45 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { dbConnect } from "@/lib/db/mongoose";
 import { createLinkToken } from "@/lib/tokens";
 import { getBot } from "@/lib/telegram/bot";
 import { getSetting } from "@/lib/settings/service";
+import { User } from "@/models";
+
+export async function DELETE() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
+      { status: 401 }
+    );
+  }
+
+  await dbConnect();
+  const user = await User.findByIdAndUpdate(
+    session.user.id,
+    {
+      $set: {
+        "telegram.chatId": null,
+        "telegram.username": null,
+        "telegram.linkedAt": null,
+        "notificationPreferences.telegram": false,
+      },
+    },
+    { new: true }
+  ).lean();
+
+  if (!user) {
+    return NextResponse.json(
+      { error: { code: "NOT_FOUND", message: "User not found" } },
+      { status: 404 }
+    );
+  }
+
+  return NextResponse.json({
+    data: { unlinked: true },
+  });
+}
 
 export async function POST() {
   const session = await auth();

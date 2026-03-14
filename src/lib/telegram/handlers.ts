@@ -214,6 +214,7 @@ async function handleAccountLink(
       "telegram.chatId": chatId,
       "telegram.username": username,
       "telegram.linkedAt": new Date(),
+      "notificationPreferences.telegram": true,
     },
     { new: true }
   );
@@ -245,7 +246,15 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
     return;
   }
 
-  const group = await Group.findById(payload.groupId);
+  let group = null;
+  if (payload.groupId) {
+    group = await Group.findById(payload.groupId);
+  } else {
+    group = await Group.findOne({
+      isActive: true,
+      "members._id": payload.memberId,
+    });
+  }
   if (!group || !group.isActive) {
     await ctx.reply("This invite link is no longer valid.");
     return;

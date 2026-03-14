@@ -124,6 +124,7 @@ export function getNotificationTemplatePreview(
           "isPublic",
           "appUrl",
           "telegramBotUsername",
+          "acceptInviteUrl",
           "accentColor",
         ],
         emailHtml: buildGroupInviteEmailHtml({

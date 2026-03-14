@@ -16,6 +16,8 @@ export interface GroupInviteTemplateParams {
   telegramBotUsername: string | null;
   /** optional; when set, invite email uses this deep link for Telegram (member-specific) */
   telegramInviteLink?: string | null;
+  /** optional; when set, shows accept invite action in email */
+  acceptInviteUrl?: string | null;
   /** optional; when set, footer includes unsubscribe link */
   unsubscribeUrl?: string | null;
   /** optional; hex accent for header and primary buttons */
@@ -35,6 +37,7 @@ export const groupInviteSampleParams: GroupInviteTemplateParams = {
   isPublic: true,
   appUrl: "https://substrack.example.com",
   telegramBotUsername: "sub5tr4ckerBot",
+  acceptInviteUrl: "https://substrack.example.com/api/invite/accept/sample",
 };
 
 export function buildGroupInviteEmailHtml(
@@ -64,6 +67,16 @@ export function buildGroupInviteEmailHtml(
           <p>Start a chat with <strong>@${params.telegramBotUsername}</strong> and send <code>/start</code> to receive payment reminders and confirm payments from your phone.</p>
         </div>`
       : "";
+  const acceptSection = params.acceptInviteUrl
+    ? `
+        <div class="section">
+          <p class="section-title">Accept invite</p>
+          <p>Confirm that you want to join this group.</p>
+          <div class="cta">
+            <a href="${params.acceptInviteUrl}" class="btn">Accept invite</a>
+          </div>
+        </div>`
+    : "";
 
   const publicCtas =
     viewGroupUrl && settingsUrl
@@ -139,6 +152,7 @@ export function buildGroupInviteEmailHtml(
             <p>${params.paymentInstructions}</p>
           </div>` : ""}
 
+          ${acceptSection}
           ${telegramSection}
           ${privateSection}
           ${publicCtas}

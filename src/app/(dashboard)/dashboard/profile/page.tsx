@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { dbConnect } from "@/lib/db/mongoose";
 import {
   Card,
   CardContent,
@@ -8,12 +9,33 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ProfileEmailForm } from "@/components/features/profile/profile-email-form";
+import { TelegramLinkCard } from "@/components/features/profile/telegram-link-card";
+import { NotificationPreferencesCard } from "@/components/features/profile/notification-preferences-card";
+import { User } from "@/models";
 
 export default async function ProfilePage() {
   const session = await auth();
-  if (!session?.user) {
+  if (!session?.user?.id) {
     redirect("/login");
   }
+
+  await dbConnect();
+  const user = await User.findById(session.user.id)
+    .select("email telegram notificationPreferences")
+    .lean();
+
+  const email = user?.email ?? session.user.email ?? "";
+  const telegram = user?.telegram;
+  const notificationPreferences = user?.notificationPreferences;
+  const isLinked = Boolean(telegram?.chatId);
+  const telegramUsername = telegram?.username ?? null;
+  const telegramLinkedAt = telegram?.linkedAt
+    ? String(telegram.linkedAt)
+    : null;
+  const prefEmail = notificationPreferences?.email ?? true;
+  const prefTelegram = notificationPreferences?.telegram ?? false;
+  const prefReminderFrequency =
+    notificationPreferences?.reminderFrequency ?? "every_3_days";
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
@@ -26,7 +48,41 @@ export default async function ProfilePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ProfileEmailForm currentEmail={session.user.email ?? ""} />
+          <ProfileEmailForm currentEmail={email} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Telegram</CardTitle>
+          <CardDescription>
+            Link your Telegram account to receive confirmation nudges and
+            optional reminders via Telegram.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TelegramLinkCard
+            isLinked={isLinked}
+            username={telegramUsername}
+            linkedAt={telegramLinkedAt}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Notification preferences</CardTitle>
+          <CardDescription>
+            Choose how you want to receive payment reminders and updates.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <NotificationPreferencesCard
+            email={prefEmail}
+            telegram={prefTelegram}
+            reminderFrequency={prefReminderFrequency}
+            telegramLinked={isLinked}
+          />
         </CardContent>
       </Card>
     </div>

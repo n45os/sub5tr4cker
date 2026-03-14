@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.16.0] - 2026-03-18
+
+### Added
+- **Telegram account linking on Profile** — Profile page now has a Telegram card where you can connect or disconnect your Telegram account. Click "Connect Telegram" to get a deep link (valid 15 minutes); open it in Telegram to link. Admins and members can use this to receive confirmation nudges and reminders via Telegram.
+- **Notification preferences on Profile** — New Notification preferences card on Profile: toggle email and Telegram channels, set reminder frequency (once per period, daily, every 3 days). Telegram toggle is only available after linking Telegram. Preferences are persisted via `PATCH /api/user/profile`.
+- **GET /api/user/profile** — Returns current user profile including `telegram` (chatId, username, linkedAt) and `notificationPreferences` (email, telegram, reminderFrequency).
+- **DELETE /api/telegram/link** — Unlinks the current user's Telegram account and turns off Telegram notifications.
+- **Email invite acceptance link** — Invite emails now include a member-specific `Accept invite` link. Opening that link validates a signed token and marks that exact group member invitation as accepted, so invites are explicitly accepted from email.
+
+### Changed
+- **PATCH /api/user/profile** — Accepts optional `notificationPreferences` (email, telegram, reminderFrequency) in addition to email. Response now includes telegram and notificationPreferences.
+- **Telegram link handler** — When a user links their account via the bot, `notificationPreferences.telegram` is set to `true` so they receive Telegram notifications by default.
+
 ## [0.15.0] - 2026-03-18
 
 ### Added

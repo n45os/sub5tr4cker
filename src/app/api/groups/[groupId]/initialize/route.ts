@@ -12,6 +12,7 @@ import {
 } from "@/lib/email/templates/group-invite";
 import { getBot } from "@/lib/telegram/bot";
 import {
+  createInviteAcceptToken,
   createInviteLinkToken,
   createUnsubscribeToken,
   getUnsubscribeUrl,
@@ -37,7 +38,7 @@ function isPublicAppUrl(appUrl: string | null): boolean {
 }
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ groupId: string }> }
 ) {
   const session = await auth();
@@ -80,6 +81,7 @@ export async function POST(
   const appUrl = await getSetting("general.appUrl");
   const isPublic = isPublicAppUrl(appUrl);
   const normalizedAppUrl = appUrl?.trim() || null;
+  const appBaseUrl = normalizedAppUrl || new URL(request.url).origin;
 
   let telegramBotUsername: string | null = null;
   try {
@@ -146,6 +148,12 @@ export async function POST(
       );
       telegramInviteLink = `https://t.me/${telegramBotUsername}?start=invite_${inviteToken}`;
     }
+    const acceptInviteToken = await createInviteAcceptToken(
+      member._id.toString(),
+      groupIdStr,
+      14
+    );
+    const acceptInviteUrl = `${appBaseUrl.replace(/\/$/, "")}/api/invite/accept/${acceptInviteToken}`;
 
     const params = {
       memberName: member.nickname,
@@ -161,6 +169,7 @@ export async function POST(
       appUrl: normalizedAppUrl,
       telegramBotUsername,
       telegramInviteLink,
+      acceptInviteUrl,
       unsubscribeUrl,
       accentColor: group.service?.accentColor ?? null,
     };

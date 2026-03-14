@@ -3,6 +3,9 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import { MongoClient } from "mongodb";
+import { compare } from "bcryptjs";
+import { dbConnect } from "@/lib/db/mongoose";
+import { User } from "@/models";
 
 let clientPromise: Promise<MongoClient> | null = null;
 
@@ -33,11 +36,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        // TODO: implement proper credential validation with bcrypt
         if (!credentials?.email || !credentials?.password) {
           return null;
         }
-        return null;
+        await dbConnect();
+        const user = await User.findOne({
+          email: (credentials.email as string).toLowerCase().trim(),
+        }).lean();
+        if (!user?.hashedPassword) {
+          return null;
+        }
+        const match = await compare(
+          credentials.password as string,
+          user.hashedPassword
+        );
+        if (!match) {
+          return null;
+        }
+        return {
+          id: String(user._id),
+          email: user.email,
+          name: user.name,
+          image: user.image,
+        };
       },
     }),
   ],

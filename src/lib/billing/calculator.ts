@@ -83,3 +83,19 @@ export function getPeriodDates(
   const end = new Date(year, month + 1, cycleDay);
   return { start, end };
 }
+
+// next period start date from today (for display in group list)
+export function getNextPeriodStart(cycleDay: number): Date {
+  const now = new Date();
+  let year = now.getFullYear();
+  let month = now.getMonth();
+  const day = now.getDate();
+  if (day >= cycleDay) {
+    month += 1;
+    if (month > 11) {
+      month = 0;
+      year += 1;
+    }
+  }
+  return new Date(year, month, cycleDay);
+}

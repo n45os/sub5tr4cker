@@ -1,11 +1,13 @@
 {
   "name": "subs-track",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint",
     "cron": "tsx src/jobs/runner.ts",
     "cron:billing": "tsx -e \"import('./src/jobs/check-billing-periods').then(m => m.checkBillingPeriods())\"",
@@ -13,9 +15,11 @@
   },
   "dependencies": {
     "@auth/mongodb-adapter": "^3.11.1",
+    "bcryptjs": "^3.0.3",
     "grammy": "^1.41.1",
     "gray-matter": "^4.0.3",
     "jsonwebtoken": "^9.0.3",
+    "mongodb": "^6.21.0",
     "mongoose": "^9.3.1",
     "next": "16.1.7",
     "next-auth": "^5.0.0-beta.30",
@@ -29,15 +33,20 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/node-cron": "^3.0.11",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.7",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
-  }
+    "typescript": "^5",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^3.2.4"
+  },
+  "packageManager": "pnpm@10.28.1+sha512.7d7dbbca9e99447b7c3bf7a73286afaaf6be99251eb9498baefa7d406892f67b879adb3a1d7e687fc4ccc1a388c7175fbaae567a26ab44d1067b54fcb0d6a316"
 }

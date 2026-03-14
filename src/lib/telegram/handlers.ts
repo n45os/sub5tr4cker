@@ -1,6 +1,7 @@
 import { Bot, Context } from "grammy";
 import { dbConnect } from "@/lib/db/mongoose";
 import { BillingPeriod, User, Group } from "@/models";
+import { verifyLinkToken } from "@/lib/tokens";
 import { adminVerificationKeyboard } from "./keyboards";
 import { sendAdminConfirmationRequest } from "./send";
 
@@ -192,13 +193,38 @@ async function handleAdminReject(
 
 async function handleAccountLink(
   ctx: Context,
-  _linkToken: string
+  linkToken: string
 ): Promise<void> {
-  // TODO: implement account linking
-  // 1. verify linkToken against a temporary token stored in DB
-  // 2. update User.telegram.chatId with ctx.chat.id
-  // 3. update User.telegram.username with ctx.from.username
+  const payload = verifyLinkToken(linkToken);
+  if (!payload) {
+    await ctx.reply("This link has expired or is invalid. Generate a new one from the SubsTrack app.");
+    return;
+  }
+
+  await dbConnect();
+  const chatId = ctx.chat?.id;
+  const username = ctx.from?.username ?? null;
+  if (!chatId) {
+    await ctx.reply("Could not get chat id.");
+    return;
+  }
+
+  const user = await User.findByIdAndUpdate(
+    payload.userId,
+    {
+      "telegram.chatId": chatId,
+      "telegram.username": username,
+      "telegram.linkedAt": new Date(),
+    },
+    { new: true }
+  );
+
+  if (!user) {
+    await ctx.reply("User not found. Please try again from the app.");
+    return;
+  }
+
   await ctx.reply(
-    "🔗 Account linking is not yet implemented. Stay tuned!"
+    "✅ Account linked! You’ll receive payment reminders here when enabled for your groups."
   );
 }

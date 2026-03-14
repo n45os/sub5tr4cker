@@ -4,6 +4,12 @@
 
 SubsTrack is an open-source web application for managing shared subscriptions. One person (the **admin**) pays for a service like YouTube Premium Family, Netflix, or any recurring bill, and splits the cost with **members**. The app automates payment tracking, reminders, confirmations, and communication — replacing the manual Google Sheets + Apps Script approach.
 
+## Progress Snapshot (2026-03-18)
+
+- Phase 1 MVP checklist is implemented
+- Core Phase 2 Telegram workflow is implemented (bot setup, account linking, payment confirmations, follow-ups)
+- Remaining near-term roadmap items are price change announcements and member-to-admin requests
+
 ## Core Concepts
 
 ### Subscription Group
@@ -232,25 +238,25 @@ For groups that want automatic payment verification:
 
 ### Phase 1 — MVP
 
-- [ ] User auth (email + password, Google OAuth)
-- [ ] Create subscription groups
-- [ ] Add members by email
-- [ ] Monthly billing period tracking
-- [ ] Payment status tracking (pending / confirmed)
-- [ ] Email reminders with payment link and "I paid" confirmation
-- [ ] Admin dashboard: see all groups, payment statuses
-- [ ] Member view: see own subscriptions and payment history
-- [ ] Cron job for automated reminders
+- [x] User auth (email + password, Google OAuth)
+- [x] Create subscription groups
+- [x] Add members by email
+- [x] Monthly billing period tracking
+- [x] Payment status tracking (pending / confirmed)
+- [x] Email reminders with payment link and "I paid" confirmation
+- [x] Admin dashboard: see all groups, payment statuses
+- [x] Member view: see own subscriptions and payment history
+- [x] Cron job for automated reminders
 
 ### Phase 2 — Telegram & Communication
 
-- [ ] Telegram bot setup (grammy, polling mode)
-- [ ] Link Telegram account to user profile
-- [ ] Telegram payment reminders with inline buttons
-- [ ] Admin confirmation via Telegram
+- [x] Telegram bot setup (grammy, webhook mode)
+- [x] Link Telegram account to user profile
+- [x] Telegram payment reminders with inline buttons
+- [x] Admin confirmation via Telegram
 - [ ] Price change announcements (email + Telegram)
 - [ ] Member-to-admin requests (e.g., "please add X to the group")
-- [ ] Follow-up reminders ("did you pay?")
+- [x] Follow-up reminders ("did you pay?")
 
 ### Phase 3 — Advanced Features
 
@@ -284,7 +290,7 @@ subs-track/
 │   │   │   ├── register/page.tsx
 │   │   │   └── layout.tsx
 │   │   ├── (dashboard)/
-│   │   │   ├── dashboard/page.tsx
+│   │   │   ├── page.tsx                        # dashboard home (groups list)
 │   │   │   ├── groups/
 │   │   │   │   ├── page.tsx                    # list groups
 │   │   │   │   ├── new/page.tsx                # create group
@@ -299,6 +305,7 @@ subs-track/
 │   │   │   └── layout.tsx
 │   │   ├── api/
 │   │   │   ├── auth/[...nextauth]/route.ts
+│   │   │   ├── register/route.ts               # POST register (email + password)
 │   │   │   ├── groups/
 │   │   │   │   ├── route.ts
 │   │   │   │   └── [groupId]/
@@ -306,10 +313,13 @@ subs-track/
 │   │   │   │       ├── members/route.ts
 │   │   │   │       └── billing/route.ts
 │   │   │   ├── confirm/[token]/route.ts        # email "I paid" handler
-│   │   │   ├── telegram/webhook/route.ts       # Telegram webhook endpoint
+│   │   │   ├── telegram/
+│   │   │   │   ├── webhook/route.ts            # Telegram webhook endpoint
+│   │   │   │   └── link/route.ts              # generate deep link for account linking
 │   │   │   ├── cron/
+│   │   │   │   ├── billing/route.ts
 │   │   │   │   ├── reminders/route.ts
-│   │   │   │   └── billing/route.ts
+│   │   │   │   └── follow-ups/route.ts
 │   │   │   └── notifications/route.ts
 │   │   ├── layout.tsx
 │   │   └── globals.css

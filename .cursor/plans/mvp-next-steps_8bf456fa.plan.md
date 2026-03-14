@@ -4,19 +4,19 @@ overview: "Align roadmap with actual implementation status and execute the highe
 todos:
   - id: phase-a-groups-members-api
     content: Implement groups and members API routes with auth/db/zod/error conventions
-    status: in_progress
+    status: completed
   - id: phase-a-billing-api
     content: Implement billing endpoints including member self-confirm and admin confirm flows
-    status: pending
+    status: completed
   - id: phase-b-auth-dashboard
     content: Add auth pages and initial dashboard pages using new API routes
-    status: pending
+    status: completed
   - id: phase-c-telegram-cron
     content: Add Telegram webhook/link endpoints and expose follow-ups cron HTTP route
-    status: pending
+    status: completed
   - id: phase-d-tests-docs-sync
     content: Add critical tests, then sync docs/PLAN and _context to match actual implementation
-    status: pending
+    status: completed
 isProject: false
 ---
 

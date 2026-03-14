@@ -1,0 +1,142 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import mongoose from "mongoose";
+import { auth } from "@/lib/auth";
+import { dbConnect } from "@/lib/db/mongoose";
+import { Group } from "@/models";
+
+const updateMemberSchema = z
+  .object({
+    nickname: z.string().min(1).max(100).optional(),
+    customAmount: z.number().positive().optional().nullable(),
+    isActive: z.boolean().optional(),
+  })
+  .strict();
+
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ groupId: string; memberId: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
+      { status: 401 }
+    );
+  }
+
+  const { groupId, memberId } = await context.params;
+  if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(memberId)) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: "Invalid group or member id" } },
+      { status: 400 }
+    );
+  }
+
+  const parsed = updateMemberSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Invalid request body",
+          details: parsed.error.flatten(),
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  await dbConnect();
+  const group = await Group.findById(groupId);
+  if (!group || !group.isActive) {
+    return NextResponse.json(
+      { error: { code: "NOT_FOUND", message: "Group not found" } },
+      { status: 404 }
+    );
+  }
+
+  if (group.admin.toString() !== session.user.id) {
+    return NextResponse.json(
+      { error: { code: "FORBIDDEN", message: "Only the admin can update members" } },
+      { status: 403 }
+    );
+  }
+
+  const member = group.members.id(memberId);
+  if (!member) {
+    return NextResponse.json(
+      { error: { code: "NOT_FOUND", message: "Member not found" } },
+      { status: 404 }
+    );
+  }
+
+  const body = parsed.data;
+  if (body.nickname !== undefined) member.nickname = body.nickname;
+  if ("customAmount" in (body || {})) member.customAmount = body.customAmount ?? null;
+  if (body.isActive !== undefined) member.isActive = body.isActive;
+
+  await group.save();
+
+  return NextResponse.json({
+    data: {
+      _id: member._id.toString(),
+      email: member.email,
+      nickname: member.nickname,
+      role: member.role,
+      isActive: member.isActive,
+      customAmount: member.customAmount,
+    },
+  });
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  context: { params: Promise<{ groupId: string; memberId: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
+      { status: 401 }
+    );
+  }
+
+  const { groupId, memberId } = await context.params;
+  if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(memberId)) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: "Invalid group or member id" } },
+      { status: 400 }
+    );
+  }
+
+  await dbConnect();
+  const group = await Group.findById(groupId);
+  if (!group || !group.isActive) {
+    return NextResponse.json(
+      { error: { code: "NOT_FOUND", message: "Group not found" } },
+      { status: 404 }
+    );
+  }
+
+  if (group.admin.toString() !== session.user.id) {
+    return NextResponse.json(
+      { error: { code: "FORBIDDEN", message: "Only the admin can remove members" } },
+      { status: 403 }
+    );
+  }
+
+  const member = group.members.id(memberId);
+  if (!member) {
+    return NextResponse.json(
+      { error: { code: "NOT_FOUND", message: "Member not found" } },
+      { status: 404 }
+    );
+  }
+
+  member.leftAt = new Date();
+  member.isActive = false;
+  await group.save();
+
+  return NextResponse.json({ data: { success: true } });
+}

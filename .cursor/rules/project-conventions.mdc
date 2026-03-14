@@ -15,6 +15,19 @@ Detailed docs:
 - `docs/data-models.md` — Mongoose schema documentation
 - `docs/api-design.md` — API route reference
 
+## Package Manager
+
+- Use `pnpm` for all dependency and script commands in this repo
+- Prefer `pnpm install`, `pnpm dev`, `pnpm build`, `pnpm test`
+- Avoid mixing package managers (`npm` + `pnpm`) in the same branch
+
+## Troubleshooting Guardrails
+
+- If test startup fails with `Cannot find native binding` and `@rolldown/binding-darwin-arm64`, reinstall dependencies with `pnpm install` and rerun using `pnpm` commands
+- If `MongoDBAdapter` shows a type mismatch against `MongoClient` after switching package manager, add/keep a direct `mongodb@^6` dependency to satisfy the adapter peer and align types
+- For strict TypeScript route code, explicitly type callback parameters in array methods on mongoose arrays (`find`, `map`, `filter`, `some`, `every`) to avoid `Parameter 'x' implicitly has an 'any' type`
+- Avoid very large inline object types directly in callback signatures inside route files; move them to a named `type` to prevent Turbopack parser errors like `Expected ',', got ';'`
+
 ## Code Style
 
 - Comments: start with lowercase, no trailing period (e.g., `// calculate member share`)

@@ -38,6 +38,7 @@ If you've ever managed a shared subscription, you know the pain: spreadsheets, m
 ### Prerequisites
 
 - Node.js 20+
+- pnpm (use Corepack: `corepack enable`)
 - MongoDB (local or Atlas)
 - A Resend API key (free tier: 3,000 emails/month)
 - (Optional) A Telegram bot token from [@BotFather](https://t.me/BotFather)
@@ -50,7 +51,7 @@ git clone https://github.com/yourusername/subs-track.git
 cd subs-track
 
 # install dependencies
-npm install
+pnpm install
 
 # copy environment variables
 cp .env.example .env.local
@@ -58,7 +59,7 @@ cp .env.example .env.local
 # edit .env.local with your values (see Environment Variables below)
 
 # run the development server
-npm run dev
+pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -151,10 +152,10 @@ Contributions are welcome. Please open an issue first to discuss what you'd like
 
 ```bash
 # fork and clone
-npm install
+pnpm install
 cp .env.example .env.local
 # fill in your env vars
-npm run dev
+pnpm dev
 ```
 
 ## License

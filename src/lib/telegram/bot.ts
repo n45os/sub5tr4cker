@@ -1,8 +1,9 @@
 import { Bot } from "grammy";
+import { registerHandlers } from "./handlers";
 
 let bot: Bot | null = null;
 
-// get or create the singleton bot instance
+// get or create the singleton bot instance and register handlers once
 export function getBot(): Bot {
   if (bot) return bot;
 
@@ -12,6 +13,7 @@ export function getBot(): Bot {
   }
 
   bot = new Bot(token);
+  registerHandlers(bot);
   return bot;
 }
 

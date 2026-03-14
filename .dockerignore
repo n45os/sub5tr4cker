@@ -1,0 +1,33 @@
+# dependencies
+node_modules
+.pnpm-store
+
+# build and cache
+.next
+out
+.turbo
+*.tsbuildinfo
+
+# env and secrets
+.env
+.env.*
+!.env.example
+
+# git and IDE
+.git
+.gitignore
+.cursor
+*.md
+!README.md
+
+# tests and tooling
+coverage
+.nyc_output
+*.test.ts
+*.spec.ts
+vitest.config.ts
+
+# misc
+Dockerfile*
+docker-compose*
+.dockerignore

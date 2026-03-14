@@ -1,18 +1,18 @@
 FROM node:20-alpine AS base
+RUN corepack enable
 
 FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --prod
 
 FROM base AS builder
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 COPY . .
-# ensure public exists so runner COPY succeeds (Next.js may have no public dir)
 RUN mkdir -p public
-RUN npm run build
+RUN pnpm run build
 
 FROM base AS runner
 WORKDIR /app

@@ -31,7 +31,7 @@ services:
     build:
       context: .
       target: builder
-    command: ["npm", "run", "cron"]
+    command: ["pnpm", "run", "cron"]
     environment:
       - MONGODB_URI=mongodb://mongo:27017/substrack
       - NODE_ENV=production

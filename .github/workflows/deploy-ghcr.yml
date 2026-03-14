@@ -40,6 +40,7 @@ jobs:
             ghcr.io/n45os/sub5tr4cker:latest
 
       - name: Deploy to Portainer
-        if: ${{ secrets.PORTAINER_WEBHOOK_URL != '' }}
-        run: |
-          curl -sf -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}"
+        env:
+          WEBHOOK: ${{ secrets.PORTAINER_WEBHOOK_URL }}
+        if: env.WEBHOOK != ''
+        run: curl -sf -X POST "$WEBHOOK"

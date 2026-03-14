@@ -9,6 +9,11 @@ import {
   paymentReminderSampleParams,
 } from "@/lib/email/templates/payment-reminder";
 import {
+  buildGroupInviteEmailHtml,
+  buildGroupInviteTelegramText,
+  groupInviteSampleParams,
+} from "@/lib/email/templates/group-invite";
+import {
   buildPriceChangeEmailHtml,
   buildPriceChangeTelegramText,
   priceChangeSampleParams,
@@ -17,7 +22,8 @@ import {
 export type NotificationTemplateType =
   | "payment_reminder"
   | "admin_confirmation_request"
-  | "price_change";
+  | "price_change"
+  | "invite";
 
 export interface NotificationTemplatePreview {
   type: NotificationTemplateType;
@@ -86,6 +92,31 @@ export function getNotificationTemplatePreview(
         emailHtml: buildPriceChangeEmailHtml(priceChangeSampleParams),
         telegramText: buildPriceChangeTelegramText(priceChangeSampleParams),
       };
+    case "invite":
+      return {
+        type,
+        name: "Group invite",
+        description:
+          "Welcome email sent to members when the admin initializes and notifies the group.",
+        subject: `You've been added to ${groupInviteSampleParams.groupName}`,
+        channels: ["email", "telegram"],
+        variables: [
+          "memberName",
+          "groupName",
+          "groupId",
+          "serviceName",
+          "adminName",
+          "billingSummary",
+          "paymentPlatform",
+          "paymentLink",
+          "paymentInstructions",
+          "isPublic",
+          "appUrl",
+          "telegramBotUsername",
+        ],
+        emailHtml: buildGroupInviteEmailHtml(groupInviteSampleParams),
+        telegramText: buildGroupInviteTelegramText(groupInviteSampleParams),
+      };
     default:
       return null;
   }
@@ -96,5 +127,6 @@ export function getNotificationTemplates() {
     getNotificationTemplatePreview("payment_reminder"),
     getNotificationTemplatePreview("admin_confirmation_request"),
     getNotificationTemplatePreview("price_change"),
+    getNotificationTemplatePreview("invite"),
   ].filter((template): template is NotificationTemplatePreview => template !== null);
 }

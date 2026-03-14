@@ -114,6 +114,9 @@ export async function GET(
         true,
     },
     isActive: group.isActive,
+    initializedAt: group.initializedAt
+      ? (group.initializedAt as Date).toISOString()
+      : null,
     role: access,
     members: group.members
       .filter((m: IGroupMember) => m.isActive && !m.leftAt)

@@ -1,6 +1,3 @@
-import { sendEmail } from "@/lib/email/client";
-import { sendTelegramMessage } from "@/lib/telegram/send";
-import { isTelegramEnabled } from "@/lib/telegram/bot";
 import {
   buildPriceChangeEmailHtml,
   buildPriceChangeTelegramText,
@@ -10,6 +7,7 @@ import { dbConnect } from "@/lib/db/mongoose";
 import { Notification, NotificationType, User } from "@/models";
 import type { IGroup } from "@/models";
 import { Types } from "mongoose";
+import { getChannels, getBuiltInChannelIds } from "@/lib/plugins/channels";
 
 interface NotificationTarget {
   email: string;
@@ -36,7 +34,7 @@ interface NotificationResult {
   telegram: { sent: boolean; messageId?: number };
 }
 
-// send a notification through all configured channels
+// send a notification through built-in channels (email, telegram) from the channel registry
 export async function sendNotification(
   target: NotificationTarget,
   content: NotificationContent
@@ -48,61 +46,62 @@ export async function sendNotification(
     telegram: { sent: false },
   };
 
-  const shouldSendEmail = target.preferences?.email !== false;
-  const telegramEnabled = await isTelegramEnabled();
-  const shouldSendTelegram =
-    target.preferences?.telegram !== false &&
-    target.telegramChatId &&
-    telegramEnabled;
+  const builtInIds = getBuiltInChannelIds();
+  const channels = getChannels().filter((ch) => builtInIds.has(ch.id));
 
-  // send email
-  if (shouldSendEmail && target.email) {
-    const emailResult = await sendEmail({
-      to: target.email,
-      subject: content.subject,
-      html: content.emailHtml,
-    });
+  const message = {
+    subject: content.subject,
+    emailHtml: content.emailHtml,
+    telegramText: content.telegramText,
+    telegramKeyboard: content.telegramKeyboard,
+  };
+  const targetPayload = {
+    email: target.email,
+    telegramChatId: target.telegramChatId ?? null,
+    userId: target.userId ?? null,
+    preferences: target.preferences,
+  };
+  const context = {
+    groupId: content.groupId,
+    billingPeriodId: content.billingPeriodId,
+  };
 
-    result.email.sent = !!emailResult;
-    result.email.id = emailResult?.id;
-
-    await logNotification({
-      recipientEmail: target.email,
-      recipientId: target.userId,
-      channel: "email",
-      type: content.type,
-      subject: content.subject,
-      preview: content.subject,
-      status: emailResult ? "sent" : "failed",
-      externalId: emailResult?.id,
-      groupId: content.groupId,
-      billingPeriodId: content.billingPeriodId,
-    });
-  }
-
-  // send telegram
-  if (shouldSendTelegram && target.telegramChatId) {
-    const messageId = await sendTelegramMessage({
-      chatId: target.telegramChatId,
-      text: content.telegramText,
-      keyboard: content.telegramKeyboard,
-    });
-
-    result.telegram.sent = !!messageId;
-    result.telegram.messageId = messageId ?? undefined;
-
-    await logNotification({
-      recipientEmail: target.email,
-      recipientId: target.userId,
-      channel: "telegram",
-      type: content.type,
-      subject: null,
-      preview: content.telegramText.substring(0, 100),
-      status: messageId ? "sent" : "failed",
-      externalId: messageId?.toString(),
-      groupId: content.groupId,
-      billingPeriodId: content.billingPeriodId,
-    });
+  for (const channel of channels) {
+    const sendResult = await channel.send(targetPayload, message, context);
+    const channelKey = channel.id as "email" | "telegram";
+    if (channelKey === "email") {
+      result.email.sent = sendResult.sent;
+      result.email.id = sendResult.externalId ?? undefined;
+      await logNotification({
+        recipientEmail: target.email,
+        recipientId: target.userId,
+        channel: "email",
+        type: content.type,
+        subject: content.subject,
+        preview: content.subject,
+        status: sendResult.sent ? "sent" : "failed",
+        externalId: sendResult.externalId ?? null,
+        groupId: content.groupId,
+        billingPeriodId: content.billingPeriodId,
+      });
+    } else if (channelKey === "telegram") {
+      result.telegram.sent = sendResult.sent;
+      result.telegram.messageId = sendResult.externalId
+        ? Number(sendResult.externalId)
+        : undefined;
+      await logNotification({
+        recipientEmail: target.email,
+        recipientId: target.userId,
+        channel: "telegram",
+        type: content.type,
+        subject: null,
+        preview: content.telegramText.substring(0, 100),
+        status: sendResult.sent ? "sent" : "failed",
+        externalId: sendResult.externalId ?? null,
+        groupId: content.groupId,
+        billingPeriodId: content.billingPeriodId,
+      });
+    }
   }
 
   return result;

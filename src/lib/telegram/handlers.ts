@@ -41,7 +41,7 @@ export function registerHandlers(bot: Bot): void {
         await handleMemberConfirm(ctx as Context, periodId, memberId);
         break;
       case "snooze":
-        await handleSnooze(ctx as Context, periodId, memberId);
+        await handleSnooze(ctx as Context);
         break;
       case "admin_confirm":
         await handleAdminConfirm(ctx as Context, periodId, memberId);

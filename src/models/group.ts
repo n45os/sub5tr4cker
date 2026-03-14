@@ -53,6 +53,7 @@ export interface IGroup extends Document {
   };
   isActive: boolean;
   inviteCode: string | null;
+  initializedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -122,6 +123,7 @@ const groupSchema = new Schema<IGroup>(
     },
     isActive: { type: Boolean, default: true },
     inviteCode: { type: String, default: null },
+    initializedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

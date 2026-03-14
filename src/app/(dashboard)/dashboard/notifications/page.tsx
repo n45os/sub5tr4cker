@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getNotificationTemplates } from "@/lib/email/templates";
+import { getNotificationTemplates } from "@/lib/plugins/templates";
 
 export default function NotificationsPage() {
   const templates = getNotificationTemplates();

@@ -3,7 +3,8 @@ export type SettingsCategory =
   | "email"
   | "telegram"
   | "security"
-  | "cron";
+  | "cron"
+  | "plugin";
 
 export interface SettingsDefinition {
   key: string;

@@ -151,27 +151,36 @@ export async function getAllSettings(category?: SettingsCategory) {
     });
 }
 
+const PLUGIN_KEY_REGEX = /^plugin\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+$/;
+
 export async function setSetting(key: string, value: string | null) {
   const definition = getSettingsDefinition(key);
-  if (!definition) {
+  const isPluginKey = PLUGIN_KEY_REGEX.test(key);
+  if (!definition && !isPluginKey) {
     throw new Error(`Unknown setting key: ${key}`);
   }
 
   await ensureSettingsMigrated();
   await dbConnect();
 
+  const effectiveDef = definition ?? {
+    category: "plugin" as const,
+    isSecret: false,
+    label: key,
+    description: "Plugin setting",
+  };
   const nextValue =
-    value && definition.isSecret ? encryptValue(value) : value ?? null;
+    value && effectiveDef.isSecret ? encryptValue(value) : value ?? null;
 
   await Settings.findOneAndUpdate(
     { key },
     {
       key,
       value: nextValue,
-      category: definition.category,
-      isSecret: definition.isSecret,
-      label: definition.label,
-      description: definition.description,
+      category: effectiveDef.category,
+      isSecret: effectiveDef.isSecret,
+      label: effectiveDef.label,
+      description: effectiveDef.description,
     },
     { upsert: true, new: true }
   );

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import {
-  getNotificationTemplatePreview,
-  type NotificationTemplateType,
-} from "@/lib/email/templates";
+import { getNotificationTemplatePreview } from "@/lib/plugins/templates";
 
 export async function GET(
   _request: NextRequest,
@@ -18,7 +15,7 @@ export async function GET(
   }
 
   const { type } = await context.params;
-  const preview = getNotificationTemplatePreview(type as NotificationTemplateType);
+  const preview = getNotificationTemplatePreview(type);
 
   if (!preview) {
     return NextResponse.json(

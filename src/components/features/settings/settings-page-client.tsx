@@ -14,13 +14,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PluginsSettingsTab } from "./plugins-settings-tab";
 
 type SettingsCategory =
   | "general"
   | "email"
   | "telegram"
   | "security"
-  | "cron";
+  | "cron"
+  | "plugin"
+  | "plugins";
 
 interface SettingItem {
   key: string;
@@ -66,6 +69,11 @@ const categories: Array<{
     key: "cron",
     label: "Cron",
     description: "Scheduled job configuration and secrets.",
+  },
+  {
+    key: "plugins",
+    label: "Plugins",
+    description: "Installed plugins and their configuration.",
   },
 ];
 
@@ -185,6 +193,9 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
 
         {groupedSettings.map((category) => (
           <TabsContent key={category.key} value={category.key}>
+            {category.key === "plugins" ? (
+              <PluginsSettingsTab />
+            ) : (
             <Card>
               <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
@@ -279,6 +290,7 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
                 ))}
               </CardContent>
             </Card>
+            )}
           </TabsContent>
         ))}
       </Tabs>

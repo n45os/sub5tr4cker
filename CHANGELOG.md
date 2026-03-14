@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2026-03-18
+
+### Added
+- **Initialize & Notify group**: Admins can send a one-time invite/welcome notification to all active members from the group detail page. Email content adapts to public vs private app (based on `general.appUrl`): public apps get "View group" and "Manage notifications" links; private apps get reply instructions and Telegram bot setup steps. New template `group-invite` and POST `/api/groups/[groupId]/initialize`; optional `initializedAt` on Group to support re-notify with a warning.
+- **Plugin system**: Installable notification templates and channels from GitHub repos. Manifest format `substrack-plugin.json` with `templates` and `channels`; validation and loader in `src/lib/plugins/`. Template registry merges built-in and plugin templates; channel registry merges built-in (email, telegram) with plugin channels. Notification service uses the channel registry for sending.
+- **CLI plugin commands**: `pnpm substrack plugin add <repo>`, `plugin remove <slug>`, `plugin list` to clone from GitHub, validate manifest, and manage `plugins/registry.json`.
+- **Plugins settings UI**: Dashboard Settings → Plugins tab lists installed plugins and allows configuring plugin channel settings (stored under `plugin.<slug>.<key>`). GET `/api/plugins` and PATCH `/api/settings` with plugin keys supported.
+- **Future idea**: Full plugin system (billing modes, payment platforms, webhooks, UI extensions) logged in `_future/full-plugin-system/` for later planning.
+
+### Changed
+- Notification template list and preview now use a unified registry from `@/lib/plugins/templates` so plugin templates appear alongside built-in ones.
+- Settings PATCH accepts keys matching `plugin.<slug>.<key>` for plugin configuration; Settings model and definitions support category `plugin`.
+
 ## [0.4.0] - 2026-03-18
 
 ### Added

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getNotificationTemplates } from "@/lib/email/templates";
+import { getNotificationTemplates } from "@/lib/plugins/templates";
 
 export async function GET() {
   const session = await auth();

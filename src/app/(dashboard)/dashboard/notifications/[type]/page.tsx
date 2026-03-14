@@ -9,8 +9,7 @@ import {
 } from "@/components/ui/card";
 import {
   getNotificationTemplatePreview,
-  type NotificationTemplateType,
-} from "@/lib/email/templates";
+} from "@/lib/plugins/templates";
 import { TemplateTestActions } from "@/components/features/notifications/template-test-actions";
 
 export default async function NotificationTemplatePage({
@@ -19,7 +18,7 @@ export default async function NotificationTemplatePage({
   params: Promise<{ type: string }>;
 }) {
   const { type } = await params;
-  const template = getNotificationTemplatePreview(type as NotificationTemplateType);
+  const template = getNotificationTemplatePreview(type);
 
   if (!template) {
     notFound();

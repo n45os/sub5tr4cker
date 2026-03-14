@@ -54,8 +54,10 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
+  const pluginKeyRegex = /^plugin\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+$/;
   for (const setting of parsed.data.settings) {
-    if (!getSettingsDefinition(setting.key)) {
+    const isPluginKey = pluginKeyRegex.test(setting.key);
+    if (!isPluginKey && !getSettingsDefinition(setting.key)) {
       return NextResponse.json(
         {
           error: {

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GroupMembersPanel } from "@/components/features/groups/group-members-panel";
+import { InitializeNotifyButton } from "@/components/features/groups/initialize-notify-button";
 import { GroupNotificationsPanel } from "@/components/features/notifications/group-notifications-panel";
 import { cn } from "@/lib/utils";
 import { getServerBaseUrl } from "@/lib/server-url";
@@ -51,6 +52,7 @@ interface GroupDetail {
     priceChangeEnabled: boolean;
   };
   role: string;
+  initializedAt: string | null;
   members: Array<{
     _id: string;
     email: string;
@@ -174,13 +176,20 @@ export default async function GroupDetailPage({
         </div>
 
         {group.role === "admin" ? (
-          <Link
-            href={`/dashboard/groups/${groupId}/edit`}
-            className={cn(buttonVariants({ variant: "outline" }))}
-          >
-            <Pencil className="size-4" />
-            Edit group
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <InitializeNotifyButton
+              groupId={groupId}
+              memberCount={group.members.length}
+              initializedAt={group.initializedAt}
+            />
+            <Link
+              href={`/dashboard/groups/${groupId}/edit`}
+              className={cn(buttonVariants({ variant: "outline" }))}
+            >
+              <Pencil className="size-4" />
+              Edit group
+            </Link>
+          </div>
         ) : null}
       </div>
 

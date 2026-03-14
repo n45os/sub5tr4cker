@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.20.0] - 2026-03-18
+
+### Added
+- **Per-member billing start date** — Each member can have a **Billing starts from** date. When set, they only owe for periods on or after that date; when empty, billing starts from their join date. New billing periods (auto or manual) only create payment entries for members whose billing has started by the period start.
+- **Member edit dialog** — Admins can edit a member from the group Members panel: pencil icon opens a dialog to change nickname, custom amount, and billing start date. PATCH `/api/groups/[groupId]/members/[memberId]` accepts optional `billingStartsAt` (date string or null).
+- **Billing starts column** — Members table shows "Billing starts" (date or "From join"). Payment summary column continues to show how many periods each member has paid (X/Y periods paid).
+
+### Changed
+- **Calculator** — `calculateShares(group, totalPrice?, periodStart?)` now accepts optional `periodStart`; only members with `(billingStartsAt ?? joinedAt) <= periodStart` are included in the split.
+- **Data model** — Group member schema and `docs/data-models.md` document new optional `billingStartsAt: Date | null` on embedded members.
+
 ## [0.19.0] - 2026-03-18
 
 ### Added

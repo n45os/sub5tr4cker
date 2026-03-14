@@ -76,12 +76,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         const token = credentials?.token;
-        if (typeof token !== "string" || !token) return null;
+        if (typeof token !== "string" || !token) {
+          console.warn("magic-invite: missing or invalid token in credentials");
+          return null;
+        }
         const payload = await verifyMagicLoginToken(token);
-        if (!payload) return null;
+        if (!payload) {
+          console.warn("magic-invite: token invalid or expired");
+          return null;
+        }
         await dbConnect();
         const user = await User.findById(payload.userId).lean();
-        if (!user) return null;
+        if (!user) {
+          console.warn("magic-invite: user not found for id", payload.userId);
+          return null;
+        }
         return {
           id: String(user._id),
           email: user.email,

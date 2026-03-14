@@ -7,13 +7,26 @@ export interface MemberShare {
   amount: number;
 }
 
+// date when member's billing effectively starts (billingStartsAt or joinedAt)
+function memberBillingStart(m: IGroupMember): Date {
+  const d = m.billingStartsAt ?? m.joinedAt;
+  return d instanceof Date ? d : (m.joinedAt as Date);
+}
+
 // calculate the share each active member owes for a given price
+// when periodStart is set, only members whose billing has started by that date are included
 export function calculateShares(
   group: IGroup,
-  totalPrice?: number
+  totalPrice?: number,
+  periodStart?: Date
 ): MemberShare[] {
   const price = totalPrice ?? group.billing.currentPrice;
-  const activeMembers = group.members.filter((m) => m.isActive && !m.leftAt);
+  let activeMembers = group.members.filter((m) => m.isActive && !m.leftAt);
+
+  if (periodStart) {
+    const start = periodStart.getTime();
+    activeMembers = activeMembers.filter((m) => memberBillingStart(m).getTime() <= start);
+  }
 
   if (activeMembers.length === 0) return [];
 

@@ -32,7 +32,10 @@ function InviteCallbackContent() {
         if (cancelled) return;
         if (res?.ok) {
           setStatus("success");
-          window.location.href = groupUrl;
+          // brief delay so session cookie is committed before navigation
+          setTimeout(() => {
+            if (!cancelled) window.location.href = groupUrl;
+          }, 100);
         } else {
           setStatus("error");
           setErrorMessage(

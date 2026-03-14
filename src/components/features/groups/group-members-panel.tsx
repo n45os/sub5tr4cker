@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, Loader2, Mail, UserPlus } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, Mail, Pencil, UserPlus } from "lucide-react";
 import { PaymentStatusBadge } from "@/components/features/billing/payment-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,10 +42,14 @@ export interface MemberRow {
   /** when false, member has not linked an account (invite not accepted) */
   hasAccount?: boolean;
   acceptedAt?: string | null;
+  /** first period member owes; null = from join date */
+  billingStartsAt?: string | null;
 }
 
 export interface PeriodPaymentRow {
   _id: string;
+  /** period start date (YYYY-MM-DD) for use as billing-starts value */
+  periodStart: string;
   periodLabel: string;
   totalPrice: number;
   payments: Array<{
@@ -93,6 +97,13 @@ export function GroupMembersPanel({
   } | null>(null);
   const [inviteSending, setInviteSending] = useState(false);
   const [resendingMemberId, setResendingMemberId] = useState<string | null>(null);
+  const [editMember, setEditMember] = useState<{
+    _id: string;
+    nickname: string;
+    customAmount: string;
+    billingStartsAt: string;
+  } | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
 
   async function handleResendInvite(memberId: string) {
     setResendingMemberId(memberId);
@@ -185,6 +196,60 @@ export function GroupMembersPanel({
     }
   }
 
+  function openEditMember(member: MemberRow) {
+    setEditMember({
+      _id: member._id,
+      nickname: member.nickname,
+      customAmount: member.customAmount != null ? String(member.customAmount) : "",
+      billingStartsAt: member.billingStartsAt ?? "",
+    });
+    setError(null);
+  }
+
+  async function handleSaveEditMember(event: React.FormEvent<HTMLFormElement>) {
+    if (!editMember) return;
+    event.preventDefault();
+    setEditSaving(true);
+    setError(null);
+    try {
+      const body: {
+        nickname: string;
+        customAmount: number | null;
+        billingStartsAt?: string | null;
+      } = {
+        nickname: editMember.nickname.trim(),
+        customAmount: editMember.customAmount.trim()
+          ? Number(editMember.customAmount)
+          : null,
+      };
+      if (editMember.billingStartsAt.trim()) {
+        body.billingStartsAt = editMember.billingStartsAt.trim();
+      } else {
+        body.billingStartsAt = null;
+      }
+      const res = await fetch(
+        `/api/groups/${groupId}/members/${editMember._id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error?.message ?? "Failed to update member.");
+        setEditSaving(false);
+        return;
+      }
+      setEditMember(null);
+      router.refresh();
+    } catch {
+      setError("Something went wrong. Try again.");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   return (
     <>
       <Dialog
@@ -222,6 +287,107 @@ export function GroupMembersPanel({
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!editMember}
+        onOpenChange={(open) => !open && setEditMember(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <form onSubmit={handleSaveEditMember}>
+            <DialogHeader>
+              <DialogTitle>Edit member</DialogTitle>
+              <DialogDescription>
+                Change nickname, custom amount, or when billing starts for this member.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              {error ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              ) : null}
+              <div className="grid gap-2">
+                <Label htmlFor="edit-nickname">Nickname</Label>
+                <Input
+                  id="edit-nickname"
+                  value={editMember?.nickname ?? ""}
+                  onChange={(e) =>
+                    setEditMember((prev) =>
+                      prev ? { ...prev, nickname: e.target.value } : null
+                    )
+                  }
+                  required
+                  disabled={editSaving}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-custom-amount">
+                  Custom amount ({currency})
+                </Label>
+                <Input
+                  id="edit-custom-amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Optional"
+                  value={editMember?.customAmount ?? ""}
+                  onChange={(e) =>
+                    setEditMember((prev) =>
+                      prev ? { ...prev, customAmount: e.target.value } : null
+                    )
+                  }
+                  disabled={editSaving}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-billing-starts">
+                  Billing starts from
+                </Label>
+                <select
+                  id="edit-billing-starts"
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  value={editMember?.billingStartsAt ?? ""}
+                  onChange={(e) =>
+                    setEditMember((prev) =>
+                      prev
+                        ? { ...prev, billingStartsAt: e.target.value || "" }
+                        : null
+                    )
+                  }
+                  disabled={editSaving}
+                >
+                  <option value="">From join date</option>
+                  {periods.map((p) => (
+                    <option key={p._id} value={p.periodStart}>
+                      {p.periodLabel}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Member will only owe from the selected billing period onward.
+                </p>
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditMember(null)}
+                disabled={editSaving}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={editSaving}>
+                {editSaving ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  "Save"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -307,17 +473,19 @@ export function GroupMembersPanel({
               <TableHead>Email</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Role</TableHead>
+              <TableHead>Billing starts</TableHead>
               <TableHead>Custom amount</TableHead>
               {periods.length > 0 ? (
                 <TableHead className="text-right">Payment summary</TableHead>
               ) : null}
+              {isAdmin ? <TableHead className="w-10" /> : null}
             </TableRow>
           </TableHeader>
           <TableBody>
             {members.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={periods.length > 0 ? 7 : 5}
+                  colSpan={periods.length > 0 ? (isAdmin ? 9 : 8) : (isAdmin ? 7 : 6)}
                   className="py-8 text-center text-muted-foreground"
                 >
                   {isAdmin
@@ -409,6 +577,12 @@ export function GroupMembersPanel({
                         )}
                       </TableCell>
                       <TableCell className="capitalize">{member.role}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {member.billingStartsAt
+                          ? (periods.find((p) => p.periodStart === member.billingStartsAt)
+                              ?.periodLabel ?? formatDate(member.billingStartsAt))
+                          : "From join"}
+                      </TableCell>
                       <TableCell>
                         {member.customAmount
                           ? `${member.customAmount} ${currency}`
@@ -430,10 +604,23 @@ export function GroupMembersPanel({
                           )}
                         </TableCell>
                       ) : null}
+                      {isAdmin ? (
+                        <TableCell className="w-10">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8"
+                            onClick={() => openEditMember(member)}
+                            aria-label="Edit member"
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                        </TableCell>
+                      ) : null}
                     </TableRow>
                     {isExpanded && memberPayments.length > 0 && (
                       <TableRow key={`${member._id}-expanded`}>
-                        <TableCell colSpan={periods.length > 0 ? 7 : 5} className="bg-muted/20 p-0">
+                        <TableCell colSpan={periods.length > 0 ? (isAdmin ? 9 : 8) : (isAdmin ? 7 : 6)} className="bg-muted/20 p-0">
                           <div className="px-4 py-3">
                             <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                               Payment history

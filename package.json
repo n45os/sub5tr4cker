@@ -1,6 +1,6 @@
 {
   "name": "sub5tr4cker",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "private": true,
   "bin": {
     "substrack": "./dist/cli/index.js"

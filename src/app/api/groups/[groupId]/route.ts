@@ -132,6 +132,9 @@ export async function GET(
         acceptedAt: m.acceptedAt
           ? (m.acceptedAt as Date).toISOString()
           : null,
+        billingStartsAt: m.billingStartsAt
+          ? (m.billingStartsAt as Date).toISOString().slice(0, 10)
+          : null,
       })),
   };
 

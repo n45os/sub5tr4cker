@@ -90,6 +90,7 @@ export async function GET(
 
   type PeriodDoc = {
     _id: { toString: () => string };
+    periodStart: Date;
     periodLabel: string;
     totalPrice: number;
     payments: Array<{
@@ -120,6 +121,7 @@ export async function GET(
       : payments;
     return {
       _id: p._id.toString(),
+      periodStart: (p.periodStart as Date).toISOString().slice(0, 10),
       periodLabel: p.periodLabel,
       totalPrice: p.totalPrice,
       payments: filteredPayments,
@@ -202,10 +204,10 @@ export async function POST(
     );
   }
 
-  const shares = calculateShares(group, totalPrice);
+  const shares = calculateShares(group, totalPrice, periodStart);
   if (shares.length === 0) {
     return NextResponse.json(
-      { error: { code: "VALIDATION_ERROR", message: "Group has no active members to split payment" } },
+      { error: { code: "VALIDATION_ERROR", message: "Group has no active members to split payment for this period" } },
       { status: 400 }
     );
   }

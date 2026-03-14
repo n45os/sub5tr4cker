@@ -13,6 +13,8 @@ export interface IGroupMember {
   acceptedAt: Date | null;
   /** when true, do not send reminder/invite/price-change emails to this member */
   unsubscribedFromEmail: boolean;
+  /** first period this member owes; when null, billing starts from joinedAt */
+  billingStartsAt: Date | null;
 }
 
 export interface IGroup extends Document {
@@ -75,6 +77,7 @@ const groupMemberSchema = new Schema<IGroupMember>({
   customAmount: { type: Number, default: null },
   acceptedAt: { type: Date, default: null },
   unsubscribedFromEmail: { type: Boolean, default: false },
+  billingStartsAt: { type: Date, default: null },
 });
 
 const groupSchema = new Schema<IGroup>(

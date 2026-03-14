@@ -99,6 +99,7 @@ A subscription group managed by an admin.
     leftAt: Date | null,                  // soft delete
     isActive: boolean,
     customAmount: number | null,          // override for this member (if not equal split)
+    billingStartsAt: Date | null,         // first period member owes; null = from joinedAt
   }],
 
   // communication

@@ -11,6 +11,12 @@ const updateMemberSchema = z
     nickname: z.string().min(1).max(100).optional(),
     customAmount: z.number().positive().optional().nullable(),
     isActive: z.boolean().optional(),
+    // date string (YYYY-MM-DD or ISO) or null to use joinedAt
+    billingStartsAt: z
+      .union([z.string().min(1), z.null(), z.literal("")])
+      .optional()
+      .nullable()
+      .transform((v) => (v === "" || v === undefined ? null : v)),
   })
   .strict();
 
@@ -76,6 +82,15 @@ export async function PATCH(
   if (body.nickname !== undefined) member.nickname = body.nickname;
   if ("customAmount" in (body || {})) member.customAmount = body.customAmount ?? null;
   if (body.isActive !== undefined) member.isActive = body.isActive;
+  if ("billingStartsAt" in (body || {})) {
+    const v = body.billingStartsAt;
+    if (v === null || v === "") {
+      member.billingStartsAt = null;
+    } else {
+      const d = new Date(v as string);
+      if (!Number.isNaN(d.getTime())) member.billingStartsAt = d;
+    }
+  }
 
   await group.save();
 
@@ -100,6 +115,7 @@ export async function PATCH(
       role: member.role,
       isActive: member.isActive,
       customAmount: member.customAmount,
+      billingStartsAt: member.billingStartsAt ? (member.billingStartsAt as Date).toISOString().slice(0, 10) : null,
     },
   });
 }

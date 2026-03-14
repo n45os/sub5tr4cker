@@ -9,8 +9,12 @@ interface ConfirmationPayload {
 }
 
 async function getConfirmationSecret() {
+  const fromSettings = await getSetting("security.confirmationSecret");
+  if (fromSettings) return fromSettings;
   return (
-    (await getSetting("security.confirmationSecret")) || "dev-secret-change-me"
+    process.env.NEXTAUTH_SECRET ||
+    process.env.AUTH_SECRET ||
+    "dev-secret-change-me"
   );
 }
 
@@ -251,10 +255,10 @@ export interface MagicLoginPayload {
   exp: number;
 }
 
-/** short-lived token for magic-link sign-in after accepting an invite (5 min) */
+/** short-lived token for magic-link sign-in after accepting an invite (30 min) */
 export async function createMagicLoginToken(
   userId: string,
-  expiresInMinutes = 5
+  expiresInMinutes = 30
 ): Promise<string> {
   const payload: MagicLoginPayload = {
     userId,

@@ -42,7 +42,7 @@ async function createPeriodIfDue(
 
   if (existing) return;
 
-  const shares = calculateShares(group);
+  const shares = calculateShares(group, undefined, start);
   if (shares.length === 0) return;
 
   const periodLabel = formatPeriodLabel(start);

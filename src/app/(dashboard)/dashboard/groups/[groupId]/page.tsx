@@ -55,11 +55,13 @@ interface GroupDetail {
     customAmount: number | null;
     hasAccount: boolean;
     acceptedAt: string | null;
+    billingStartsAt: string | null;
   }>;
 }
 
 interface BillingPeriodItem {
   _id: string;
+  periodStart: string;
   periodLabel: string;
   totalPrice: number;
   payments: Array<{

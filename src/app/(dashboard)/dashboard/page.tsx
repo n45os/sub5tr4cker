@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { Bell, CreditCard, Users } from "lucide-react";
 import { GroupCard } from "@/components/features/groups/GroupCard";
+import { AllGroupsQuickStatus } from "@/components/features/dashboard/all-groups-quick-status";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -93,6 +94,10 @@ export default async function DashboardPage() {
             Members still waiting for follow-up
           </CardContent>
         </Card>
+      </section>
+
+      <section>
+        <AllGroupsQuickStatus />
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.8fr_1fr]">

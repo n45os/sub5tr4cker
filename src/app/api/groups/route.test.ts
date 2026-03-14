@@ -24,8 +24,7 @@ describe("GET /api/groups", () => {
   it("returns 401 when not authenticated", async () => {
     vi.mocked(auth).mockResolvedValue(null as never);
 
-    const request = new Request("http://localhost/api/groups");
-    const response = await GET(request);
+    const response = await GET();
     const json = await response.json();
 
     expect(response.status).toBe(401);
@@ -37,8 +36,7 @@ describe("GET /api/groups", () => {
       user: { id: "user-1", email: "u@example.com" },
     } as never);
 
-    const request = new Request("http://localhost/api/groups");
-    const response = await GET(request);
+    const response = await GET();
     const json = await response.json();
 
     expect(response.status).toBe(200);

@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.0] - 2026-03-18
+
+### Added
+- **Dashboard quick status** — New “All groups quick status” section on the dashboard with at-a-glance stats (groups, needing attention, pending/overdue counts, member-confirmed awaiting admin).
+- **Notify all unpaid** — Bulk action to send payment reminders to all unpaid (pending/overdue) members across admin-owned groups. Button opens a confirmation modal that shows a preview: how many reminders will be sent by email and Telegram, per-group breakdown, and skip reasons (unsubscribed, email/Telegram prefs off, Telegram not linked, no reachable channel). Delivery respects each member’s preferences; unsubscribed members never receive email. Manual send bypasses grace period.
+- **Dashboard APIs** — GET `/api/dashboard/quick-status` (admin-only aggregate stats). GET `/api/dashboard/notify-unpaid` (preview with eligibility and skip reasons). POST `/api/dashboard/notify-unpaid` (execute send; returns sent/skipped/failed counts).
+- **Shared reminder targeting** — `reminder-targeting` and `reminder-send` libs centralize eligibility and channel resolution. Cron reminder job uses the same logic; skip reasons are explicit (unsubscribed_from_email, email_pref_off, telegram_pref_off, no_telegram_link, no_reachable_channel).
+
 ## [0.9.0] - 2026-03-18
 
 ### Added

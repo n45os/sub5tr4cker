@@ -1,12 +1,6 @@
 import { dbConnect } from "@/lib/db/mongoose";
-import { BillingPeriod, Group, User } from "@/models";
-import { sendNotification } from "@/lib/notifications/service";
-import { paymentConfirmationKeyboard } from "@/lib/telegram/keyboards";
-import { getConfirmationUrl, createUnsubscribeToken, getUnsubscribeUrl } from "@/lib/tokens";
-import {
-  buildPaymentReminderEmailHtml,
-  buildPaymentReminderTelegramText,
-} from "@/lib/email/templates/payment-reminder";
+import { BillingPeriod, Group } from "@/models";
+import { sendReminderForPayment } from "@/lib/notifications/reminder-send";
 
 // send payment reminders for unpaid billing periods
 export async function sendReminders(): Promise<void> {
@@ -38,7 +32,7 @@ export async function sendReminders(): Promise<void> {
       }
 
       try {
-        await sendReminderToMember(group, period, payment);
+        await sendReminderForPayment(group, period, payment);
       } catch (error) {
         console.error(
           `error sending reminder to ${payment.memberEmail}:`,
@@ -58,83 +52,4 @@ export async function sendReminders(): Promise<void> {
     });
     await period.save();
   }
-}
-
-async function sendReminderToMember(
-  group: InstanceType<typeof Group>,
-  period: InstanceType<typeof BillingPeriod>,
-  payment: {
-    memberId: { toString: () => string };
-    memberEmail: string;
-    memberNickname: string;
-    amount: number;
-    confirmationToken: string | null;
-  }
-): Promise<void> {
-  // look up member's user account for Telegram
-  const member = group.members.find(
-    (m: { _id: { toString: () => string } }) => m._id.toString() === payment.memberId.toString()
-  );
-  const user = member?.user ? await User.findById(member.user) : null;
-
-  const confirmUrl = payment.confirmationToken
-    ? await getConfirmationUrl(payment.confirmationToken)
-    : null;
-
-  const paymentLink = group.payment.link;
-  const currency = period.currency || "€";
-
-  const sendEmail = !member?.unsubscribedFromEmail;
-  const unsubscribeUrl = sendEmail && member
-    ? await getUnsubscribeUrl(await createUnsubscribeToken(payment.memberId.toString(), group._id.toString()))
-    : null;
-
-  // build email HTML (only used when sendEmail; preferences checked in sendNotification)
-  const emailHtml = buildPaymentReminderEmailHtml({
-    memberName: payment.memberNickname,
-    groupName: group.name,
-    periodLabel: period.periodLabel,
-    amount: payment.amount,
-    currency,
-    paymentPlatform: group.payment.platform,
-    paymentLink,
-    confirmUrl,
-    ownerName: "the admin",
-    extraText: group.announcements.extraText,
-    unsubscribeUrl,
-  });
-
-  // build telegram text + keyboard
-  const keyboard = paymentConfirmationKeyboard(
-    period._id.toString(),
-    payment.memberId.toString()
-  );
-
-  await sendNotification(
-    {
-      email: payment.memberEmail,
-      telegramChatId: user?.telegram?.chatId,
-      userId: user?._id?.toString(),
-      preferences: {
-        email: sendEmail && (user?.notificationPreferences?.email ?? true),
-        telegram: user?.notificationPreferences?.telegram ?? false,
-      },
-    },
-    {
-      type: "payment_reminder",
-      subject: `Pay your ${group.service.name} share — ${period.periodLabel}`,
-      emailHtml,
-      telegramText: buildPaymentReminderTelegramText({
-        memberName: payment.memberNickname,
-        groupName: group.name,
-        periodLabel: period.periodLabel,
-        amount: payment.amount,
-        currency,
-        paymentLink,
-      }),
-      telegramKeyboard: keyboard,
-      groupId: group._id.toString(),
-      billingPeriodId: period._id.toString(),
-    }
-  );
 }

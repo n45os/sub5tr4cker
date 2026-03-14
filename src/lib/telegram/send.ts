@@ -71,3 +71,22 @@ export async function sendAdminConfirmationRequest(
 
   return sendTelegramMessage({ chatId, text, keyboard });
 }
+
+// send price-change announcement to a chat
+export async function sendPriceChange(
+  chatId: number,
+  groupName: string,
+  serviceName: string,
+  oldPrice: number,
+  newPrice: number,
+  currency: string
+): Promise<number | null> {
+  const text =
+    `📢 <b>Price update</b>\n\n` +
+    `<b>${groupName}</b> (${serviceName})\n\n` +
+    `Previous: <s>${oldPrice.toFixed(2)}${currency}</s>\n` +
+    `New: <b>${newPrice.toFixed(2)}${currency}</b>\n\n` +
+    `Your next billing cycle will use the new amount.`;
+
+  return sendTelegramMessage({ chatId, text });
+}

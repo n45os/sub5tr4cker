@@ -1,9 +1,11 @@
 import { sendEmail } from "@/lib/email/client";
 import { sendTelegramMessage } from "@/lib/telegram/send";
 import { isTelegramEnabled } from "@/lib/telegram/bot";
+import { buildPriceChangeEmailHtml } from "@/lib/email/templates/price-change";
 import { InlineKeyboard } from "grammy";
 import { dbConnect } from "@/lib/db/mongoose";
-import { Notification, NotificationType } from "@/models";
+import { Notification, NotificationType, User } from "@/models";
+import type { IGroup } from "@/models";
 import { Types } from "mongoose";
 
 interface NotificationTarget {
@@ -135,5 +137,107 @@ async function logNotification(params: {
   } catch (error) {
     // don't let logging failures break the notification flow
     console.error("failed to log notification:", error);
+  }
+}
+
+// notification target for price-change (email + optional telegram/prefs)
+type PriceChangeTarget = {
+  email: string;
+  telegramChatId?: number | null;
+  userId?: string | null;
+  preferences?: { email: boolean; telegram: boolean };
+};
+
+// send price-change announcements to admin and all active members when group price is updated
+export async function sendPriceChangeAnnouncements(
+  group: IGroup,
+  params: {
+    previousPrice: number;
+    newPrice: number;
+    currency: string;
+    serviceName: string;
+  }
+): Promise<void> {
+  if (!group.announcements?.notifyOnPriceChange) return;
+
+  await dbConnect();
+
+  const { previousPrice, newPrice, currency, serviceName } = params;
+  const groupName = group.name;
+  const subject = `Price update: ${groupName} (${serviceName})`;
+  const emailHtml = buildPriceChangeEmailHtml({
+    groupName,
+    serviceName,
+    oldPrice: previousPrice,
+    newPrice,
+    currency,
+  });
+  const telegramText =
+    `📢 <b>Price update</b>\n\n` +
+    `<b>${groupName}</b> (${serviceName})\n\n` +
+    `Previous: <s>${previousPrice.toFixed(2)}${currency}</s>\n` +
+    `New: <b>${newPrice.toFixed(2)}${currency}</b>\n\n` +
+    `Your next billing cycle will use the new amount.`;
+
+  const targets = new Map<string, PriceChangeTarget>();
+
+  const admin = await User.findById(group.admin);
+  if (admin) {
+    targets.set(admin.email.toLowerCase(), {
+      email: admin.email,
+      telegramChatId: admin.telegram?.chatId ?? null,
+      userId: admin._id.toString(),
+      preferences: {
+        email: admin.notificationPreferences?.email ?? true,
+        telegram: admin.notificationPreferences?.telegram ?? false,
+      },
+    });
+  }
+
+  for (const member of group.members) {
+    if (!member.isActive || member.leftAt) continue;
+    const key = member.email.toLowerCase();
+    if (targets.has(key)) continue;
+
+    if (member.user) {
+      const user = await User.findById(member.user);
+      if (user) {
+        targets.set(key, {
+          email: user.email,
+          telegramChatId: user.telegram?.chatId ?? null,
+          userId: user._id.toString(),
+          preferences: {
+            email: user.notificationPreferences?.email ?? true,
+            telegram: user.notificationPreferences?.telegram ?? false,
+          },
+        });
+        continue;
+      }
+    }
+
+    targets.set(key, {
+      email: member.email,
+      telegramChatId: null,
+      userId: null,
+      preferences: { email: true, telegram: false },
+    });
+  }
+
+  const groupId = group._id.toString();
+  for (const target of targets.values()) {
+    try {
+      await sendNotification(target, {
+        type: "price_change",
+        subject,
+        emailHtml,
+        telegramText,
+        groupId,
+      });
+    } catch (error) {
+      console.error(
+        `price-change notification failed for ${target.email}:`,
+        error
+      );
+    }
   }
 }

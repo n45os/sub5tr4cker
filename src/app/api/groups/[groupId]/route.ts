@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group } from "@/models";
 import type { IGroupMember } from "@/models";
+import { sendPriceChangeAnnouncements } from "@/lib/notifications/service";
 
 const updateGroupSchema = z
   .object({
@@ -171,6 +172,8 @@ export async function PATCH(
   }
 
   const body = parsed.data;
+  const previousPrice = group.billing.currentPrice;
+
   if (body.name !== undefined) group.name = body.name;
   if (body.description !== undefined) group.description = body.description;
   if (body.service) {
@@ -204,6 +207,22 @@ export async function PATCH(
   }
 
   await group.save();
+
+  const priceChanged =
+    body.billing?.currentPrice !== undefined &&
+    previousPrice !== group.billing.currentPrice;
+  if (priceChanged && group.announcements?.notifyOnPriceChange) {
+    try {
+      await sendPriceChangeAnnouncements(group, {
+        previousPrice,
+        newPrice: group.billing.currentPrice,
+        currency: group.billing.currency,
+        serviceName: group.service.name,
+      });
+    } catch (error) {
+      console.error("price-change announcements failed:", error);
+    }
+  }
 
   return NextResponse.json({
     data: {

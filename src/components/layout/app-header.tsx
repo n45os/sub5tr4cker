@@ -113,7 +113,7 @@ export function AppHeader({ user }: AppHeaderProps) {
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <SidebarTrigger />
-            <Badge variant="outline" className="hidden sm:inline-flex">
+            <Badge variant="outline" className="hidden font-mono text-xs sm:inline-flex">
               <Sparkles className="size-3" />
               Refined workspace
             </Badge>

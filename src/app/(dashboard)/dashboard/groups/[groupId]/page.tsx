@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GroupMembersPanel } from "@/components/features/groups/group-members-panel";
 import { GroupNotificationsPanel } from "@/components/features/notifications/group-notifications-panel";
 import { cn } from "@/lib/utils";
 import { getServerBaseUrl } from "@/lib/server-url";
@@ -187,7 +188,7 @@ export default async function GroupDetailPage({
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Current price</CardDescription>
-            <CardTitle className="text-3xl">
+            <CardTitle className="font-mono text-3xl tabular-nums">
               {group.billing.currentPrice} {group.billing.currency}
             </CardTitle>
           </CardHeader>
@@ -199,7 +200,7 @@ export default async function GroupDetailPage({
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Members</CardDescription>
-            <CardTitle className="text-3xl">{group.members.length}</CardTitle>
+            <CardTitle className="font-mono text-3xl tabular-nums">{group.members.length}</CardTitle>
           </CardHeader>
           <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
             <Users className="size-4" />
@@ -209,11 +210,11 @@ export default async function GroupDetailPage({
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Cycle cadence</CardDescription>
-            <CardTitle className="text-3xl capitalize">
+            <CardTitle className="font-mono text-3xl capitalize">
               {group.billing.cycleType}
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
+          <CardContent className="font-mono flex items-center gap-2 text-sm tabular-nums text-muted-foreground">
             <CalendarDays className="size-4" />
             Day {group.billing.cycleDay} of each cycle
           </CardContent>
@@ -221,7 +222,7 @@ export default async function GroupDetailPage({
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Open billing periods</CardDescription>
-            <CardTitle className="text-3xl">
+            <CardTitle className="font-mono text-3xl tabular-nums">
               {periods.filter((period) => !period.isFullyPaid).length}
             </CardTitle>
           </CardHeader>
@@ -259,7 +260,7 @@ export default async function GroupDetailPage({
                 </div>
                 <div className="rounded-xl border bg-muted/35 p-4">
                   <p className="text-sm text-muted-foreground">Grace period</p>
-                  <p className="mt-2 font-medium">
+                  <p className="font-mono mt-2 font-medium tabular-nums">
                     {group.billing.gracePeriodDays} day
                     {group.billing.gracePeriodDays !== 1 ? "s" : ""}
                   </p>
@@ -306,40 +307,12 @@ export default async function GroupDetailPage({
         </TabsContent>
 
         <TabsContent value="members">
-          <Card>
-            <CardHeader>
-              <CardTitle>Members</CardTitle>
-              <CardDescription>
-                Everyone currently included in this subscription split.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nickname</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Custom amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {group.members.map((member) => (
-                    <TableRow key={member._id}>
-                      <TableCell className="font-medium">{member.nickname}</TableCell>
-                      <TableCell>{member.email}</TableCell>
-                      <TableCell className="capitalize">{member.role}</TableCell>
-                      <TableCell>
-                        {member.customAmount
-                          ? `${member.customAmount} ${group.billing.currency}`
-                          : "Auto split"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <GroupMembersPanel
+            groupId={groupId}
+            members={group.members}
+            currency={group.billing.currency}
+            isAdmin={group.role === "admin"}
+          />
         </TabsContent>
 
         <TabsContent value="billing">
@@ -383,7 +356,7 @@ export default async function GroupDetailPage({
                             <TableCell className="font-medium">
                               {payment.memberNickname}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="font-mono tabular-nums">
                               {payment.amount} {group.billing.currency}
                             </TableCell>
                             <TableCell>

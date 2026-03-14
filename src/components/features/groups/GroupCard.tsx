@@ -42,10 +42,10 @@ export function GroupCard({ group }: { group: GroupCardData }) {
         <CardContent className="grid gap-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl border bg-muted/40 p-3">
-              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+              <p className="font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">
                 Price
               </p>
-              <p className="mt-2 text-lg font-semibold">
+              <p className="font-mono mt-2 text-lg font-semibold tabular-nums">
                 {group.billing.currentPrice} {group.billing.currency}
               </p>
             </div>
@@ -58,11 +58,11 @@ export function GroupCard({ group }: { group: GroupCardData }) {
           </div>
 
           <div className="flex items-center justify-between rounded-xl border bg-background px-3 py-2 text-sm text-muted-foreground">
-            <span className="flex items-center gap-2">
+            <span className="font-mono flex items-center gap-2 text-sm">
               <Users className="size-4" />
               {group.memberCount} member{group.memberCount !== 1 ? "s" : ""}
             </span>
-            <span className="flex items-center gap-2">
+            <span className="font-mono flex items-center gap-2 text-sm tabular-nums">
               <CalendarDays className="size-4" />
               {group.nextBillingDate}
             </span>

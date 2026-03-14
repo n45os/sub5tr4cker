@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Outfit, Syne, Geist_Mono } from "next/font/google";
+import { Outfit, Syne, JetBrains_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
@@ -13,8 +13,8 @@ const syne = Syne({
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
 });
 
@@ -31,7 +31,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${outfit.variable} ${syne.variable} ${geistMono.variable} min-h-screen bg-background font-sans antialiased`}
+        className={`${outfit.variable} ${syne.variable} ${jetbrainsMono.variable} min-h-screen bg-background font-sans antialiased`}
       >
         <Providers>{children}</Providers>
       </body>

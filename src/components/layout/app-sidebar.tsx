@@ -93,7 +93,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
               </div>
               <div className="grid flex-1 text-left leading-tight">
                 <span className="font-display truncate font-semibold">SubsTrack</span>
-                <span className="truncate text-xs text-muted-foreground">
+                <span className="font-mono truncate text-xs text-muted-foreground">
                   Subscription ops
                 </span>
               </div>

@@ -147,19 +147,19 @@ export default async function DashboardPage() {
           <CardContent className="grid gap-4">
             <div className="rounded-2xl border bg-muted/40 p-4">
               <p className="text-sm text-muted-foreground">Tracked spend</p>
-              <p className="mt-2 text-2xl font-semibold">
+              <p className="font-mono mt-2 text-2xl font-semibold tabular-nums">
                 {totalSpend.toFixed(2)} {groups[0]?.billing.currency ?? "EUR"}
               </p>
             </div>
             <div className="rounded-2xl border bg-muted/40 p-4">
               <p className="text-sm text-muted-foreground">Groups needing attention</p>
-              <p className="mt-2 text-2xl font-semibold">
+              <p className="font-mono mt-2 text-2xl font-semibold tabular-nums">
                 {groups.filter((group) => group.unpaidCount > 0).length}
               </p>
             </div>
             <div className="rounded-2xl border bg-muted/40 p-4">
               <p className="text-sm text-muted-foreground">Healthy groups</p>
-              <p className="mt-2 text-2xl font-semibold">
+              <p className="font-mono mt-2 text-2xl font-semibold tabular-nums">
                 {groups.filter((group) => group.unpaidCount === 0).length}
               </p>
             </div>

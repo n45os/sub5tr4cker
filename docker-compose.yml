@@ -28,8 +28,10 @@ services:
 
   # cron runner — same image, different entrypoint
   cron:
-    build: .
-    command: ["node", "dist/jobs/runner.js"]
+    build:
+      context: .
+      target: builder
+    command: ["npm", "run", "cron"]
     environment:
       - MONGODB_URI=mongodb://mongo:27017/substrack
       - NODE_ENV=production

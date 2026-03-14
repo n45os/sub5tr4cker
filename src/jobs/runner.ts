@@ -3,8 +3,7 @@ import { checkBillingPeriods } from "./check-billing-periods";
 import { sendReminders } from "./send-reminders";
 import { sendFollowUps } from "./send-follow-ups";
 
-// standalone cron runner — start with `npx tsx src/jobs/runner.ts`
-// or `node dist/jobs/runner.js` in production
+// standalone cron runner — start with `tsx src/jobs/runner.ts`
 
 console.log("SubsTrack cron runner starting...");
 

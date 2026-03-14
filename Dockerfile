@@ -10,6 +10,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+# ensure public exists so runner COPY succeeds (Next.js may have no public dir)
+RUN mkdir -p public
 RUN npm run build
 
 FROM base AS runner

@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.18.0] - 2026-03-18
+
+### Added
+- **Magic-link invite sign-in** — Clicking "Accept invite" in an invite email now signs you in and redirects you to the group page. If you don't have an account yet, a passwordless account is created and you land on the group; you can set a password later in Profile or sign in with Google.
+- **Invite callback page** — `/invite-callback` handles the magic token from the accept flow: it calls the magic-invite credentials provider and redirects to the group (or shows an error with a sign-in link if the token expired).
+- **callbackUrl across auth** — Login and register pages accept `callbackUrl` and `email` query params. After sign-in or registration, you are redirected to the requested URL (e.g. a group page). Dashboard layout redirects unauthenticated users to `/login?callbackUrl=<current path>` so you return to the page you tried to open after signing in.
+
+### Changed
+- **Accept invite handler** — `GET /api/invite/accept/[token]` now finds or creates a User for the member's email, links `member.user`, sets `member.acceptedAt`, creates a short-lived magic login token, and redirects (302) to `/invite-callback?token=...&groupId=...` instead of returning a static HTML page.
+- **Auth** — New `magic-invite` credentials provider validates the 5-minute HMAC magic token and signs the user in.
+
 ## [0.17.0] - 2026-03-18
 
 ### Added

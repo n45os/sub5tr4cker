@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
-export default function InviteCallbackPage() {
+function InviteCallbackContent() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<"loading" | "success" | "error">(
     "loading"
@@ -91,4 +91,20 @@ export default function InviteCallbackPage() {
   }
 
   return null;
+}
+
+export default function InviteCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4 dark:bg-zinc-950">
+          <div className="w-full max-w-sm space-y-6 text-center">
+            <p className="text-zinc-600 dark:text-zinc-400">Loading…</p>
+          </div>
+        </div>
+      }
+    >
+      <InviteCallbackContent />
+    </Suspense>
+  );
 }

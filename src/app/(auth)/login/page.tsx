@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
-export default function LoginPage() {
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -25,14 +28,14 @@ export default function LoginPage() {
       return;
     }
     if (res?.ok) {
-      window.location.href = "/dashboard";
+      window.location.href = callbackUrl;
       return;
     }
   }
 
   async function handleGoogleSignIn() {
     setError(null);
-    await signIn("google", { callbackUrl: "/dashboard" });
+    await signIn("google", { callbackUrl });
   }
 
   return (
@@ -147,7 +150,11 @@ export default function LoginPage() {
         <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
           Don’t have an account?{" "}
           <Link
-            href="/register"
+            href={
+              callbackUrl !== "/dashboard"
+                ? `/register?callbackUrl=${encodeURIComponent(callbackUrl)}`
+                : "/register"
+            }
             className="font-medium text-zinc-900 hover:underline dark:text-zinc-100"
           >
             Sign up
@@ -155,5 +162,21 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4 dark:bg-zinc-950">
+          <div className="w-full max-w-sm space-y-8 text-center">
+            <p className="text-zinc-600 dark:text-zinc-400">Loading…</p>
+          </div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

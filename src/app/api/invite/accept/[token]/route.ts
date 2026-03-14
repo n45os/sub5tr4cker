@@ -106,6 +106,6 @@ export async function GET(
 
   const magicToken = await createMagicLoginToken(user._id.toString());
   const baseUrl = appUrl.replace(/\/$/, "");
-  const callbackUrl = `${baseUrl}/auth/invite-callback?token=${encodeURIComponent(magicToken)}&groupId=${encodeURIComponent(payload.groupId)}`;
+  const callbackUrl = `${baseUrl}/invite-callback?token=${encodeURIComponent(magicToken)}&groupId=${encodeURIComponent(payload.groupId)}`;
   return NextResponse.redirect(callbackUrl, 302);
 }

@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronRight, Sparkles } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
@@ -21,6 +20,14 @@ function getInitials(name?: string | null, email?: string | null) {
 }
 
 function getHeaderMeta(pathname: string) {
+  if (pathname === "/dashboard/groups") {
+    return {
+      title: "Your groups",
+      description:
+        "Review pricing, due dates, and unpaid balances at a glance.",
+    };
+  }
+
   if (pathname.startsWith("/dashboard/groups/new")) {
     return {
       title: "Create a new group",
@@ -39,6 +46,21 @@ function getHeaderMeta(pathname: string) {
     return {
       title: "Group dashboard",
       description: "Track members, billing progress, and outgoing notifications.",
+    };
+  }
+
+  if (pathname.startsWith("/dashboard/activity")) {
+    return {
+      title: "Activity log",
+      description:
+        "Sent notifications and scheduled reminder and follow-up runs.",
+    };
+  }
+
+  if (pathname.startsWith("/dashboard/payments")) {
+    return {
+      title: "Payments",
+      description: "Payment history and status across all your groups.",
     };
   }
 
@@ -67,7 +89,15 @@ function getBreadcrumbs(pathname: string) {
   const breadcrumbs = [{ label: "Dashboard", href: "/dashboard" }];
 
   if (parts[1] === "groups") {
-    breadcrumbs.push({ label: "Groups", href: "/dashboard" });
+    breadcrumbs.push({ label: "Groups", href: "/dashboard/groups" });
+  }
+
+  if (parts[1] === "activity") {
+    breadcrumbs.push({ label: "Activity", href: "/dashboard/activity" });
+  }
+
+  if (parts[1] === "payments") {
+    breadcrumbs.push({ label: "Payments", href: "/dashboard/payments" });
   }
 
   if (parts[1] === "notifications") {

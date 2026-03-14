@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
+  Activity,
   Bell,
   CreditCard,
   LayoutDashboard,
@@ -11,6 +12,7 @@ import {
   Plus,
   Settings,
   Users,
+  Wallet,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -37,9 +39,23 @@ const navigationItems = [
   },
   {
     title: "Groups",
-    href: "/dashboard/groups/new",
+    href: "/dashboard/groups",
     icon: Users,
     isActive: (pathname: string) => pathname.startsWith("/dashboard/groups"),
+  },
+  {
+    title: "Activity",
+    href: "/dashboard/activity",
+    icon: Activity,
+    isActive: (pathname: string) =>
+      pathname.startsWith("/dashboard/activity"),
+  },
+  {
+    title: "Payments",
+    href: "/dashboard/payments",
+    icon: Wallet,
+    isActive: (pathname: string) =>
+      pathname.startsWith("/dashboard/payments"),
   },
   {
     title: "Notifications",

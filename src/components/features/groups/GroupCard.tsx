@@ -25,13 +25,13 @@ export function GroupCard({ group }: { group: GroupCardData }) {
       className="block transition-transform duration-200 hover:-translate-y-0.5"
     >
       <Card className="h-full border-border/70 shadow-sm transition-shadow hover:shadow-md">
-        <CardHeader className="gap-3">
+        <CardHeader className="gap-4 px-5 pt-5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm text-muted-foreground">
                 {group.service.icon || "ST"} {group.service.name}
               </p>
-              <CardTitle className="mt-1 text-xl">{group.name}</CardTitle>
+              <CardTitle className="mt-1.5 text-xl">{group.name}</CardTitle>
             </div>
             <Badge variant={group.role === "admin" ? "default" : "secondary"}>
               {roleLabel}
@@ -39,25 +39,25 @@ export function GroupCard({ group }: { group: GroupCardData }) {
           </div>
         </CardHeader>
 
-        <CardContent className="grid gap-4">
+        <CardContent className="grid gap-5 px-5">
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl border bg-muted/40 p-3">
+            <div className="rounded-xl border bg-muted/40 p-4">
               <p className="font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">
                 Price
               </p>
-              <p className="font-mono mt-2 text-lg font-semibold tabular-nums">
+              <p className="font-mono mt-2.5 text-lg font-semibold tabular-nums">
                 {group.billing.currentPrice} {group.billing.currency}
               </p>
             </div>
-            <div className="rounded-xl border bg-muted/40 p-3">
+            <div className="rounded-xl border bg-muted/40 p-4">
               <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                 Status
               </p>
-              <p className="mt-2 text-lg font-semibold">{healthLabel}</p>
+              <p className="mt-2.5 text-lg font-semibold">{healthLabel}</p>
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-xl border bg-background px-3 py-2 text-sm text-muted-foreground">
+          <div className="flex items-center justify-between rounded-xl border bg-background px-4 py-3 text-sm text-muted-foreground">
             <span className="font-mono flex items-center gap-2 text-sm">
               <Users className="size-4" />
               {group.memberCount} member{group.memberCount !== 1 ? "s" : ""}
@@ -69,7 +69,7 @@ export function GroupCard({ group }: { group: GroupCardData }) {
           </div>
         </CardContent>
 
-        <CardFooter className="justify-between">
+        <CardFooter className="justify-between px-5 py-4">
           <span className="text-sm text-muted-foreground">
             {group.billing.mode.replace("_", " ")}
           </span>

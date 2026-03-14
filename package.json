@@ -1,6 +1,6 @@
 {
   "name": "sub5tr4cker",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "bin": {
     "substrack": "./dist/cli/index.js"
@@ -16,7 +16,8 @@
     "cron:billing": "tsx -e \"import('./src/jobs/check-billing-periods').then(m => m.checkBillingPeriods())\"",
     "cron:reminders": "tsx -e \"import('./src/jobs/send-reminders').then(m => m.sendReminders())\"",
     "setup": "tsx src/cli/index.ts setup",
-    "configure": "tsx src/cli/index.ts configure"
+    "configure": "tsx src/cli/index.ts configure",
+    "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
     "@auth/mongodb-adapter": "^3.11.1",

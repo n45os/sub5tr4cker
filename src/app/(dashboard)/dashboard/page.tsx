@@ -126,7 +126,7 @@ export default async function DashboardPage() {
                 </Link>
               </div>
             ) : (
-              <ul className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+              <ul className="grid gap-5 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
                 {groups.map((group) => (
                   <li key={group._id}>
                     <GroupCard group={group} />

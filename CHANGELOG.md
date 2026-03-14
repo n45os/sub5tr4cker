@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] - 2026-03-18
+
+### Added
+- **Activity log** — Dashboard page at `/dashboard/activity` with Sent and Upcoming tabs. Sent tab lists past notifications (type, channel, recipient, group, subject, status) with filters by type and channel. Upcoming tab shows predicted reminder and admin follow-up runs for the next two weeks based on cron schedules.
+- **Payments page** — Dashboard page at `/dashboard/payments` with summary cards (collected, pending, overdue) and a filterable table of all payment records across groups the user admins. Filters by group and status; links to group billing.
+- **Seed script** — `pnpm seed` populates a demo group "YouTube Premium Family" with 5 months of billing periods, mixed payment statuses (confirmed, member_confirmed, pending), reminder entries, and notification logs. Creates demo users (`admin@demo.local` / `demo1234` and members). Idempotent: removes existing `*@demo.local` data before seeding.
+
+### Changed
+- Sidebar and header: added Activity and Payments nav items and breadcrumbs.
+
 ## [0.7.0] - 2026-03-18
 
 ### Added

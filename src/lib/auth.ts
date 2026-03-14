@@ -19,6 +19,7 @@ function getMongoClientPromise(): Promise<MongoClient> {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
   secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || (process.env.NODE_ENV === "development" ? "dev-secret-change-in-production" : undefined),
   adapter: MongoDBAdapter(getMongoClientPromise),
   session: { strategy: "jwt" },

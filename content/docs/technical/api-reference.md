@@ -5,7 +5,7 @@ description: REST API endpoints, auth, and response formats.
 
 # API Reference
 
-All API routes live under `/api/`. Protected routes require a valid Auth.js session. Cron routes require the `CRON_SECRET` header.
+All API routes live under `/api/`. Protected routes require a valid Auth.js session. Cron routes require the `x-cron-secret` header (value from app setting `security.cronSecret` or env `CRON_SECRET`).
 
 ## Authentication
 
@@ -85,13 +85,23 @@ Trigger notifications manually. Body: `type`, `message`, `channels`. Admin only.
 
 ## Cron
 
+All cron routes require header: `x-cron-secret: <secret>`.
+
 ### `POST /api/cron/billing`
 
-Create billing periods for due groups. Header: `x-cron-secret: <CRON_SECRET>`.
+Create billing periods for due groups.
 
 ### `POST /api/cron/reminders`
 
-Send payment reminders. Header: `x-cron-secret: <CRON_SECRET>`.
+Enqueue payment reminder tasks and run the notification worker. Response: `enqueued`, `worker` (claimed, completed, failed).
+
+### `POST /api/cron/follow-ups`
+
+Reconcile overdue payments and enqueue admin nudge tasks, then run the worker. Response: `overdueReconciled`, `adminNudgesEnqueued`, `worker`.
+
+### `POST /api/cron/notification-tasks`
+
+Run the notification task worker (claim and execute due tasks). Call frequently (e.g. every 5 min). Response: `claimed`, `completed`, `failed`, `counts` (pending, locked, completed, failed).
 
 ## Error format
 

@@ -4,7 +4,7 @@
 
 SubsTrack is an open-source web app for managing shared subscriptions. An admin pays for a service (YouTube Premium, Netflix, etc.) and splits the cost with members. The app automates reminders, tracks payments, and handles confirmations.
 
-**Tech**: Next.js 15 (App Router), MongoDB/Mongoose, Auth.js v5, Resend (email), grammy (Telegram), node-cron.
+**Tech**: Next.js 15 (App Router), MongoDB/Mongoose, Auth.js v5, Resend (email), grammy (Telegram), node-cron, persisted notification task queue.
 
 ## Architecture
 
@@ -14,7 +14,7 @@ Read `docs/PLAN.md` for the full architecture. Key concepts:
 - **Billing periods** — monthly entries tracking who owes what
 - **Payment flow** — pending → member_confirmed → confirmed (admin verifies)
 - **Notification channels** — email (Resend) and Telegram (grammy)
-- **Cron jobs** — automated billing period creation, reminders, follow-ups
+- **Cron + task queue** — reconciliation jobs (billing periods, overdue state); notification delivery via enqueue + worker (ScheduledTask)
 
 ## Directory Map
 
@@ -29,7 +29,7 @@ src/
 │       ├── groups/         # group CRUD + members + billing
 │       ├── confirm/        # email "I paid" token handler
 │       ├── telegram/       # Telegram webhook
-│       ├── cron/           # cron job endpoints (protected by CRON_SECRET)
+│       ├── cron/           # cron endpoints (billing, enqueue reminders/follow-ups, notification worker)
 │       └── notifications/  # manual notification triggers
 ├── components/
 │   ├── ui/                 # shadcn/ui primitives
@@ -42,9 +42,10 @@ src/
 │   ├── telegram/           # grammy bot, handlers, keyboards, send helpers
 │   ├── billing/            # split calculation, period management
 │   ├── notifications/      # unified dispatcher across channels
+│   ├── tasks/              # task queue (enqueue, claim, worker)
 │   └── tokens.ts           # HMAC tokens for confirmation links
-├── models/                 # Mongoose schemas (User, Group, BillingPeriod, etc.)
-├── jobs/                   # cron job logic (billing, reminders, follow-ups)
+├── models/                 # Mongoose schemas (User, Group, BillingPeriod, ScheduledTask, etc.)
+├── jobs/                   # cron logic (billing, enqueue-reminders/follow-ups, run-notification-tasks)
 └── types/                  # shared TypeScript types
 ```
 
@@ -72,6 +73,7 @@ See `docs/data-models.md`. Quick summary:
 - **BillingPeriod** — one cycle per group per month, with per-member payment statuses
 - **PriceHistory** — price change log per group
 - **Notification** — delivery log for all sent messages
+- **ScheduledTask** — queue for notification delivery (pending → locked → completed/failed)
 
 ## Conventions
 
@@ -102,9 +104,8 @@ See `docs/data-models.md`. Quick summary:
 
 ### Adding a new cron job
 
-1. Create job logic in `src/jobs/<job-name>.ts`
-2. Register in `src/jobs/runner.ts` with cron schedule
-3. (Optional) Add HTTP trigger in `src/app/api/cron/<job-name>/route.ts`
+1. For **reconciliation** (e.g. billing periods): create job in `src/jobs/<job-name>.ts`, register in `src/jobs/runner.ts`, optionally add `src/app/api/cron/<job-name>/route.ts`.
+2. For **notification delivery**: add a task type in `src/models/scheduled-task.ts`, implement producer (enqueue in `src/jobs/enqueue-*.ts` or similar), add handler in `src/lib/tasks/worker.ts`, and enqueue from cron or from API (e.g. confirm flow).
 
 ## References
 

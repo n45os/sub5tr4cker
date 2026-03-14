@@ -38,7 +38,7 @@ This starts:
 
 - **app** — Next.js on port 3000
 - **mongo** — MongoDB on 27017
-- **cron** — node-cron runner (same image, different command)
+- **cron** — node-cron runner (billing, enqueue reminders/follow-ups, notification worker; same image, different command)
 
 Build: `docker-compose build`. Logs: `docker-compose logs -f app`.
 
@@ -57,8 +57,12 @@ Use a process manager (systemd, PM2) to keep both running.
 - Deploy the Next.js app (e.g. connect GitHub to Vercel).
 - Set env vars in the dashboard; add `MONGODB_URI` (e.g. Atlas).
 - The app runs as serverless; **cron does not run inside Vercel**. Options:
-  - **External cron**: Use [Vercel Cron](https://vercel.com/docs/cron-jobs) or an external service (cron-job.org, GitHub Actions) to call `POST /api/cron/billing` and `POST /api/cron/reminders` with the `x-cron-secret` header on a schedule.
-  - **Separate worker**: Run the cron runner (`npm run cron`) on a small VPS or Railway and point it to the same MongoDB and env (including `APP_URL` and `CRON_SECRET`).
+  - **External cron**: Use [Vercel Cron](https://vercel.com/docs/cron-jobs) or an external service (cron-job.org, GitHub Actions) to call:
+    - `POST /api/cron/billing` (daily)
+    - `POST /api/cron/reminders` (daily)
+    - `POST /api/cron/follow-ups` (e.g. every 3 days)
+    - `POST /api/cron/notification-tasks` (every 5 min) with the `x-cron-secret` header.
+  - **Separate worker**: Run the cron runner (`npm run cron`) on a small VPS or Railway; it will enqueue tasks and run the notification worker every 5 min.
 
 ## Telegram
 

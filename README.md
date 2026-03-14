@@ -11,7 +11,7 @@ If you've ever managed a shared subscription, you know the pain: spreadsheets, m
 ## Features
 
 - **Subscription groups** — Create a group for each shared service, add members by email
-- **Automated reminders** — Cron-driven email and Telegram reminders for unpaid members
+- **Automated reminders** — Queued notification tasks: cron enqueues reminders and a worker sends them via email/Telegram
 - **Payment confirmation flow** — Members click "I paid" in email/Telegram → admin verifies
 - **Multiple billing modes** — Equal split, fixed per-member amount, or variable (utility bills)
 - **Payment links** — Revolut, PayPal, bank transfer, or custom links embedded in reminders
@@ -29,7 +29,7 @@ If you've ever managed a shared subscription, you know the pain: spreadsheets, m
 | Auth | [Auth.js v5](https://authjs.dev) (NextAuth) |
 | Email | [Resend](https://resend.com) (pluggable) |
 | Telegram | [grammy](https://grammy.dev) |
-| Cron | [node-cron](https://github.com/node-cron/node-cron) |
+| Cron / queue | [node-cron](https://github.com/node-cron/node-cron) + persisted task queue |
 | UI | [Tailwind CSS](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) |
 | Validation | [Zod](https://zod.dev) |
 
@@ -89,7 +89,7 @@ To run MongoDB natively and store data in the repo root (e.g. for local developm
    pnpm dev
    ```
 
-4. **Optional — run the cron job runner** (billing periods, reminders, follow-ups):
+4. **Optional — run the cron runner** (billing periods, enqueue reminders/follow-ups, and notification worker every 5 min):
 
    ```bash
    pnpm run cron
@@ -116,7 +116,7 @@ docker-compose up -d
 This starts:
 - The Next.js app on port 3054
 - MongoDB on port 25417
-- The cron job runner
+- The cron runner (billing, enqueue reminders/follow-ups, notification worker)
 
 ### Environment Variables
 

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyConfirmationToken } from "@/lib/tokens";
 import { dbConnect } from "@/lib/db/mongoose";
-import { BillingPeriod, Group, User } from "@/models";
-import { sendAdminConfirmationRequest } from "@/lib/telegram/send";
-import { adminVerificationKeyboard } from "@/lib/telegram/keyboards";
+import { BillingPeriod, Group } from "@/models";
+import { enqueueTask } from "@/lib/tasks/queue";
+import { runNotificationTasks } from "@/jobs/run-notification-tasks";
 import { getSetting } from "@/lib/settings/service";
 
 export async function GET(
@@ -54,25 +54,18 @@ export async function GET(
   payment.memberConfirmedAt = new Date();
   await period.save();
 
-  // notify admin via Telegram if possible
+  // enqueue admin nudge so admin gets email + telegram via notification service
   const group = await Group.findById(payload.groupId);
   if (group) {
-    const admin = await User.findById(group.admin);
-    if (admin?.telegram?.chatId) {
-      const keyboard = adminVerificationKeyboard(
-        payload.periodId,
-        payload.memberId
-      );
-      await sendAdminConfirmationRequest(
-        admin.telegram.chatId,
-        payment.memberNickname,
-        group.name,
-        period.periodLabel,
-        payment.amount,
-        period.currency,
-        keyboard
-      );
-    }
+    await enqueueTask({
+      type: "admin_confirmation_request",
+      runAt: new Date(),
+      payload: {
+        groupId: payload.groupId,
+        billingPeriodId: payload.periodId,
+      },
+    });
+    await runNotificationTasks({ limit: 5 });
   }
 
   return NextResponse.redirect(

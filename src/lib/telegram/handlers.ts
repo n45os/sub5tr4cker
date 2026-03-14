@@ -2,8 +2,8 @@ import { Bot, Context } from "grammy";
 import { dbConnect } from "@/lib/db/mongoose";
 import { BillingPeriod, User, Group } from "@/models";
 import { verifyLinkToken } from "@/lib/tokens";
-import { adminVerificationKeyboard } from "./keyboards";
-import { sendAdminConfirmationRequest } from "./send";
+import { enqueueTask } from "@/lib/tasks/queue";
+import { runNotificationTasks } from "@/jobs/run-notification-tasks";
 
 // register all bot handlers
 export function registerHandlers(bot: Bot): void {
@@ -90,22 +90,18 @@ async function handleMemberConfirm(
     "You've confirmed payment for this period. Waiting for admin verification."
   );
 
-  // notify admin
+  // enqueue admin nudge (email + telegram) via notification task queue
   const group = await Group.findById(period.group);
   if (group) {
-    const admin = await User.findById(group.admin);
-    if (admin?.telegram?.chatId) {
-      const keyboard = adminVerificationKeyboard(periodId, memberId);
-      await sendAdminConfirmationRequest(
-        admin.telegram.chatId,
-        payment.memberNickname,
-        group.name,
-        period.periodLabel,
-        payment.amount,
-        period.currency,
-        keyboard
-      );
-    }
+    await enqueueTask({
+      type: "admin_confirmation_request",
+      runAt: new Date(),
+      payload: {
+        groupId: (group._id as { toString: () => string }).toString(),
+        billingPeriodId: periodId,
+      },
+    });
+    await runNotificationTasks({ limit: 5 });
   }
 }
 

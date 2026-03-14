@@ -7,7 +7,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 
 ## Quick Facts
 
-- **Stack**: Next.js 15 (App Router), MongoDB/Mongoose, Auth.js v5, Resend, grammy, node-cron
+- **Stack**: Next.js 15 (App Router), MongoDB/Mongoose, Auth.js v5, Resend, grammy, node-cron, persisted notification task queue (ScheduledTask)
 - **UI**: Tailwind CSS + shadcn/ui with a sidebar dashboard shell, richer cards, tabs, and settings surfaces
 - **Origin**: Migrated from a Google Sheets + Apps Script setup (see `docs/legacy/`)
 - **Phase**: Core MVP plus dashboard refresh, editable groups, DB-backed app settings, notification previews, per-group email accent color, automated-message badge in emails, and setup CLI
@@ -18,9 +18,9 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 - `src/app/(auth)/` — login, register
 - `src/app/(dashboard)/` — dashboard home, group detail/edit/new, notification previews, settings
 - `src/app/api/` — groups CRUD, group notification toggles, billing, notifications, settings, confirm, telegram webhook/link, cron, register
-- `src/lib/` — db, auth, settings service, tokens (confirmation + link), email, telegram, billing calculator, notifications
-- `src/models/` — Mongoose schemas (User, Group, BillingPeriod, PriceHistory, Notification, Settings)
-- `src/jobs/` — check-billing-periods, send-reminders, send-follow-ups, runner
+- `src/lib/` — db, auth, settings service, tokens (confirmation + link), email, telegram, billing calculator, notifications, tasks (queue + worker)
+- `src/models/` — Mongoose schemas (User, Group, BillingPeriod, PriceHistory, Notification, Settings, ScheduledTask)
+- `src/jobs/` — check-billing-periods, enqueue-reminders, enqueue-follow-ups, reconcile-overdue, send-follow-ups, run-notification-tasks, runner
 - `src/components/features/groups/` — GroupCard and group UI
 - `docs/` — architecture plan, data models, API design
 
@@ -42,7 +42,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 - Settings: GET/PATCH /api/settings, POST /api/settings/test-email, POST /api/settings/test-telegram
 - Auth: /api/auth/[...nextauth], POST /api/register
 - Telegram: POST /api/telegram/webhook, POST /api/telegram/link
-- Cron: POST /api/cron/billing, reminders, follow-ups (CRON_SECRET)
+- Cron: POST /api/cron/billing, reminders, follow-ups, notification-tasks (x-cron-secret)
 - Confirm: GET /api/confirm/[token] (email "I paid")
 
 ## Context Files

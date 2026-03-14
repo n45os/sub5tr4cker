@@ -18,3 +18,11 @@ export type { IAuditEvent, AuditAction } from "./audit-event";
 
 export { Settings } from "./settings";
 export type { ISettings } from "./settings";
+
+export { ScheduledTask } from "./scheduled-task";
+export type {
+  IScheduledTask,
+  ScheduledTaskType,
+  ScheduledTaskStatus,
+  IScheduledTaskPayload,
+} from "./scheduled-task";

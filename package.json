@@ -1,6 +1,6 @@
 {
   "name": "sub5tr4cker",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "private": true,
   "bin": {
     "substrack": "./dist/cli/index.js"
@@ -14,7 +14,7 @@
     "lint": "eslint",
     "cron": "tsx src/jobs/runner.ts",
     "cron:billing": "tsx -e \"import('./src/jobs/check-billing-periods').then(m => m.checkBillingPeriods())\"",
-    "cron:reminders": "tsx -e \"import('./src/jobs/send-reminders').then(m => m.sendReminders())\"",
+    "cron:reminders": "tsx -e \"import('./src/jobs/enqueue-reminders').then(m => m.enqueueReminders()).then(n => { console.log('Enqueued:', n); return import('./src/jobs/run-notification-tasks'); }).then(m => m.runNotificationTasks()).then(r => console.log('Worker:', r))\"",
     "setup": "tsx src/cli/index.ts setup",
     "configure": "tsx src/cli/index.ts configure",
     "seed": "tsx scripts/seed.ts"

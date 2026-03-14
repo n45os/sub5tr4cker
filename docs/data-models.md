@@ -230,6 +230,40 @@ Log of all notifications sent. Useful for debugging and user history.
 
 **Indexes**: `recipient`, `group`, `type`, `createdAt` (TTL index optional — auto-delete after 90 days)
 
+## ScheduledTask
+
+Queue for notification delivery. Cron (or other producers) enqueue tasks; a worker claims and executes them via the notification service.
+
+```typescript
+{
+  _id: ObjectId,
+  type: 'payment_reminder' | 'admin_confirmation_request' | 'price_change' | 'invite' | 'follow_up',
+  status: 'pending' | 'locked' | 'completed' | 'failed',
+  runAt: Date,                            // when the task is due
+  lockedAt: Date | null,                  // set when a worker claims the task
+  lockedBy: string | null,               // worker identifier (e.g. hostname:pid)
+  attempts: number,                       // number of execution attempts
+  maxAttempts: number,                    // default 5
+  lastError: string | null,               // last failure message
+  completedAt: Date | null,               // set when status becomes completed
+  idempotencyKey: string,                 // unique per business event and run window
+  payload: {                              // type-specific payload
+    groupId: string,
+    billingPeriodId?: string,
+    memberId?: string,
+    paymentId?: string,
+    channel?: 'email' | 'telegram',
+    [key: string]: unknown,
+  },
+  createdAt: Date,
+  updatedAt: Date,
+}
+```
+
+**Indexes**: `status` + `runAt` (for claiming), `lockedAt` (sparse, for stale lock recovery), `idempotencyKey` (unique), `type` + `payload.groupId`, `createdAt`
+
+**Lifecycle**: pending → locked (worker claim) → completed or failed; failed tasks are retried with backoff until `maxAttempts`.
+
 ## Settings
 
 Runtime configuration stored in MongoDB so app operators can manage integrations

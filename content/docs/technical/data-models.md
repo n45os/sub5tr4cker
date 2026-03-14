@@ -43,6 +43,13 @@ User ──┬── owns ──── Group ──── has many ──── 
 - **Fields**: recipient (ref User), recipientEmail, group (ref), billingPeriod (ref), type, channel (email | telegram), status (sent | failed | pending), subject, preview, externalId, error, deliveredAt, timestamps.
 - **Types**: payment_reminder, payment_confirmed, admin_confirmation_request, price_change, announcement, invite, follow_up.
 
+## ScheduledTask
+
+Queue for notification delivery. Producers enqueue tasks; a worker claims and executes them.
+
+- **Fields**: type (payment_reminder, admin_confirmation_request, etc.), status (pending | locked | completed | failed), runAt, lockedAt, lockedBy, attempts, maxAttempts, lastError, completedAt, idempotencyKey, payload (groupId, billingPeriodId, memberId, paymentId, …), timestamps.
+- **Lifecycle**: pending → locked (on claim) → completed or failed; failed tasks retry with backoff.
+
 ## Confirmation token
 
 Used in “I’ve paid” email links. Payload: `memberId`, `periodId`, `groupId`, `exp`. Signed with HMAC-SHA256; no DB lookup needed to validate.

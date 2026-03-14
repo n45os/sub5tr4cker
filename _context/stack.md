@@ -29,10 +29,11 @@
 - grammy (Telegram bot framework)
 - Polling mode for dev, webhook for prod
 
-## Cron
+## Cron and task queue
 
-- node-cron (self-hosted)
-- HTTP-triggered endpoints (for cloud hosting)
+- node-cron (self-hosted runner)
+- Persisted task queue (ScheduledTask model) for notification delivery; worker claims and executes; idempotency and retries
+- HTTP-triggered cron endpoints (for cloud hosting)
 
 ## UI
 

@@ -168,31 +168,49 @@ This is optional and separate from DM-based notifications.
 
 ## Cron Job Design
 
+Notification delivery uses a **persisted task queue**: cron jobs enqueue work into the `ScheduledTask` collection, and a worker (run frequently) claims and executes due tasks. Reconciliation jobs (billing period creation, overdue state) still run inline on a schedule.
+
+### Architecture
+
+- **Producers** — Cron (or one-off triggers) scan business state and enqueue tasks with an idempotency key so the same reminder/nudge is not duplicated.
+- **Task store** — `ScheduledTask` documents with `status` (pending → locked → completed/failed), `runAt`, `lockedAt`/`lockedBy`, retry metadata.
+- **Worker** — Claims due tasks in batches, executes each via the notification service, then marks completed or fails with backoff.
+
 ### Self-hosted mode
 
-A separate Node.js process runs `node-cron` jobs:
+A separate Node.js process runs `node-cron`:
 
 ```
 jobs/
-├── check-billing-periods.ts    # create new billing periods when due
-├── send-reminders.ts           # send reminders for unpaid periods
-├── send-follow-ups.ts          # follow up on member_confirmed awaiting admin
-└── runner.ts                   # node-cron scheduler entry point
+├── check-billing-periods.ts      # create new billing periods when due (reconciliation)
+├── enqueue-reminders.ts         # enqueue payment_reminder tasks for unpaid periods
+├── enqueue-follow-ups.ts        # enqueue admin_confirmation_request tasks
+├── reconcile-overdue.ts         # mark pending → overdue after 14 days
+├── send-follow-ups.ts          # reconcile overdue + enqueue admin nudges
+├── run-notification-tasks.ts   # worker: claim and execute due tasks
+└── runner.ts                    # node-cron scheduler entry point
 ```
 
 ### Hosted mode (Vercel, Railway, etc.)
 
-- Expose `/api/cron/[job]` routes protected by a secret header
-- External scheduler (GitHub Actions, cron-job.org, etc.) hits these endpoints
-- Same job logic, different trigger mechanism
+- Expose `/api/cron/[job]` routes protected by `x-cron-secret` (app setting `security.cronSecret`).
+- External scheduler hits these endpoints. Call **notification-tasks** frequently (e.g. every 5 min) to process the queue.
 
 ### Job Schedule
 
-| Job | Schedule | Description |
-|-----|----------|-------------|
+| Trigger | Schedule | Description |
+|---------|----------|-------------|
 | `check-billing-periods` | Daily at 00:00 | Creates new billing period entries when a subscription's billing date passes |
-| `send-reminders` | Daily at 10:00 | Sends reminders for all `pending` payments older than the grace period |
-| `send-follow-ups` | Every 3 days | Reminds members who haven't confirmed, and nudges admin for `member_confirmed` items |
+| `reminders` (cron) | Daily at 10:00 | Enqueues payment reminder tasks for unpaid payments past grace period, then runs worker |
+| `follow-ups` (cron) | Every 3 days at 14:00 | Reconciles overdue state (pending → overdue), enqueues admin nudge tasks, then runs worker |
+| `notification-tasks` | Every 5 minutes | Worker: claims due tasks, sends via notification service, updates task state |
+
+### Notification task queue (operator notes)
+
+- **Idempotency** — One task per business event per run window (e.g. per payment per day). Duplicate enqueue is a no-op.
+- **Lock TTL** — Worker claims tasks with a 5-minute lock. Stale locks are recovered on the next run so stuck tasks are retried.
+- **Retries** — Failed tasks are retried with exponential backoff (capped at 24 h) up to `maxAttempts` (default 5), then marked failed.
+- **Observability** — `POST /api/cron/notification-tasks` response includes `counts` (pending, locked, completed, failed). Use for monitoring backlog.
 
 ## Payment Integration
 

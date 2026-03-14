@@ -107,14 +107,11 @@ function FieldLabel({
       <Label htmlFor={htmlFor}>{children}</Label>
       {hint ? (
         <Tooltip>
-          <TooltipTrigger>
-            <button
-              type="button"
-              className="inline-flex text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded"
-              aria-label="Explanation"
-            >
-              <Info className="size-3.5" />
-            </button>
+          <TooltipTrigger
+            className="inline-flex text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded"
+            aria-label="Explanation"
+          >
+            <Info className="size-3.5" />
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-[240px]">
             {hint}

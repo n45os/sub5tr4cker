@@ -22,10 +22,12 @@ Members choose their preferred channel(s). The dispatcher checks preferences and
 
 Uses HMAC-signed tokens (not JWTs) for email "I paid" links. Token contains memberId + periodId + expiry. Validated without DB lookup. Telegram uses inline keyboard callbacks with colon-delimited data.
 
-## Cron Jobs
+## Cron Jobs and Notification Queue
 
-Self-hosted: node-cron process (`src/jobs/runner.ts`)
-Hosted: HTTP-triggered endpoints at `/api/cron/*` protected by secret header
+- **Reconciliation** — Cron runs billing period creation and overdue state (pending → overdue) in `src/jobs/`.
+- **Notification delivery** — Producers enqueue tasks into `ScheduledTask`; worker in `src/lib/tasks/worker.ts` claims due tasks and sends via `src/lib/notifications/service.ts`. Idempotency per business event; retries with backoff.
+- Self-hosted: node-cron process (`src/jobs/runner.ts`) runs billing, enqueue reminders/follow-ups, and the notification worker every 5 min.
+- Hosted: HTTP endpoints `/api/cron/*` (billing, reminders, follow-ups, notification-tasks) protected by `x-cron-secret`; call notification-tasks frequently to process the queue.
 
 ## Telegram Bot
 

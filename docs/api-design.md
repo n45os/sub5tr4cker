@@ -360,17 +360,23 @@ Generate a Telegram linking token for the authenticated user. Returns a deep lin
 
 ## Cron Jobs
 
+All cron routes require the `x-cron-secret` header to match the app setting `security.cronSecret`.
+
 ### `POST /api/cron/billing`
 
-Create billing periods for subscriptions that are due. Protected by `CRON_SECRET`.
+Create billing periods for subscriptions that are due. Runs reconciliation only; no notification tasks.
 
 ### `POST /api/cron/reminders`
 
-Send payment reminders for unpaid billing periods. Protected by `CRON_SECRET`.
+Enqueue payment reminder tasks for unpaid periods (past grace period), then run the notification worker. Response includes `enqueued` and `worker` (claimed, completed, failed).
 
 ### `POST /api/cron/follow-ups`
 
-Send follow-up reminders and admin nudges. Protected by `CRON_SECRET`.
+Reconcile overdue payment state (pending → overdue after 14 days) and enqueue admin confirmation nudge tasks, then run the worker. Response includes `overdueReconciled`, `adminNudgesEnqueued`, and `worker`.
+
+### `POST /api/cron/notification-tasks`
+
+Run the notification task worker: claim due tasks, execute sends via the notification service, return counts. Intended to be called frequently (e.g. every 5 min). Response includes `claimed`, `completed`, `failed`, and `counts` (pending, locked, completed, failed) for observability.
 
 ## User Settings
 

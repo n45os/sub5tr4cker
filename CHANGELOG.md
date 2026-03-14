@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.0] - 2026-03-18
+
+### Added
+- **Persisted notification task queue** — Notification delivery (payment reminders, admin confirmation nudges) now uses a `ScheduledTask` model. Cron jobs enqueue tasks with idempotency keys; a worker process claims and executes due tasks via the notification service. Retries use exponential backoff; stale locks are recovered automatically.
+- **New cron endpoint** — `POST /api/cron/notification-tasks` runs the notification worker. Intended to be called frequently (e.g. every 5 min) when using HTTP-triggered cron; response includes task counts (pending, locked, completed, failed) for observability.
+- **Task queue library** — `src/lib/tasks/` provides `enqueueTask`, `claimTasks`, `completeTask`, `failTask`, `getTaskCounts`, and idempotency key builder. Worker dispatches by task type (`payment_reminder`, `admin_confirmation_request`).
+- **Admin nudge helper** — `sendAdminConfirmationNudge(group, period)` in `src/lib/notifications/admin-nudge.ts` for use by the worker and tests.
+
+### Changed
+- **Cron flow** — Reminders cron now enqueues payment reminder tasks and runs the worker; follow-ups cron reconciles overdue state (pending → overdue), enqueues admin nudge tasks, and runs the worker. Standalone runner adds a job every 5 minutes to process the notification queue.
+- **Confirm and Telegram flows** — When a member confirms payment (email link or Telegram), the app enqueues an `admin_confirmation_request` task and runs the worker so the admin receives the nudge through the notification service (email + Telegram) with consistent logging and retries.
+- **Cron API responses** — `POST /api/cron/reminders` returns `enqueued` and `worker`; `POST /api/cron/follow-ups` returns `overdueReconciled`, `adminNudgesEnqueued`, and `worker`.
+- **Docs** — Architecture plan, API design, data models, README, deployment, and context files updated to describe the task queue, worker, and migration from inline cron delivery.
+
 ## [0.11.0] - 2026-03-18
 
 ### Added

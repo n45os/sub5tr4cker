@@ -39,6 +39,7 @@ type SentItem =
       subject: string | null;
       preview: string;
       recipientEmail: string;
+      externalId: string | null;
       groupId: string | null;
       billingPeriodId: string | null;
       deliveredAt: string | null;
@@ -396,6 +397,11 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps) 
                             <p className="max-w-full truncate text-sm text-muted-foreground">
                               {item.subject ?? item.preview}
                             </p>
+                            {item.channel === "email" && item.externalId && (
+                              <p className="text-xs text-muted-foreground">
+                                Message ID: {item.externalId}
+                              </p>
+                            )}
                           </div>
                         ) : (
                           <div

@@ -99,7 +99,7 @@ Update per-group notification toggles. Admin only.
 
 ### `POST /api/groups/[groupId]/members`
 
-Add a member to the group. Admin only. Sends invite email.
+Add a member to the group. Admin only. After adding, the dashboard prompts the admin to optionally send an invite email; use the send-invite endpoint to send it (or skip).
 
 **Body:**
 ```json
@@ -107,6 +107,21 @@ Add a member to the group. Admin only. Sends invite email.
   "email": "newmember@example.com",
   "nickname": "New Member",
   "customAmount": null
+}
+```
+
+### `POST /api/groups/[groupId]/members/[memberId]/send-invite`
+
+Send an invite notification (email and/or Telegram) to a single member. Admin only. Use after adding a member if the admin chose to send an invite, or to re-send an invite later.
+
+**Response:**
+```json
+{
+  "data": {
+    "sent": true,
+    "email": true,
+    "telegram": false
+  }
 }
 ```
 
@@ -314,7 +329,7 @@ List notifications for the authenticated user. Supports pagination.
 
 ### `GET /api/notifications?groupId=<id>&limit=<n>`
 
-List recent notifications for a specific group.
+List recent notifications for a specific group. Each notification includes `status` (`sent` | `failed` | `pending`), `deliveredAt`, and `externalId` (e.g. Resend message id for email) so admins can verify delivery.
 
 ### `GET /api/notifications/templates`
 
@@ -401,6 +416,8 @@ Update profile and notification preferences.
 ```
 
 ## App Settings
+
+Settings are key-value; keys include `general.appUrl`, `email.apiKey`, `email.fromAddress` (sender address for outgoing emails), optional `email.replyToAddress` (reply-to header), Telegram and security keys, etc. See the Settings UI or `src/lib/settings/definitions.ts` for the full list.
 
 ### `GET /api/settings`
 

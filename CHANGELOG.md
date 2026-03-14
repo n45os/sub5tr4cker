@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.14.0] - 2026-03-18
+
+### Added
+- **Profile page** — New dashboard page **Profile** (`/dashboard/profile`) where you can change your account email. Sidebar includes a Profile link. Email is validated and must be unique; after update, the session reflects the new address so you can sign in with it next time.
+
+### Changed
+- **Session data** — Auth session callback now loads user email, name, and image from the database on each request so profile changes (e.g. updated email) are reflected without signing out.
+
+## [0.13.0] - 2026-03-18
+
+### Added
+- **Invite after adding a member** — When an admin adds a new member, a dialog asks whether to send an invite email. Choosing "Send invite" calls the new send-invite endpoint; "Skip" closes the dialog. Invite content matches the bulk initialize flow (group details, payment instructions, Telegram).
+- **Send-invite endpoint** — `POST /api/groups/[groupId]/members/[memberId]/send-invite` sends an invite notification (email and/or Telegram) to a single member. Admin only.
+- **Reply-to email setting** — New app setting `email.replyToAddress` (env: `EMAIL_REPLY_TO`). When set, all outgoing emails use this as the Reply-To header so recipients can reply to a specific inbox.
+- **Email delivery tracking** — Notifications API and Activity feed now include `externalId` (e.g. Resend message id for email). Activity log shows Message ID for email notifications so admins can verify delivery or trace in Resend.
+
+### Changed
+- **From address** — Settings description for `email.fromAddress` clarified; value is used as the sender on all outgoing emails.
+- **Add member flow** — Adding a member no longer sends an invite automatically; the admin is prompted after add and can send invite or skip.
+
 ## [0.12.0] - 2026-03-18
 
 ### Added

@@ -33,6 +33,8 @@ export async function sendEmail(
   const defaultFrom =
     (await getSetting("email.fromAddress")) || "sub5tr4cker <noreply@example.com>";
   const from = params.from || defaultFrom;
+  const replyTo =
+    params.replyTo ?? (await getSetting("email.replyToAddress")) ?? undefined;
 
   try {
     const result = await client.emails.send({
@@ -40,7 +42,7 @@ export async function sendEmail(
       to: Array.isArray(params.to) ? params.to : [params.to],
       subject: params.subject,
       html: params.html,
-      replyTo: params.replyTo,
+      ...(replyTo ? { replyTo } : {}),
     });
 
     if (result.error) {

@@ -73,6 +73,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       if (token.id && session.user) {
         session.user.id = token.id as string;
+        // load fresh user from DB so profile changes (e.g. email) are reflected
+        await dbConnect();
+        const u = await User.findById(token.id).lean();
+        if (u) {
+          session.user.email = u.email;
+          session.user.name = u.name;
+          session.user.image = u.image ?? null;
+        }
       }
       return session;
     },

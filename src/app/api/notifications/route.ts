@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
         subject: notification.subject,
         preview: notification.preview,
         recipientEmail: notification.recipientEmail,
+        externalId: notification.externalId ?? null,
         deliveredAt: notification.deliveredAt,
         createdAt: notification.createdAt,
       })),

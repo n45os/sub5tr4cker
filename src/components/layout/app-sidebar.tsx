@@ -11,6 +11,7 @@ import {
   LogOut,
   Plus,
   Settings,
+  User,
   Users,
   Wallet,
 } from "lucide-react";
@@ -63,6 +64,12 @@ const navigationItems = [
     icon: Bell,
     isActive: (pathname: string) =>
       pathname.startsWith("/dashboard/notifications"),
+  },
+  {
+    title: "Profile",
+    href: "/dashboard/profile",
+    icon: User,
+    isActive: (pathname: string) => pathname.startsWith("/dashboard/profile"),
   },
   {
     title: "Settings",

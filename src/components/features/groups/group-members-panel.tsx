@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, Loader2, UserPlus } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, Mail, UserPlus } from "lucide-react";
 import { PaymentStatusBadge } from "@/components/features/billing/payment-status-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -74,6 +82,12 @@ export function GroupMembersPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
+  // when set, show dialog asking whether to send invite email to the newly added member
+  const [inviteDialog, setInviteDialog] = useState<{
+    memberId: string;
+    email: string;
+  } | null>(null);
+  const [inviteSending, setInviteSending] = useState(false);
 
   async function handleAddMember(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -112,6 +126,10 @@ export function GroupMembersPanel({
       setEmail("");
       setNickname("");
       setCustomAmount("");
+      setInviteDialog({
+        memberId: json.data._id,
+        email: json.data.email,
+      });
       router.refresh();
     } catch {
       setError("Something went wrong. Try again.");
@@ -120,8 +138,69 @@ export function GroupMembersPanel({
     }
   }
 
+  async function handleSendInvite() {
+    if (!inviteDialog) return;
+    setInviteSending(true);
+    try {
+      const res = await fetch(
+        `/api/groups/${groupId}/members/${inviteDialog.memberId}/send-invite`,
+        { method: "POST" }
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error?.message ?? "Failed to send invite.");
+        return;
+      }
+      setInviteDialog(null);
+      router.refresh();
+    } catch {
+      setError("Failed to send invite. Try again.");
+    } finally {
+      setInviteSending(false);
+    }
+  }
+
   return (
-    <Card>
+    <>
+      <Dialog
+        open={!!inviteDialog}
+        onOpenChange={(open) => !open && setInviteDialog(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Member added</DialogTitle>
+            <DialogDescription>
+              {inviteDialog
+                ? `Send an invite email to ${inviteDialog.email}? They'll get group details, payment instructions, and how to get reminders via Telegram.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setInviteDialog(null)}
+              disabled={inviteSending}
+            >
+              Skip
+            </Button>
+            <Button
+              onClick={handleSendInvite}
+              disabled={inviteSending}
+            >
+              {inviteSending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <>
+                  <Mail className="size-4 mr-2" />
+                  Send invite
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Card>
       <CardHeader>
         <CardTitle>Members</CardTitle>
         <CardDescription>
@@ -330,5 +409,6 @@ export function GroupMembersPanel({
         </Table>
       </CardContent>
     </Card>
+    </>
   );
 }

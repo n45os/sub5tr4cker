@@ -10,7 +10,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 - **Stack**: Next.js 15 (App Router), MongoDB/Mongoose, Auth.js v5, Resend, grammy, node-cron
 - **UI**: Tailwind CSS + shadcn/ui with a sidebar dashboard shell, richer cards, tabs, and settings surfaces
 - **Origin**: Migrated from a Google Sheets + Apps Script setup (see `docs/legacy/`)
-- **Phase**: Core MVP plus dashboard refresh, editable groups, DB-backed app settings, notification previews, and setup CLI
+- **Phase**: Core MVP plus dashboard refresh, editable groups, DB-backed app settings, notification previews, per-group email accent color, automated-message badge in emails, and setup CLI
 
 ## Key Directories
 

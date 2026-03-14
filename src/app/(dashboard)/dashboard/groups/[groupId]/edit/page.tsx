@@ -7,7 +7,7 @@ interface GroupDetailResponse {
   _id: string;
   name: string;
   description: string | null;
-  service: { name: string; icon: string | null; url: string | null };
+  service: { name: string; icon: string | null; url: string | null; accentColor: string | null };
   billing: {
     mode: "equal_split" | "fixed_amount" | "variable";
     currentPrice: number;
@@ -66,6 +66,7 @@ export default async function EditGroupPage({
         serviceName: group.service.name,
         serviceIcon: group.service.icon ?? "",
         serviceUrl: group.service.url ?? "",
+        serviceAccentColor: group.service.accentColor ?? "",
         billingMode: group.billing.mode,
         currentPrice: String(group.billing.currentPrice),
         currency: group.billing.currency,

@@ -178,6 +178,7 @@ export async function sendPriceChangeAnnouncements(
     oldPrice: previousPrice,
     newPrice,
     currency,
+    accentColor: group.service?.accentColor ?? null,
   });
   const telegramText = buildPriceChangeTelegramText({
     groupName,
@@ -252,6 +253,7 @@ export async function sendPriceChangeAnnouncements(
         newPrice,
         currency,
         unsubscribeUrl,
+        accentColor: group.service?.accentColor ?? null,
       });
       await sendNotification(
         {

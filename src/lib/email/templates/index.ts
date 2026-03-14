@@ -58,8 +58,12 @@ export function getNotificationTemplatePreview(
           "paymentLink",
           "confirmUrl",
           "extraText",
+          "accentColor",
         ],
-        emailHtml: buildPaymentReminderEmailHtml(paymentReminderSampleParams),
+        emailHtml: buildPaymentReminderEmailHtml({
+          ...paymentReminderSampleParams,
+          accentColor: "#3b82f6",
+        }),
         telegramText: buildPaymentReminderTelegramText(paymentReminderSampleParams),
       };
     case "admin_confirmation_request":
@@ -70,8 +74,11 @@ export function getNotificationTemplatePreview(
           "Notification sent to the group owner when members mark their payment as completed.",
         subject: `Verify payments for ${adminFollowUpSampleParams.groupName}`,
         channels: ["email", "telegram"],
-        variables: ["groupName", "periodLabel", "currency", "unverifiedMembers"],
-        emailHtml: buildAdminFollowUpEmailHtml(adminFollowUpSampleParams),
+        variables: ["groupName", "periodLabel", "currency", "unverifiedMembers", "accentColor"],
+        emailHtml: buildAdminFollowUpEmailHtml({
+          ...adminFollowUpSampleParams,
+          accentColor: "#3b82f6",
+        }),
         telegramText: buildAdminFollowUpTelegramText(adminFollowUpSampleParams),
       };
     case "price_change":
@@ -88,8 +95,12 @@ export function getNotificationTemplatePreview(
           "oldPrice",
           "newPrice",
           "currency",
+          "accentColor",
         ],
-        emailHtml: buildPriceChangeEmailHtml(priceChangeSampleParams),
+        emailHtml: buildPriceChangeEmailHtml({
+          ...priceChangeSampleParams,
+          accentColor: "#3b82f6",
+        }),
         telegramText: buildPriceChangeTelegramText(priceChangeSampleParams),
       };
     case "invite":
@@ -113,8 +124,12 @@ export function getNotificationTemplatePreview(
           "isPublic",
           "appUrl",
           "telegramBotUsername",
+          "accentColor",
         ],
-        emailHtml: buildGroupInviteEmailHtml(groupInviteSampleParams),
+        emailHtml: buildGroupInviteEmailHtml({
+          ...groupInviteSampleParams,
+          accentColor: "#3b82f6",
+        }),
         telegramText: buildGroupInviteTelegramText(groupInviteSampleParams),
       };
     default:

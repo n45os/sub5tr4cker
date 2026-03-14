@@ -68,6 +68,7 @@ export async function sendReminderForPayment(
     ownerName: "the admin",
     extraText: group.announcements?.extraText ?? null,
     unsubscribeUrl,
+    accentColor: group.service?.accentColor ?? null,
   });
 
   const keyboard = paymentConfirmationKeyboard(

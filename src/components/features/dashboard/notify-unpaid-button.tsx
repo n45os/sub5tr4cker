@@ -96,19 +96,15 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
     }
   }, []);
 
-  const handleOpenChange = useCallback(
-    (next: boolean) => {
-      setOpen(next);
-      if (next) loadPreview();
-      else {
-        setPreview(null);
-        setPreviewError(null);
-        setSendResult(null);
-        setSendError(null);
-      }
-    },
-    [loadPreview]
-  );
+  const handleOpenChange = useCallback((next: boolean) => {
+    setOpen(next);
+    if (!next) {
+      setPreview(null);
+      setPreviewError(null);
+      setSendResult(null);
+      setSendError(null);
+    }
+  }, []);
 
   async function handleConfirm() {
     setSendError(null);
@@ -142,7 +138,10 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
         type="button"
         variant="default"
         disabled={disabled}
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          loadPreview();
+          setOpen(true);
+        }}
       >
         <Bell className="size-4" />
         Notify all unpaid
@@ -155,6 +154,12 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
               Send payment reminders to members with pending or overdue payments. Delivery uses each member’s preferences; unsubscribed members will not receive email.
             </DialogDescription>
           </DialogHeader>
+
+          {preview && !previewLoading && preview.summary.totalPayments > 0 && (
+            <p className="text-sm font-medium text-foreground">
+              Here&apos;s exactly what will happen when you confirm:
+            </p>
+          )}
 
           {previewLoading && (
             <div className="flex items-center gap-2 py-6 text-muted-foreground">
@@ -260,8 +265,14 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
               </Button>
               {!showResult && canSend && (
                 <Button onClick={handleConfirm} disabled={sending}>
-                  {sending ? <Loader2 className="size-4 animate-spin" /> : null}
-                  {sending ? " Sending…" : "Confirm and send"}
+                  {sending ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Sending…
+                    </>
+                  ) : (
+                    "Confirm"
+                  )}
                 </Button>
               )}
             </DialogFooter>

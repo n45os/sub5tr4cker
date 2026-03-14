@@ -22,6 +22,8 @@ export interface IGroup extends Document {
     name: string;
     icon: string | null;
     url: string | null;
+    /** hex color (e.g. #3b82f6) used as accent in notification emails */
+    accentColor: string | null;
   };
   billing: {
     mode: "equal_split" | "fixed_amount" | "variable";
@@ -82,6 +84,7 @@ const groupSchema = new Schema<IGroup>(
       name: { type: String, required: true },
       icon: { type: String, default: null },
       url: { type: String, default: null },
+      accentColor: { type: String, default: null },
     },
     billing: {
       mode: {

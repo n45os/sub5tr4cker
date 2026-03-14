@@ -66,6 +66,7 @@ async function nudgeAdminForConfirmations(
         amount: payment.amount,
       })
     ),
+    accentColor: group.service?.accentColor ?? null,
   };
 
   const emailHtml = buildAdminFollowUpEmailHtml(templateParams);

@@ -45,7 +45,7 @@ Create a new subscription group. Authenticated user becomes the admin.
 ```json
 {
   "name": "YouTube Premium Family",
-  "service": { "name": "YouTube Premium" },
+  "service": { "name": "YouTube Premium", "accentColor": "#3b82f6" },
   "billing": {
     "mode": "equal_split",
     "currentPrice": 18,
@@ -74,8 +74,9 @@ Get full group details. Admin sees everything, members see limited info.
 
 Update group settings. Admin only.
 
-The editable payload covers general details, billing configuration, payment
-instructions, and the values used by the dashboard edit flow.
+The editable payload covers general details, service (including optional
+`service.accentColor` hex for notification email branding), billing configuration,
+payment instructions, and the values used by the dashboard edit flow.
 
 ### `DELETE /api/groups/[groupId]`
 

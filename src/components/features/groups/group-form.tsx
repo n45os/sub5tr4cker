@@ -45,6 +45,7 @@ export interface GroupFormValues {
   serviceName: string;
   serviceIcon: string;
   serviceUrl: string;
+  serviceAccentColor: string;
   billingMode: BillingMode;
   currentPrice: string;
   currency: string;
@@ -70,6 +71,7 @@ const defaultValues: GroupFormValues = {
   serviceName: "",
   serviceIcon: "",
   serviceUrl: "",
+  serviceAccentColor: "",
   billingMode: "equal_split",
   currentPrice: "",
   currency: "EUR",
@@ -206,6 +208,9 @@ export function GroupForm({
         name: form.serviceName.trim(),
         icon: form.serviceIcon.trim() || null,
         url: form.serviceUrl.trim() || null,
+        accentColor: /^#[0-9A-Fa-f]{6}$/.test(form.serviceAccentColor.trim())
+          ? form.serviceAccentColor.trim()
+          : null,
       },
       billing: {
         mode: form.billingMode,
@@ -372,6 +377,38 @@ export function GroupForm({
                   }
                   placeholder="https://…"
                 />
+              </div>
+
+              <div className="grid gap-2">
+                <FieldLabel htmlFor="service-accent" hint="Used as the accent color in notification emails for this group.">
+                  Accent color
+                </FieldLabel>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="service-accent"
+                    type="color"
+                    className="h-10 w-14 cursor-pointer rounded border border-input bg-background p-1"
+                    value={
+                      /^#[0-9A-Fa-f]{6}$/.test(form.serviceAccentColor)
+                        ? form.serviceAccentColor
+                        : "#3b82f6"
+                    }
+                    onChange={(event) =>
+                      updateField("serviceAccentColor", event.target.value)
+                    }
+                    aria-label="Pick accent color"
+                  />
+                  <Input
+                    type="text"
+                    value={form.serviceAccentColor}
+                    onChange={(event) =>
+                      updateField("serviceAccentColor", event.target.value)
+                    }
+                    placeholder="#3b82f6"
+                    className="font-mono"
+                    maxLength={7}
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>

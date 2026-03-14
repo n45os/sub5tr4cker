@@ -147,6 +147,7 @@ export async function POST(
       appUrl: normalizedAppUrl,
       telegramBotUsername,
       unsubscribeUrl,
+      accentColor: group.service?.accentColor ?? null,
     };
 
     const emailHtml = buildGroupInviteEmailHtml(params);

@@ -1,4 +1,5 @@
 import { buildEmailFooterHtml } from "@/lib/email/footer";
+import { getAccentColor, buildAutomatedMessageBadgeHtml } from "@/lib/email/branding";
 
 export interface GroupInviteTemplateParams {
   memberName: string;
@@ -15,6 +16,8 @@ export interface GroupInviteTemplateParams {
   telegramBotUsername: string | null;
   /** optional; when set, footer includes unsubscribe link */
   unsubscribeUrl?: string | null;
+  /** optional; hex accent for header and primary buttons */
+  accentColor?: string | null;
 }
 
 export const groupInviteSampleParams: GroupInviteTemplateParams = {
@@ -35,6 +38,7 @@ export const groupInviteSampleParams: GroupInviteTemplateParams = {
 export function buildGroupInviteEmailHtml(
   params: GroupInviteTemplateParams
 ): string {
+  const accent = getAccentColor(params.accentColor);
   const viewGroupUrl = params.isPublic && params.appUrl
     ? `${params.appUrl.replace(/\/$/, "")}/dashboard/groups/${params.groupId}`
     : null;
@@ -78,13 +82,13 @@ export function buildGroupInviteEmailHtml(
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; padding: 20px; }
         .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .header { background: #3b82f6; color: #fff; padding: 24px; text-align: center; }
+        .header { background: ${accent}; color: #fff; padding: 24px; text-align: center; }
         .header h1 { margin: 0; font-size: 20px; }
         .body { padding: 24px; }
         .section { margin: 20px 0; }
         .section-title { font-weight: 600; color: #1e293b; margin-bottom: 8px; }
         .reply-section { background: #f8fafc; padding: 16px; border-radius: 6px; }
-        .btn { display: inline-block; background: #3b82f6; color: #fff; text-decoration: none; padding: 12px 32px; border-radius: 6px; font-weight: 600; }
+        .btn { display: inline-block; background: ${accent}; color: #fff; text-decoration: none; padding: 12px 32px; border-radius: 6px; font-weight: 600; }
         .btn-secondary { background: #64748b; }
         .cta { text-align: center; margin: 16px 0; }
         .hint { font-size: 13px; color: #64748b; text-align: center; margin-top: 8px; }
@@ -94,6 +98,7 @@ export function buildGroupInviteEmailHtml(
     </head>
     <body>
       <div class="container">
+        ${buildAutomatedMessageBadgeHtml()}
         <div class="header">
           <h1>You've been added to ${params.groupName}</h1>
         </div>

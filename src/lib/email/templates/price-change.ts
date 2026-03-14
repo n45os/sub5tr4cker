@@ -1,4 +1,5 @@
 import { buildEmailFooterHtml } from "@/lib/email/footer";
+import { getAccentColor, buildAutomatedMessageBadgeHtml } from "@/lib/email/branding";
 
 export interface PriceChangeTemplateParams {
   groupName: string;
@@ -8,6 +9,8 @@ export interface PriceChangeTemplateParams {
   currency: string;
   /** optional; when set, footer includes unsubscribe link */
   unsubscribeUrl?: string | null;
+  /** optional; hex accent for header */
+  accentColor?: string | null;
 }
 
 export const priceChangeSampleParams: PriceChangeTemplateParams = {
@@ -22,6 +25,7 @@ export const priceChangeSampleParams: PriceChangeTemplateParams = {
 export function buildPriceChangeEmailHtml(
   params: PriceChangeTemplateParams
 ): string {
+  const accent = getAccentColor(params.accentColor);
   return `
     <!DOCTYPE html>
     <html>
@@ -30,7 +34,7 @@ export function buildPriceChangeEmailHtml(
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; padding: 20px; }
         .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .header { background: #3b82f6; color: #fff; padding: 24px; text-align: center; }
+        .header { background: ${accent}; color: #fff; padding: 24px; text-align: center; }
         .header h1 { margin: 0; font-size: 20px; }
         .body { padding: 24px; }
         .price-row { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 20px 0; flex-wrap: wrap; }
@@ -41,6 +45,7 @@ export function buildPriceChangeEmailHtml(
     </head>
     <body>
       <div class="container">
+        ${buildAutomatedMessageBadgeHtml()}
         <div class="header">
           <h1>Price update</h1>
         </div>

@@ -1,4 +1,5 @@
 import { buildEmailFooterHtml } from "@/lib/email/footer";
+import { getAccentColor, buildAutomatedMessageBadgeHtml } from "@/lib/email/branding";
 
 export interface PaymentReminderTemplateParams {
   memberName: string;
@@ -13,6 +14,8 @@ export interface PaymentReminderTemplateParams {
   extraText: string | null;
   /** optional; when set, footer includes repo link and unsubscribe link */
   unsubscribeUrl?: string | null;
+  /** optional; hex accent for header and primary buttons */
+  accentColor?: string | null;
 }
 
 export const paymentReminderSampleParams: PaymentReminderTemplateParams = {
@@ -31,6 +34,7 @@ export const paymentReminderSampleParams: PaymentReminderTemplateParams = {
 export function buildPaymentReminderEmailHtml(
   params: PaymentReminderTemplateParams
 ): string {
+  const accent = getAccentColor(params.accentColor);
   return `
     <!DOCTYPE html>
     <html>
@@ -39,11 +43,11 @@ export function buildPaymentReminderEmailHtml(
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; padding: 20px; }
         .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .header { background: #3b82f6; color: #fff; padding: 24px; text-align: center; }
+        .header { background: ${accent}; color: #fff; padding: 24px; text-align: center; }
         .header h1 { margin: 0; font-size: 20px; }
         .body { padding: 24px; }
         .amount { font-size: 28px; font-weight: bold; color: #1e293b; text-align: center; margin: 20px 0; }
-        .btn { display: inline-block; background: #3b82f6; color: #fff; text-decoration: none; padding: 12px 32px; border-radius: 6px; font-weight: 600; }
+        .btn { display: inline-block; background: ${accent}; color: #fff; text-decoration: none; padding: 12px 32px; border-radius: 6px; font-weight: 600; }
         .btn-confirm { background: #22c55e; }
         .footer { padding: 16px 24px; background: #f8fafc; color: #94a3b8; font-size: 12px; text-align: center; }
         .cta { text-align: center; margin: 24px 0; }
@@ -51,6 +55,7 @@ export function buildPaymentReminderEmailHtml(
     </head>
     <body>
       <div class="container">
+        ${buildAutomatedMessageBadgeHtml()}
         <div class="header">
           <h1>Payment Reminder</h1>
         </div>

@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.0] - 2026-03-18
+
+### Added
+- **Per-group accent color** — Admins can set an optional accent color (hex) per group in the group form (create/edit). The color is used as the accent in notification emails (headers, primary buttons) for that group. Stored as `service.accentColor`; validated as 6-digit hex (e.g. `#3b82f6`).
+- **Automated-message badge** — All notification email templates now show a clear “This is an automated message from your subscription group.” badge near the top so recipients know the email is system-generated.
+- **Email branding helper** — Shared `src/lib/email/branding.ts` provides `getAccentColor()`, `buildAutomatedMessageBadgeHtml()`, and default accent; payment reminder, group invite, price change, and admin follow-up templates use them.
+
+### Changed
+- Group model and APIs: `service` object now supports optional `accentColor`. POST/PATCH group payloads accept it; GET group and list responses include it when present.
+- Notification previews (dashboard templates) use the default accent and the new automated-message badge so preview matches delivered emails.
+
 ## [0.10.0] - 2026-03-18
 
 ### Added

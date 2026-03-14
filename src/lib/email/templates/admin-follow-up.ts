@@ -1,4 +1,5 @@
 import { buildEmailFooterHtml } from "@/lib/email/footer";
+import { buildAutomatedMessageBadgeHtml } from "@/lib/email/branding";
 
 export interface AdminFollowUpTemplateParams {
   groupName: string;
@@ -8,6 +9,8 @@ export interface AdminFollowUpTemplateParams {
     memberNickname: string;
     amount: number;
   }>;
+  /** optional; not used for this minimal template, kept for consistency */
+  accentColor?: string | null;
 }
 
 export const adminFollowUpSampleParams: AdminFollowUpTemplateParams = {
@@ -31,12 +34,17 @@ export function buildAdminFollowUpEmailHtml(
     .join("\n");
 
   return `
-    <p>Hi,</p>
-    <p>The following members say they've paid for <strong>${params.groupName}</strong> — ${params.periodLabel}:</p>
-    <pre>${memberList}</pre>
-    <p>Please verify their payments in the dashboard.</p>
-    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
-      ${buildEmailFooterHtml({})}
+    <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      ${buildAutomatedMessageBadgeHtml()}
+      <div style="padding: 24px;">
+        <p>Hi,</p>
+        <p>The following members say they've paid for <strong>${params.groupName}</strong> — ${params.periodLabel}:</p>
+        <pre>${memberList}</pre>
+        <p>Please verify their payments in the dashboard.</p>
+      </div>
+      <div style="margin-top: 24px; padding: 16px 24px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
+        ${buildEmailFooterHtml({})}
+      </div>
     </div>
   `;
 }

@@ -60,6 +60,7 @@ A subscription group managed by an admin.
     name: string,                         // e.g., "YouTube Premium"
     icon: string | null,                  // URL or emoji
     url: string | null,                   // service URL
+    accentColor: string | null,           // hex e.g. #3b82f6; used in notification emails
   },
 
   // billing configuration

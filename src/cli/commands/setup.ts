@@ -1,3 +1,4 @@
+import fs from "fs";
 import path from "path";
 import { createClackPrompter } from "@/cli/wizard/clack-prompter";
 import { loadCurrentConfig, seedSettings, writeBootstrapEnv } from "@/cli/wizard/finalize";
@@ -7,10 +8,16 @@ import { runEmailStep } from "@/cli/wizard/steps/email";
 import { runGeneralStep } from "@/cli/wizard/steps/general";
 import { runTelegramStep } from "@/cli/wizard/steps/telegram";
 
+const MONGODB_DATA_DIR = ".mongodb-data";
+
 export async function runSetupCommand() {
   const prompter = createClackPrompter();
   const rootDir = process.cwd();
   const state = await loadCurrentConfig(rootDir);
+
+  // ensure local Mongo data dir exists for repo-root persistence
+  const mongoDataPath = path.join(rootDir, MONGODB_DATA_DIR);
+  fs.mkdirSync(mongoDataPath, { recursive: true });
 
   await prompter.intro("SubsTrack setup");
   await prompter.note(

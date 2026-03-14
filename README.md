@@ -67,6 +67,36 @@ If you prefer npm scripts, `npm run setup` and `npm run configure` work too.
 
 Open [http://localhost:3054](http://localhost:3054).
 
+### Local MongoDB (no Docker)
+
+To run MongoDB natively and store data in the repo root (e.g. for local development):
+
+1. **Start MongoDB** with the project’s data directory (`.mongodb-data/` at repo root; created automatically by `pnpm setup`, or create it yourself):
+
+   ```bash
+   mongod --dbpath .mongodb-data --port 27017
+   ```
+
+2. **Point the app at local Mongo** by setting in `.env.local` (or via `pnpm setup`):
+
+   ```
+   MONGODB_URI=mongodb://localhost:27017/substrack
+   ```
+
+3. **Run the app** (in another terminal):
+
+   ```bash
+   pnpm dev
+   ```
+
+4. **Optional — run the cron job runner** (billing periods, reminders, follow-ups):
+
+   ```bash
+   pnpm run cron
+   ```
+
+Data lives under `.mongodb-data/` (git-ignored). Leave `mongod` running while you use the app.
+
 ### Documentation
 
 Full documentation (user guide and technical reference) is built into the app:

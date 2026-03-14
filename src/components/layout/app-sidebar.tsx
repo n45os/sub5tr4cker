@@ -31,53 +31,27 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 
-const navigationItems = [
-  {
-    title: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-    isActive: (pathname: string) => pathname === "/dashboard",
-  },
-  {
-    title: "Groups",
-    href: "/dashboard/groups",
-    icon: Users,
-    isActive: (pathname: string) => pathname === "/dashboard/groups",
-  },
-  {
-    title: "Activity",
-    href: "/dashboard/activity",
-    icon: Activity,
-    isActive: (pathname: string) =>
-      pathname.startsWith("/dashboard/activity"),
-  },
-  {
-    title: "Payments",
-    href: "/dashboard/payments",
-    icon: Wallet,
-    isActive: (pathname: string) =>
-      pathname.startsWith("/dashboard/payments"),
-  },
-  {
-    title: "Notifications",
-    href: "/dashboard/notifications",
-    icon: Bell,
-    isActive: (pathname: string) =>
-      pathname.startsWith("/dashboard/notifications"),
-  },
-  {
-    title: "Profile",
-    href: "/dashboard/profile",
-    icon: User,
-    isActive: (pathname: string) => pathname.startsWith("/dashboard/profile"),
-  },
-  {
-    title: "Settings",
-    href: "/dashboard/settings",
-    icon: Settings,
-    isActive: (pathname: string) => pathname.startsWith("/dashboard/settings"),
-  },
+const ALL_NAV_ITEMS = [
+  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard, adminOnly: false },
+  { title: "Groups", href: "/dashboard/groups", icon: Users, adminOnly: false },
+  { title: "Activity", href: "/dashboard/activity", icon: Activity, adminOnly: true },
+  { title: "Payments", href: "/dashboard/payments", icon: Wallet, adminOnly: true },
+  { title: "Notifications", href: "/dashboard/notifications", icon: Bell, adminOnly: true },
+  { title: "Profile", href: "/dashboard/profile", icon: User, adminOnly: false },
+  { title: "Settings", href: "/dashboard/settings", icon: Settings, adminOnly: true },
 ];
+
+function getNavigationItems(isAdmin: boolean) {
+  return ALL_NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map(
+    (item) => ({
+      title: item.title,
+      href: item.href,
+      icon: item.icon,
+      isActive: (pathname: string) =>
+        pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)),
+    })
+  );
+}
 
 function getInitials(name?: string | null, email?: string | null) {
   const source = name?.trim() || email?.trim() || "ST";
@@ -95,12 +69,15 @@ interface AppSidebarProps {
     name?: string | null;
     email?: string | null;
     image?: string | null;
+    role?: "admin" | "user";
   };
   groups: Array<{ _id: string; name: string }>;
 }
 
 export function AppSidebar({ user, groups }: AppSidebarProps) {
   const pathname = usePathname();
+  const isAdmin = user.role === "admin";
+  const navigationItems = getNavigationItems(isAdmin);
 
   return (
     <Sidebar collapsible="icon" variant="inset">
@@ -163,15 +140,17 @@ export function AppSidebar({ user, groups }: AppSidebarProps) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  render={<Link href="/dashboard/groups/new" />}
-                  tooltip="New group"
-                >
-                  <Plus />
-                  <span>New group</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {isAdmin ? (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    render={<Link href="/dashboard/groups/new" />}
+                    tooltip="New group"
+                  >
+                    <Plus />
+                    <span>New group</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ) : null}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

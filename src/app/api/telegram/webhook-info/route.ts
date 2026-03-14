@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { isInstanceAdmin } from "@/lib/authorization";
 import { getSetting } from "@/lib/settings/service";
 
 type TelegramWebhookInfo = {
@@ -26,6 +27,12 @@ export async function GET() {
     return NextResponse.json(
       { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
       { status: 401 }
+    );
+  }
+  if (!isInstanceAdmin(session)) {
+    return NextResponse.json(
+      { error: { code: "FORBIDDEN", message: "Only admins can view webhook info" } },
+      { status: 403 }
     );
   }
 

@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.21.0] - 2026-03-18
+
+### Added
+
+- **Instance-level role** — User model has `role: "admin" | "user"`. The first registered user becomes `"admin"`; new users get `"user"`. Existing deployments: the earliest user (by `createdAt`) is promoted to admin on first session load via `ensureInstanceAdmin()`.
+- **Member access control** — Non-admin users (members) only see their own data. They cannot see other members’ emails, payment statuses, activity logs, or notification delivery logs. They cannot access Settings, Activity, Payments, or Notification templates pages, or create groups.
+- **Filtered group and billing APIs** — `GET /api/groups/[groupId]` for members returns `memberCount` and `myMembership` instead of the full `members` array. `GET /api/groups/[groupId]/billing` for members returns only the calling member’s payment rows per period.
+- **Admin-only API guards** — Settings, Activity, Notifications, Payments, Plugins, notification templates, dashboard quick-status, notify-unpaid, create group, and Telegram webhook/set-webhook endpoints require `role === "admin"` and return 403 for regular users.
+
+### Changed
+
+- **Dashboard** — Admins see the full ops snapshot, quick status, and workspace pulse; members see a simplified “Your groups” view without those sections. Sidebar and header hide Activity, Payments, Notifications, Settings, and “New group” for non-admins.
+- **Group detail page** — Members see group info, member count, and their own payment status only; members list and notification log are hidden. Settings and Activity pages redirect non-admins to the dashboard.
+
 ## [0.20.0] - 2026-03-18
 
 ### Added

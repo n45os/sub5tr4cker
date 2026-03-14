@@ -1,5 +1,8 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { isInstanceAdmin } from "@/lib/authorization";
 import {
   Activity,
   Bell,
@@ -298,6 +301,10 @@ interface ActivityPageProps {
 }
 
 export default async function ActivityPage({ searchParams }: ActivityPageProps) {
+  const session = await auth();
+  if (!session?.user?.id || !isInstanceAdmin(session)) {
+    redirect("/dashboard");
+  }
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
   const params = await searchParams;

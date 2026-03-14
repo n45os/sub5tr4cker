@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { isInstanceAdmin } from "@/lib/authorization";
 import { loadPlugins, getPluginChannels } from "@/lib/plugins/loader";
 import { getSetting } from "@/lib/settings/service";
 
@@ -9,6 +10,12 @@ export async function GET() {
     return NextResponse.json(
       { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
       { status: 401 }
+    );
+  }
+  if (!isInstanceAdmin(session)) {
+    return NextResponse.json(
+      { error: { code: "FORBIDDEN", message: "Only admins can view plugins" } },
+      { status: 403 }
     );
   }
 

@@ -14,13 +14,14 @@ User ──┬── owns ──── Group ──── has many ──── 
 
 ## User
 
-The person using the platform. Can be an admin (group owner) or a member of groups.
+The person using the platform. Can be an instance admin (first user or promoted), a group owner, or a member of groups.
 
 ```typescript
 {
   _id: ObjectId,
   name: string,
   email: string,                          // unique, used for auth
+  role: 'admin' | 'user',                 // instance-level: admin can access settings, activity, create groups; default 'user'
   emailVerified: Date | null,
   image: string | null,                   // avatar URL
   hashedPassword: string | null,          // null if using OAuth only

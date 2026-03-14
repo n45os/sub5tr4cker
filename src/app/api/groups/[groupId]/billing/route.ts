@@ -6,6 +6,11 @@ import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group, BillingPeriod } from "@/models";
 import type { IGroupMember, IMemberPayment } from "@/models";
+import {
+  filterBillingForMember,
+  getGroupAccess,
+  getMemberEntry,
+} from "@/lib/authorization";
 import { calculateShares } from "@/lib/billing/calculator";
 import { createConfirmationToken } from "@/lib/tokens";
 
@@ -57,26 +62,39 @@ export async function GET(
     );
   }
 
-  const isAdmin = group.admin.toString() === session.user.id;
-  const isMember = group.members.some(
-    (m: IGroupMember) =>
-      m.isActive &&
-      !m.leftAt &&
-      (m.user?.toString() === session.user.id || m.email === session.user.email)
+  const access = getGroupAccess(
+    group,
+    session.user.id,
+    (session.user.email as string) || ""
   );
-  if (!isAdmin && !isMember) {
+  if (!access) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Not authorized to view this group" } },
       { status: 403 }
     );
   }
 
+  const memberEntry = getMemberEntry(
+    group,
+    session.user.id,
+    (session.user.email as string) || ""
+  );
+  if (!memberEntry) {
+    return NextResponse.json(
+      { error: { code: "FORBIDDEN", message: "Not authorized to view this group" } },
+      { status: 403 }
+    );
+  }
+
+  const effectiveMemberId =
+    access === "member" ? memberEntry._id.toString() : memberIdFilter;
+
   const query: Record<string, unknown> = { group: groupId };
   if (statusFilter) {
     query["payments.status"] = statusFilter;
   }
-  if (memberIdFilter && mongoose.isValidObjectId(memberIdFilter)) {
-    query["payments.memberId"] = memberIdFilter;
+  if (effectiveMemberId && mongoose.isValidObjectId(effectiveMemberId)) {
+    query["payments.memberId"] = effectiveMemberId;
   }
 
   const total = await BillingPeriod.countDocuments(query);
@@ -103,7 +121,10 @@ export async function GET(
     }>;
     isFullyPaid: boolean;
   };
-  const list = (periods as PeriodDoc[]).map((p) => {
+  const allPeriods = periods as PeriodDoc[];
+  const list = access === "member"
+    ? filterBillingForMember(allPeriods, memberEntry._id.toString())
+    : allPeriods.map((p) => {
     const payments = p.payments.map((pay) => ({
       memberId: pay.memberId.toString(),
       memberNickname: pay.memberNickname,
@@ -116,8 +137,8 @@ export async function GET(
         ? (pay.adminConfirmedAt as Date).toISOString()
         : null,
     }));
-    const filteredPayments = memberIdFilter
-      ? payments.filter((pay) => pay.memberId === memberIdFilter)
+    const filteredPayments = effectiveMemberId
+      ? payments.filter((pay) => pay.memberId === effectiveMemberId)
       : payments;
     return {
       _id: p._id.toString(),

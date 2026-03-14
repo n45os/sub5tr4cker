@@ -6,6 +6,11 @@ import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group } from "@/models";
 import type { IGroupMember } from "@/models";
+import {
+  filterGroupForMember,
+  getGroupAccess,
+  getMemberEntry,
+} from "@/lib/authorization";
 import { sendPriceChangeAnnouncements } from "@/lib/notifications/service";
 
 const updateGroupSchema = z
@@ -44,21 +49,6 @@ const updateGroupSchema = z
   })
   .strict();
 
-function canAccess(
-  group: InstanceType<typeof Group>,
-  userId: string,
-  userEmail: string
-): "admin" | "member" | null {
-  if (group.admin.toString() === userId) return "admin";
-  const member = group.members.find(
-    (m: IGroupMember) =>
-      m.isActive &&
-      !m.leftAt &&
-      (m.user?.toString() === userId || m.email === userEmail)
-  );
-  return member ? "member" : null;
-}
-
 export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ groupId: string }> }
@@ -88,7 +78,7 @@ export async function GET(
     );
   }
 
-  const access = canAccess(
+  const access = getGroupAccess(
     group,
     session.user.id,
     (session.user.email as string) || ""
@@ -100,43 +90,19 @@ export async function GET(
     );
   }
 
-  const payload: Record<string, unknown> = {
-    _id: group._id.toString(),
-    name: group.name,
-    description: group.description,
-    service: group.service,
-    billing: group.billing,
-    payment: group.payment,
-    notifications: {
-      remindersEnabled: group.notifications?.remindersEnabled ?? true,
-      followUpsEnabled: group.notifications?.followUpsEnabled ?? true,
-      priceChangeEnabled:
-        group.notifications?.priceChangeEnabled ??
-        group.announcements?.notifyOnPriceChange ??
-        true,
-    },
-    isActive: group.isActive,
-    initializedAt: group.initializedAt
-      ? (group.initializedAt as Date).toISOString()
-      : null,
-    role: access,
-    members: group.members
-      .filter((m: IGroupMember) => m.isActive && !m.leftAt)
-      .map((m: IGroupMember) => ({
-        _id: m._id.toString(),
-        email: m.email,
-        nickname: m.nickname,
-        role: m.role,
-        customAmount: m.customAmount,
-        hasAccount: !!m.user,
-        acceptedAt: m.acceptedAt
-          ? (m.acceptedAt as Date).toISOString()
-          : null,
-        billingStartsAt: m.billingStartsAt
-          ? (m.billingStartsAt as Date).toISOString().slice(0, 10)
-          : null,
-      })),
-  };
+  const memberEntry = getMemberEntry(
+    group,
+    session.user.id,
+    (session.user.email as string) || ""
+  );
+  if (!memberEntry) {
+    return NextResponse.json(
+      { error: { code: "FORBIDDEN", message: "Not authorized to view this group" } },
+      { status: 403 }
+    );
+  }
+
+  const payload = filterGroupForMember(group, memberEntry, access);
 
   return NextResponse.json({ data: payload });
 }

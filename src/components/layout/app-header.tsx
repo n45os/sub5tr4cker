@@ -129,6 +129,7 @@ interface AppHeaderProps {
     name?: string | null;
     email?: string | null;
     image?: string | null;
+    role?: "admin" | "user";
   };
 }
 
@@ -146,12 +147,14 @@ export function AppHeader({ user }: AppHeaderProps) {
           </div>
 
           <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard/groups/new"
-              className={cn(buttonVariants({ variant: "default" }))}
-            >
-              Create group
-            </Link>
+            {user.role === "admin" ? (
+              <Link
+                href="/dashboard/groups/new"
+                className={cn(buttonVariants({ variant: "default" }))}
+              >
+                Create group
+              </Link>
+            ) : null}
             <Button variant="outline" className="h-10 px-3">
               <Avatar className="size-7">
                 <AvatarImage src={user.image ?? undefined} alt={user.name ?? "User"} />

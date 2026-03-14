@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { auth } from "@/lib/auth";
 import { getServerBaseUrl } from "@/lib/server-url";
 
 interface GroupSummary {
@@ -36,6 +37,8 @@ async function getGroups(cookieHeader: string): Promise<GroupSummary[]> {
 }
 
 export default async function DashboardPage() {
+  const session = await auth();
+  const isAdmin = (session?.user as { role?: "admin" | "user" } | undefined)?.role === "admin";
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
   const groups = await getGroups(cookieHeader);
@@ -48,87 +51,112 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-      <section className="grid gap-4 lg:grid-cols-[1.5fr_repeat(3,1fr)]">
-        <Card className="border-border/70 bg-gradient-to-br from-card via-card to-muted/40 shadow-sm">
-          <CardHeader>
-            <Badge variant="outline" className="w-fit">
-              Ops snapshot
-            </Badge>
-            <CardTitle className="text-3xl">Run every subscription from one place</CardTitle>
-            <CardDescription className="max-w-xl text-sm">
-              Track owners, unpaid balances, and upcoming cycles without bouncing
-              between env files, message drafts, and ad-hoc spreadsheets.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      {isAdmin ? (
+        <>
+          <section className="grid gap-4 lg:grid-cols-[1.5fr_repeat(3,1fr)]">
+            <Card className="border-border/70 bg-gradient-to-br from-card via-card to-muted/40 shadow-sm">
+              <CardHeader>
+                <Badge variant="outline" className="w-fit">
+                  Ops snapshot
+                </Badge>
+                <CardTitle className="text-3xl">Run every subscription from one place</CardTitle>
+                <CardDescription className="max-w-xl text-sm">
+                  Track owners, unpaid balances, and upcoming cycles without bouncing
+                  between env files, message drafts, and ad-hoc spreadsheets.
+                </CardDescription>
+              </CardHeader>
+            </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total groups</CardDescription>
-            <CardTitle className="text-3xl">{groups.length}</CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CreditCard className="size-4" />
-            Active subscriptions
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Total groups</CardDescription>
+                <CardTitle className="text-3xl">{groups.length}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
+                <CreditCard className="size-4" />
+                Active subscriptions
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Members tracked</CardDescription>
-            <CardTitle className="text-3xl">{totalMembers}</CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Users className="size-4" />
-            Across every active group
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Members tracked</CardDescription>
+                <CardTitle className="text-3xl">{totalMembers}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Users className="size-4" />
+                Across every active group
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Pending confirmations</CardDescription>
-            <CardTitle className="text-3xl">{totalPending}</CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Bell className="size-4" />
-            Members still waiting for follow-up
-          </CardContent>
-        </Card>
-      </section>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Pending confirmations</CardDescription>
+                <CardTitle className="text-3xl">{totalPending}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Bell className="size-4" />
+                Members still waiting for follow-up
+              </CardContent>
+            </Card>
+          </section>
 
-      <section>
-        <AllGroupsQuickStatus />
-      </section>
+          <section>
+            <AllGroupsQuickStatus />
+          </section>
+        </>
+      ) : (
+        <section className="grid gap-4 md:grid-cols-1">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Groups you belong to</CardDescription>
+              <CardTitle className="text-2xl">{groups.length}</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              Open a group to see your payment status and billing cycle.
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
-      <section className="grid gap-4 lg:grid-cols-[1.8fr_1fr]">
+      <section className={isAdmin ? "grid gap-4 lg:grid-cols-[1.8fr_1fr]" : ""}>
         <Card>
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
               <CardTitle>Your groups</CardTitle>
               <CardDescription>
-                Review pricing, due dates, and unpaid balances at a glance.
+                {isAdmin
+                  ? "Review pricing, due dates, and unpaid balances at a glance."
+                  : "Groups you are a member of. Open one to see your payment status."}
               </CardDescription>
             </div>
-            <Link href="/dashboard/groups/new">
-              <Badge variant="accent" className="px-3 py-1 text-sm">New group</Badge>
-            </Link>
+            {isAdmin ? (
+              <Link href="/dashboard/groups/new">
+                <Badge variant="accent" className="px-3 py-1 text-sm">New group</Badge>
+              </Link>
+            ) : null}
           </CardHeader>
           <CardContent>
             {groups.length === 0 ? (
               <div className="rounded-2xl border border-dashed px-6 py-14 text-center">
                 <p className="text-base font-medium">
-                  You do not have any subscription groups yet.
+                  {isAdmin
+                    ? "You do not have any subscription groups yet."
+                    : "You are not in any subscription groups yet."}
                 </p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Create your first group to start managing reminders, billing
-                  periods, and member confirmations from one dashboard.
+                  {isAdmin
+                    ? "Create your first group to start managing reminders, billing periods, and member confirmations from one dashboard."
+                    : "Ask your group admin to add you, or use an invite link if you have one."}
                 </p>
-                <Link
-                  href="/dashboard/groups/new"
-                  className="mt-5 inline-flex text-sm font-medium text-primary hover:underline"
-                >
-                  Create your first group
-                </Link>
+                {isAdmin ? (
+                  <Link
+                    href="/dashboard/groups/new"
+                    className="mt-5 inline-flex text-sm font-medium text-primary hover:underline"
+                  >
+                    Create your first group
+                  </Link>
+                ) : null}
               </div>
             ) : (
               <ul className="grid gap-5 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
@@ -142,34 +170,36 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Workspace pulse</CardTitle>
-            <CardDescription>
-              A quick read on the current portfolio.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            <div className="rounded-2xl border bg-muted/40 p-4">
-              <p className="text-sm text-muted-foreground">Tracked spend</p>
-              <p className="font-mono mt-2 text-2xl font-semibold tabular-nums">
-                {totalSpend.toFixed(2)} {groups[0]?.billing.currency ?? "EUR"}
-              </p>
-            </div>
-            <div className="rounded-2xl border bg-muted/40 p-4">
-              <p className="text-sm text-muted-foreground">Groups needing attention</p>
-              <p className="font-mono mt-2 text-2xl font-semibold tabular-nums">
-                {groups.filter((group) => group.unpaidCount > 0).length}
-              </p>
-            </div>
-            <div className="rounded-2xl border bg-muted/40 p-4">
-              <p className="text-sm text-muted-foreground">Healthy groups</p>
-              <p className="font-mono mt-2 text-2xl font-semibold tabular-nums">
-                {groups.filter((group) => group.unpaidCount === 0).length}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {isAdmin ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Workspace pulse</CardTitle>
+              <CardDescription>
+                A quick read on the current portfolio.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <div className="rounded-2xl border bg-muted/40 p-4">
+                <p className="text-sm text-muted-foreground">Tracked spend</p>
+                <p className="font-mono mt-2 text-2xl font-semibold tabular-nums">
+                  {totalSpend.toFixed(2)} {groups[0]?.billing.currency ?? "EUR"}
+                </p>
+              </div>
+              <div className="rounded-2xl border bg-muted/40 p-4">
+                <p className="text-sm text-muted-foreground">Groups needing attention</p>
+                <p className="font-mono mt-2 text-2xl font-semibold tabular-nums">
+                  {groups.filter((group) => group.unpaidCount > 0).length}
+                </p>
+              </div>
+              <div className="rounded-2xl border bg-muted/40 p-4">
+                <p className="text-sm text-muted-foreground">Healthy groups</p>
+                <p className="font-mono mt-2 text-2xl font-semibold tabular-nums">
+                  {groups.filter((group) => group.unpaidCount === 0).length}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
       </section>
     </div>
   );

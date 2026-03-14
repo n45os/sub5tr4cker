@@ -43,11 +43,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const usersCount = await User.countDocuments();
   const hashedPassword = await hash(password, 12);
   await User.create({
     name: name.trim(),
     email: normalizedEmail,
     hashedPassword,
+    role: usersCount === 0 ? "admin" : "user",
     notificationPreferences: {
       email: true,
       telegram: false,

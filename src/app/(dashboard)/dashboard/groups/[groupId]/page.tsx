@@ -20,6 +20,17 @@ import { auth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { getServerBaseUrl } from "@/lib/server-url";
 
+interface MemberRow {
+  _id: string;
+  email: string;
+  nickname: string;
+  role: string;
+  customAmount: number | null;
+  hasAccount: boolean;
+  acceptedAt: string | null;
+  billingStartsAt: string | null;
+}
+
 interface GroupDetail {
   _id: string;
   name: string;
@@ -47,16 +58,11 @@ interface GroupDetail {
   };
   role: string;
   initializedAt: string | null;
-  members: Array<{
-    _id: string;
-    email: string;
-    nickname: string;
-    role: string;
-    customAmount: number | null;
-    hasAccount: boolean;
-    acceptedAt: string | null;
-    billingStartsAt: string | null;
-  }>;
+  /** present for admin; absent for member */
+  members?: MemberRow[];
+  /** present for member; absent for admin */
+  memberCount?: number;
+  myMembership?: Omit<MemberRow, "email">;
 }
 
 interface BillingPeriodItem {
@@ -119,18 +125,16 @@ async function getBillingPeriods(
 
 async function getNotifications(
   groupId: string,
-  cookieHeader: string
+  cookieHeader: string,
+  isAdmin: boolean
 ): Promise<NotificationItem[]> {
+  if (!isAdmin) return [];
   const baseUrl = await getServerBaseUrl();
   const res = await fetch(`${baseUrl}/api/notifications?groupId=${groupId}&limit=12`, {
     headers: { cookie: cookieHeader },
     cache: "no-store",
   });
-
-  if (!res.ok) {
-    return [];
-  }
-
+  if (!res.ok) return [];
   const json = await res.json();
   return json.data?.notifications ?? [];
 }
@@ -145,19 +149,25 @@ export default async function GroupDetailPage({
   const cookieHeader = cookieStore.toString();
   const session = await auth();
 
-  const [group, periods, notifications] = await Promise.all([
-    getGroup(groupId, cookieHeader),
-    getBillingPeriods(groupId, cookieHeader),
-    getNotifications(groupId, cookieHeader),
-  ]);
-
+  const group = await getGroup(groupId, cookieHeader);
   if (!group) notFound();
 
+  const isAdmin = group.role === "admin";
+  const [periods, notifications] = await Promise.all([
+    getBillingPeriods(groupId, cookieHeader),
+    getNotifications(groupId, cookieHeader, isAdmin),
+  ]);
+
+  const members = group.members ?? [];
+  const memberCount = group.memberCount ?? members.length;
+  const myMembership = group.myMembership;
   const currentPeriod = periods[0];
-  const acceptedCount = group.members.filter((m) => !!m.acceptedAt).length;
+  const acceptedCount = isAdmin
+    ? members.filter((m) => !!m.acceptedAt).length
+    : (myMembership?.acceptedAt ? 1 : 0);
   const currentMemberId =
-    (session?.user?.email &&
-      group.members.find((m) => m.email === session.user.email)?._id) ??
+    myMembership?._id ??
+    (session?.user?.email && members.find((m) => m.email === session.user.email)?._id) ??
     null;
 
   return (
@@ -181,11 +191,11 @@ export default async function GroupDetailPage({
           </div>
         </div>
 
-        {group.role === "admin" ? (
+        {isAdmin ? (
           <div className="flex flex-wrap items-center gap-2">
             <InitializeNotifyButton
               groupId={groupId}
-              memberCount={group.members.length}
+              memberCount={memberCount}
               initializedAt={group.initializedAt}
             />
             <Link
@@ -215,11 +225,11 @@ export default async function GroupDetailPage({
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Members</CardDescription>
-            <CardTitle className="font-mono text-3xl tabular-nums">{group.members.length}</CardTitle>
+            <CardTitle className="font-mono text-3xl tabular-nums">{memberCount}</CardTitle>
           </CardHeader>
           <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
             <Users className="size-4" />
-            {acceptedCount}/{group.members.length} accepted invites
+            {isAdmin ? `${acceptedCount}/${memberCount} accepted invites` : "On this plan"}
           </CardContent>
         </Card>
         <Card>
@@ -310,28 +320,31 @@ export default async function GroupDetailPage({
             </div>
           </CardContent>
         </Card>
-        {group.role === "admin" ? (
+        {isAdmin ? (
           <InviteLinkCard groupId={groupId} />
         ) : null}
       </section>
 
-      {/* members */}
-      <GroupMembersPanel
-        groupId={groupId}
-        members={group.members}
-        currency={group.billing.currency}
-        isAdmin={group.role === "admin"}
-        periods={periods}
-      />
+      {/* members: admin only */}
+      {isAdmin ? (
+        <GroupMembersPanel
+          groupId={groupId}
+          members={members}
+          currency={group.billing.currency}
+          isAdmin
+          periods={periods}
+        />
+      ) : null}
 
-      {/* billing periods */}
+      {/* billing periods / my payment status */}
       {!currentPeriod ? (
         <Card>
           <CardHeader>
-            <CardTitle>No billing periods yet</CardTitle>
+            <CardTitle>{isAdmin ? "No billing periods yet" : "Your payment status"}</CardTitle>
             <CardDescription>
-              Periods are created automatically on the configured cycle day, or
-              manually for variable billing.
+              {isAdmin
+                ? "Periods are created automatically on the configured cycle day, or manually for variable billing."
+                : "No billing periods have been created for this group yet. Your status will appear here."}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -340,23 +353,27 @@ export default async function GroupDetailPage({
           groupId={groupId}
           currency={group.billing.currency}
           periods={periods}
-          members={group.members.map((m) => ({
-            _id: m._id,
-            nickname: m.nickname,
-            email: m.email,
-          }))}
-          isAdmin={group.role === "admin"}
+          members={
+            isAdmin && members.length > 0
+              ? members.map((m) => ({ _id: m._id, nickname: m.nickname, email: m.email }))
+              : myMembership
+                ? [{ _id: myMembership._id, nickname: myMembership.nickname, email: "" }]
+                : []
+          }
+          isAdmin={isAdmin}
           currentMemberId={currentMemberId}
         />
       )}
 
-      {/* notifications */}
-      <GroupNotificationsPanel
-        groupId={groupId}
-        isAdmin={group.role === "admin"}
-        initialPreferences={group.notifications}
-        recentNotifications={notifications}
-      />
+      {/* notifications: admin only */}
+      {isAdmin ? (
+        <GroupNotificationsPanel
+          groupId={groupId}
+          isAdmin
+          initialPreferences={group.notifications}
+          recentNotifications={notifications}
+        />
+      ) : null}
     </div>
   );
 }

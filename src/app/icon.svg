@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- card shape: rounded rectangle (primary green) -->
+  <rect x="2" y="6" width="28" height="20" rx="3" fill="#15803d"/>
+  <!-- stripe (magnetic strip style) -->
+  <rect x="2" y="12" width="28" height="4" fill="rgba(255,255,255,0.35)"/>
+  <!-- chip -->
+  <rect x="6" y="8" width="6" height="5" rx="0.8" fill="rgba(255,255,255,0.5)"/>
+</svg>

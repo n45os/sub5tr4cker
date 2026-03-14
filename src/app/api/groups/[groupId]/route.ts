@@ -128,6 +128,7 @@ export async function GET(
         nickname: m.nickname,
         role: m.role,
         customAmount: m.customAmount,
+        hasAccount: !!m.user,
       })),
   };
 

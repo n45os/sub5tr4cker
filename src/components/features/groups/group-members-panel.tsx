@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Loader2, Mail, UserPlus } from "lucide-react";
 import { PaymentStatusBadge } from "@/components/features/billing/payment-status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -38,6 +39,8 @@ export interface MemberRow {
   nickname: string;
   role: string;
   customAmount: number | null;
+  /** when false, member has not linked an account (invite not accepted) */
+  hasAccount?: boolean;
 }
 
 export interface PeriodPaymentRow {
@@ -88,6 +91,27 @@ export function GroupMembersPanel({
     email: string;
   } | null>(null);
   const [inviteSending, setInviteSending] = useState(false);
+  const [resendingMemberId, setResendingMemberId] = useState<string | null>(null);
+
+  async function handleResendInvite(memberId: string) {
+    setResendingMemberId(memberId);
+    try {
+      const res = await fetch(
+        `/api/groups/${groupId}/members/${memberId}/send-invite`,
+        { method: "POST" }
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error?.message ?? "Failed to send invite.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Failed to send invite. Try again.");
+    } finally {
+      setResendingMemberId(null);
+    }
+  }
 
   async function handleAddMember(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -280,6 +304,7 @@ export function GroupMembersPanel({
               <TableHead className="w-8" />
               <TableHead>Nickname</TableHead>
               <TableHead>Email</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Custom amount</TableHead>
               {periods.length > 0 ? (
@@ -291,7 +316,7 @@ export function GroupMembersPanel({
             {members.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={periods.length > 0 ? 6 : 4}
+                  colSpan={periods.length > 0 ? 7 : 5}
                   className="py-8 text-center text-muted-foreground"
                 >
                   {isAdmin
@@ -347,6 +372,32 @@ export function GroupMembersPanel({
                         {member.nickname}
                       </TableCell>
                       <TableCell>{member.email}</TableCell>
+                      <TableCell>
+                        {member.hasAccount === false ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary" className="font-normal">
+                              Invite pending
+                            </Badge>
+                            {isAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => handleResendInvite(member._id)}
+                                disabled={resendingMemberId === member._id}
+                              >
+                                {resendingMemberId === member._id ? (
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                  "Resend invite"
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="capitalize">{member.role}</TableCell>
                       <TableCell>
                         {member.customAmount
@@ -372,7 +423,7 @@ export function GroupMembersPanel({
                     </TableRow>
                     {isExpanded && memberPayments.length > 0 && (
                       <TableRow key={`${member._id}-expanded`}>
-                        <TableCell colSpan={periods.length > 0 ? 6 : 4} className="bg-muted/20 p-0">
+                        <TableCell colSpan={periods.length > 0 ? 7 : 5} className="bg-muted/20 p-0">
                           <div className="px-4 py-3">
                             <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                               Payment history

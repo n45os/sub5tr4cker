@@ -62,6 +62,7 @@ interface GroupDetail {
     nickname: string;
     role: string;
     customAmount: number | null;
+    hasAccount: boolean;
   }>;
 }
 

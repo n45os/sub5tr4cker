@@ -105,7 +105,7 @@ export default async function DashboardPage() {
               </CardDescription>
             </div>
             <Link href="/dashboard/groups/new">
-              <Badge className="px-3 py-1 text-sm">New group</Badge>
+              <Badge variant="accent" className="px-3 py-1 text-sm">New group</Badge>
             </Link>
           </CardHeader>
           <CardContent>

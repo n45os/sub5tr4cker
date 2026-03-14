@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Sparkles } from "lucide-react";
+import { Info, Loader2, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +23,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
 
 type BillingMode = "equal_split" | "fixed_amount" | "variable";
@@ -83,6 +88,39 @@ function mergeValues(initialValues?: Partial<GroupFormValues>): GroupFormValues 
     ...defaultValues,
     ...initialValues,
   };
+}
+
+// label with optional (i) tooltip for fields that need a short explanation
+function FieldLabel({
+  htmlFor,
+  hint,
+  children,
+}: {
+  htmlFor: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <Label htmlFor={htmlFor}>{children}</Label>
+      {hint ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded"
+              aria-label="Explanation"
+            >
+              <Info className="size-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-[240px]">
+            {hint}
+          </TooltipContent>
+        </Tooltip>
+      ) : null}
+    </div>
+  );
 }
 
 export function GroupForm({
@@ -222,7 +260,7 @@ export function GroupForm({
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <Badge variant="outline" className="mb-3">
+          <Badge variant="accent" className="mb-3">
             <Sparkles className="size-3" />
             {mode === "create" ? "Setup flow" : "Configuration"}
           </Badge>
@@ -264,7 +302,7 @@ export function GroupForm({
                   id="name"
                   value={form.name}
                   onChange={(event) => updateField("name", event.target.value)}
-                  placeholder="Family YouTube Premium"
+                  placeholder="e.g. Family streaming plan"
                   required
                 />
               </div>
@@ -301,26 +339,30 @@ export function GroupForm({
                   onChange={(event) =>
                     updateField("serviceName", event.target.value)
                   }
-                  placeholder="YouTube Premium"
+                  placeholder="e.g. Streaming service"
                   required
                 />
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="service-icon">Icon or emoji</Label>
+                <FieldLabel htmlFor="service-icon" hint="Short label or emoji shown on group cards (e.g. YT or 📺).">
+                  Icon or emoji
+                </FieldLabel>
                 <Input
                   id="service-icon"
                   value={form.serviceIcon}
                   onChange={(event) =>
                     updateField("serviceIcon", event.target.value)
                   }
-                  placeholder="YT"
+                  placeholder="e.g. 2–3 letters or emoji"
                   maxLength={20}
                 />
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="service-url">Service URL</Label>
+                <FieldLabel htmlFor="service-url" hint="Optional link to the subscription service, shown on the group card.">
+                  Service URL
+                </FieldLabel>
                 <Input
                   id="service-url"
                   type="url"
@@ -328,7 +370,7 @@ export function GroupForm({
                   onChange={(event) =>
                     updateField("serviceUrl", event.target.value)
                   }
-                  placeholder="https://youtube.com/premium"
+                  placeholder="https://…"
                 />
               </div>
             </CardContent>
@@ -345,7 +387,9 @@ export function GroupForm({
             </CardHeader>
             <CardContent className="grid gap-5 md:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="billing-mode">Billing mode</Label>
+                <FieldLabel htmlFor="billing-mode" hint="Equal split shares the total evenly among members. Fixed amount sets a per-member price. Variable is for manual tracking each cycle.">
+                  Billing mode
+                </FieldLabel>
                 <Select
                   value={form.billingMode}
                   onValueChange={(value) =>
@@ -398,7 +442,9 @@ export function GroupForm({
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="fixed-member-amount">Fixed member amount</Label>
+                <FieldLabel htmlFor="fixed-member-amount" hint="Exact amount each member pays per cycle. Only used when billing mode is Fixed amount.">
+                  Fixed member amount
+                </FieldLabel>
                 <Input
                   id="fixed-member-amount"
                   type="number"
@@ -416,7 +462,9 @@ export function GroupForm({
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="cycle-day">Cycle day</Label>
+                <FieldLabel htmlFor="cycle-day" hint="Day of the month (1–28) when each billing cycle starts. Used for reminders and period creation.">
+                  Cycle day
+                </FieldLabel>
                 <Input
                   id="cycle-day"
                   type="number"
@@ -446,7 +494,9 @@ export function GroupForm({
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="grace-period-days">Grace period days</Label>
+                <FieldLabel htmlFor="grace-period-days" hint="Days after the cycle end before the first payment reminder is sent.">
+                  Grace period days
+                </FieldLabel>
                 <Input
                   id="grace-period-days"
                   type="number"
@@ -461,7 +511,9 @@ export function GroupForm({
 
               <div className="flex items-center justify-between rounded-xl border p-4 md:col-span-2">
                 <div className="space-y-1">
-                  <Label htmlFor="admin-split">Include admin in the split</Label>
+                  <FieldLabel htmlFor="admin-split" hint="When on, the admin is counted as a member so the total is split among everyone including them.">
+                    Include admin in the split
+                  </FieldLabel>
                   <p className="text-sm text-muted-foreground">
                     Turn this off if the admin pays but should not be counted in the
                     member split.
@@ -511,7 +563,9 @@ export function GroupForm({
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="payment-link">Payment link</Label>
+                <FieldLabel htmlFor="payment-link" hint="Optional link included in payment reminders (e.g. Revolut.me or PayPal).">
+                  Payment link
+                </FieldLabel>
                 <Input
                   id="payment-link"
                   type="url"
@@ -519,7 +573,7 @@ export function GroupForm({
                   onChange={(event) =>
                     updateField("paymentLink", event.target.value)
                   }
-                  placeholder="https://revolut.me/your-link"
+                  placeholder="https://…"
                 />
               </div>
 

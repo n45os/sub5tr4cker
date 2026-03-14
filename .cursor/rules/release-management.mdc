@@ -1,0 +1,37 @@
+---
+description: Changelog and versioning workflow for substantial changes
+globs: **/*
+alwaysApply: true
+---
+
+# Release Management
+
+After every substantial change, decide whether the work needs a changelog entry and a version bump.
+
+## Treat it as substantial when
+
+- it adds or removes a feature, endpoint, integration, job, or workflow
+- it changes runtime behavior users, admins, or operators will notice
+- it changes schemas, env vars, deployment steps, or dependency behavior
+- it fixes a real bug with product or operational impact
+
+## Skip versioning when
+
+- the change is only comments, copy, formatting, linting, or file moves
+- the change is refactoring or tests only with no behavior change
+- the change is a tiny internal adjustment that would not matter in release notes
+
+## Version bump rules
+
+- major: breaking change, incompatible API/schema change, required manual migration, or removed behavior
+- minor: new non-breaking capability, workflow, endpoint, integration, or automation
+- patch: bug fix, safe dependency update, non-breaking polish, or internal improvement with user impact
+
+## When a bump is needed
+
+1. Update `package.json` version
+2. Update matching root version fields in lockfiles
+3. Add or update `CHANGELOG.md` with a dated version section
+4. Explain the bump decision briefly in the final response
+
+If no bump is needed, say that explicitly in the final response.

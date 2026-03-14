@@ -63,6 +63,16 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+### Documentation
+
+Full documentation (user guide and technical reference) is built into the app:
+
+- **On the same domain**: open `/docs` (e.g. [http://localhost:3000/docs](http://localhost:3000/docs))
+- **User guide**: getting started, creating groups, managing members, payment flow, Telegram setup, FAQ
+- **Technical**: architecture, API reference, data models, deployment, environment variables, contributing
+
+Docs are static Markdown in `content/docs/` and are served by the Next.js app — no separate hosting needed.
+
 ### Docker
 
 ```bash

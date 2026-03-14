@@ -34,3 +34,11 @@
 - Kebab-case for files: `billing-period.ts`, not `BillingPeriod.ts`
 - PascalCase for components: `GroupCard.tsx`
 - Barrel exports via `index.ts` in model and lib directories
+
+## Release Workflow
+
+- After a substantial change, decide whether `CHANGELOG.md` and the project version must be updated
+- Major: breaking or incompatible change
+- Minor: new non-breaking capability or workflow
+- Patch: non-breaking fix, polish, or operational improvement with release impact
+- Skip version bumps for docs-only, comments-only, formatting-only, lint-only, or refactor-only changes with no behavior impact

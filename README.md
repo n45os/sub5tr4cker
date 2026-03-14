@@ -118,6 +118,48 @@ This starts:
 - MongoDB on port 25417
 - The cron runner (billing, enqueue reminders/follow-ups, notification worker)
 
+### Production deployment (Portainer)
+
+You can run SubsTrack as a standalone stack on a server (e.g. a VPS) using [Portainer](https://www.portainer.io/) and Docker Compose. The stack includes the app, MongoDB, and the cron runner. No private data or credentials go in the repo; everything is configured via Portainer environment variables and GitHub Actions secrets.
+
+**Required environment variables** (set in Portainer stack env, not in the repo):
+
+| Variable | Description |
+|----------|-------------|
+| `MONGODB_URI` | MongoDB connection string (e.g. `mongodb://mongo:27017/substrack` when using the bundled Mongo) |
+| `NEXTAUTH_SECRET` | Random secret for Auth.js sessions |
+| `GOOGLE_CLIENT_ID` | Optional Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Optional Google OAuth client secret |
+| `NODE_ENV` | Set to `production` |
+
+**Setup checklist:**
+
+1. **Portainer** — Create a new stack from this repo:
+   - Build method: **Repository**
+   - Repository URL: your fork or `https://github.com/n45os/sub5tr4cker`
+   - Compose path: `docker-compose.portainer.yml`
+   - Add the environment variables above in the stack’s env section, then deploy.
+
+2. **Webhook (optional CI/CD)** — After the stack is running, open the stack → **Webhooks** → enable and copy the webhook URL. In the GitHub repo go to **Settings → Secrets and variables → Actions** and add a secret named `PORTAINER_WEBHOOK_URL` with that URL. Pushes to `main` will then build the app image, push to GitHub Container Registry, and trigger a redeploy.
+
+3. **Reverse proxy and DNS** — Point your domain at the host (e.g. add an A record for `sub5tr4cker.example.com` to your server IP). In your reverse proxy (Nginx, Caddy, Nginx Proxy Manager, etc.), add a proxy host for that domain forwarding to the host port **3054** (HTTP). Enable TLS (e.g. Let’s Encrypt) and force HTTPS.
+
+4. **Verify** — Open `https://your-domain/api/health`; it should return `{"status":"ok"}`. Then open the app URL, complete `pnpm setup` (or configure via the dashboard settings), and configure email/Telegram from the settings page.
+
+**Image:** The app image is `ghcr.io/n45os/sub5tr4cker:latest`. The cron service is built from the same repo (Dockerfile target `cron`) when the stack is deployed from the repository.
+
+### Deploy your own instance
+
+You can self-host SubsTrack on any machine that runs Docker:
+
+- **Docker Compose (recommended)** — Use the included `docker-compose.yml` (development) or `docker-compose.portainer.yml` (production-style with health checks). Copy `.env.example` to `.env.local`, set `MONGODB_URI`, `NEXTAUTH_SECRET`, and optionally Google OAuth, then run `docker compose up -d`. Configure the rest (APP_URL, email, Telegram, etc.) from the in-app settings after first login.
+
+- **MongoDB elsewhere** — If you already run MongoDB (e.g. Atlas or another server), set `MONGODB_URI` to that connection string and run only the `app` and `cron` services. Use the same image for both; for cron, build with `docker build --target cron -t substrack-cron .` and run with the same env and `pnpm run cron` as the command.
+
+- **No Docker** — Install Node.js 20+, pnpm, and MongoDB. Run `pnpm install`, `pnpm setup`, then `pnpm dev` and (in another terminal) `pnpm run cron`. Use a process manager (systemd, PM2) and a reverse proxy for production.
+
+Never commit `.env`, `.env.local`, or any file containing secrets; `.env.example` is the only env file tracked.
+
 ### Environment Variables
 
 Only bootstrap values stay in `.env.local`. Runtime settings such as `APP_URL`,

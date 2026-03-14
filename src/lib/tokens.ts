@@ -246,6 +246,52 @@ export async function verifyInviteAcceptToken(
   }
 }
 
+export interface MagicLoginPayload {
+  userId: string;
+  exp: number;
+}
+
+/** short-lived token for magic-link sign-in after accepting an invite (5 min) */
+export async function createMagicLoginToken(
+  userId: string,
+  expiresInMinutes = 5
+): Promise<string> {
+  const payload: MagicLoginPayload = {
+    userId,
+    exp: Date.now() + expiresInMinutes * 60 * 1000,
+  };
+  const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const secret = await getConfirmationSecret();
+  const signature = crypto
+    .createHmac("sha256", secret)
+    .update(data)
+    .digest("base64url");
+  return `${data}.${signature}`;
+}
+
+export async function verifyMagicLoginToken(
+  token: string
+): Promise<MagicLoginPayload | null> {
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [data, signature] = parts;
+  const secret = await getConfirmationSecret();
+  const expectedSignature = crypto
+    .createHmac("sha256", secret)
+    .update(data)
+    .digest("base64url");
+  if (signature !== expectedSignature) return null;
+  try {
+    const payload: MagicLoginPayload = JSON.parse(
+      Buffer.from(data, "base64url").toString()
+    );
+    if (Date.now() > payload.exp) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 export interface UnsubscribePayload {
   memberId: string;
   groupId: string;

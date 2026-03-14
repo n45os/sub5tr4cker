@@ -6,6 +6,7 @@ import { MongoClient } from "mongodb";
 import { compare } from "bcryptjs";
 import { dbConnect } from "@/lib/db/mongoose";
 import { User } from "@/models";
+import { verifyMagicLoginToken } from "@/lib/tokens";
 
 let clientPromise: Promise<MongoClient> | null = null;
 
@@ -54,6 +55,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!match) {
           return null;
         }
+        return {
+          id: String(user._id),
+          email: user.email,
+          name: user.name,
+          image: user.image,
+        };
+      },
+    }),
+    CredentialsProvider({
+      id: "magic-invite",
+      name: "magic-invite",
+      credentials: {
+        token: { label: "Token", type: "text" },
+      },
+      async authorize(credentials) {
+        const token = credentials?.token;
+        if (typeof token !== "string" || !token) return null;
+        const payload = await verifyMagicLoginToken(token);
+        if (!payload) return null;
+        await dbConnect();
+        const user = await User.findById(payload.userId).lean();
+        if (!user) return null;
         return {
           id: String(user._id),
           email: user.email,

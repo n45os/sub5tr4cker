@@ -14,6 +14,13 @@ COPY . .
 RUN mkdir -p public
 RUN pnpm run build
 
+# cron runner — full deps + source for pnpm run cron (tsx)
+FROM base AS cron
+WORKDIR /app
+COPY --from=builder /app ./
+ENV NODE_ENV=production
+CMD ["pnpm", "run", "cron"]
+
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production

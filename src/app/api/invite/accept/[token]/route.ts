@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db/mongoose";
-import { Group } from "@/models";
+import { Group, User } from "@/models";
 import type { IGroupMember } from "@/models";
 import { getSetting } from "@/lib/settings/service";
-import { verifyInviteAcceptToken } from "@/lib/tokens";
+import {
+  verifyInviteAcceptToken,
+  createMagicLoginToken,
+} from "@/lib/tokens";
 
 function buildHtml(title: string, message: string, appUrl: string): string {
   return `<!DOCTYPE html>
@@ -78,17 +81,31 @@ export async function GET(
     );
   }
 
-  if (!member.acceptedAt) {
-    member.acceptedAt = new Date();
-    await group.save();
+  const normalizedEmail = (member.email as string).toLowerCase().trim();
+  let user = await User.findOne({ email: normalizedEmail });
+  if (!user) {
+    user = await User.create({
+      name: (member.nickname as string).trim() || normalizedEmail,
+      email: normalizedEmail,
+      hashedPassword: null,
+      notificationPreferences: {
+        email: true,
+        telegram: false,
+        reminderFrequency: "every_3_days",
+      },
+    });
   }
 
-  return new NextResponse(
-    buildHtml(
-      "Invite accepted",
-      "You have accepted the invitation. You can now open sub5tr4cker and continue.",
-      appUrl
-    ),
-    { status: 200, headers: { "content-type": "text/html; charset=utf-8" } }
-  );
+  if (!member.user || member.user.toString() !== user._id.toString()) {
+    member.user = user._id;
+  }
+  if (!member.acceptedAt) {
+    member.acceptedAt = new Date();
+  }
+  await group.save();
+
+  const magicToken = await createMagicLoginToken(user._id.toString());
+  const baseUrl = appUrl.replace(/\/$/, "");
+  const callbackUrl = `${baseUrl}/auth/invite-callback?token=${encodeURIComponent(magicToken)}&groupId=${encodeURIComponent(payload.groupId)}`;
+  return NextResponse.redirect(callbackUrl, 302);
 }

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.17.0] - 2026-03-18
+
+### Added
+- **Health check endpoint** — `GET /api/health` returns `{ status: "ok" }` for Docker and reverse proxy health checks.
+- **Portainer deployment** — `docker-compose.portainer.yml` for running SubsTrack as a standalone Portainer stack (app + MongoDB + cron). App image: `ghcr.io/n45os/sub5tr4cker:latest`.
+- **CI/CD workflow** — `.github/workflows/deploy-ghcr.yml` builds the app image on push to `main`, pushes to GitHub Container Registry, and optionally triggers a Portainer webhook when `PORTAINER_WEBHOOK_URL` is set.
+- **Dockerfile cron stage** — New build target `cron` for the cron runner container (used by the Portainer compose file).
+- **README deployment docs** — "Production deployment (Portainer)" and "Deploy your own instance" sections with setup checklists and env var reference.
+
+### Changed
+- **.gitignore** — Added `.env.portainer` so stack-specific env files are never committed.
+
 ## [0.16.0] - 2026-03-18
 
 ### Added

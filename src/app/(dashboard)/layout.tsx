@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { AppShell } from "@/components/layout/app-shell";
 
@@ -9,7 +10,13 @@ export default async function DashboardLayout({
 }) {
   const session = await auth();
   if (!session?.user) {
-    redirect("/login");
+    const headerStore = await headers();
+    const pathname = headerStore.get("x-pathname") ?? "/dashboard";
+    const callbackUrl =
+      pathname && pathname !== "/login"
+        ? `/login?callbackUrl=${encodeURIComponent(pathname)}`
+        : "/login";
+    redirect(callbackUrl);
   }
 
   return (

@@ -1,0 +1,42 @@
+---
+description: Conventions for Telegram bot code
+globs: src/lib/telegram/**/*.ts
+---
+
+# Telegram Bot Conventions
+
+## Library
+
+We use **grammy** (not telegraf, not node-telegram-bot-api). 
+
+## Architecture
+
+- `bot.ts` — creates and exports the grammy Bot instance
+- `handlers.ts` — registers message and callback_query handlers
+- `keyboards.ts` — inline keyboard builder functions
+- `send.ts` — outbound message helpers (send reminder, send confirmation request, etc.)
+
+## Inline Keyboards
+
+Use grammy's `InlineKeyboard` class:
+
+```typescript
+import { InlineKeyboard } from "grammy";
+
+const keyboard = new InlineKeyboard()
+  .text("I've Paid", `confirm:${periodId}:${memberId}`)
+  .text("Remind Later", `snooze:${periodId}:${memberId}`);
+```
+
+## Callback Data
+
+- Max 64 bytes per callback_data
+- Use colon-delimited format: `action:param1:param2`
+- Common prefixes: `confirm:`, `admin_confirm:`, `admin_reject:`, `snooze:`
+
+## Reference
+
+The Telegram integration is modeled after OpenClaw's grammy implementation. Key patterns:
+- Bot instance created once, exported as singleton
+- Handlers registered via a setup function
+- Send helpers abstract away chunking and error handling

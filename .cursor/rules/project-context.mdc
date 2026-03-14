@@ -1,0 +1,19 @@
+---
+description: Project context system for SubsTrack
+globs: **/*
+alwaysApply: true
+---
+
+# Project Context
+
+This project uses a `_context/` knowledge base. When working on SubsTrack:
+
+1. Read `_context/context.md` for a quick project overview
+2. Deeper context in `_context/architecture.md`, `_context/stack.md`, `_context/conventions.md`, `_context/integrations.md`
+3. After completing a task, update relevant `_context/` files if you discovered something new
+
+Key documentation:
+- `AGENTS.md` — directory map, key files, common tasks
+- `docs/PLAN.md` — full architecture and feature roadmap
+- `docs/data-models.md` — Mongoose schema docs
+- `docs/api-design.md` — API reference

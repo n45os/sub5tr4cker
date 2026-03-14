@@ -1,0 +1,41 @@
+---
+description: Conventions for Mongoose model definitions
+globs: src/models/**/*.ts
+---
+
+# Mongoose Model Conventions
+
+## Schema Definition
+
+- Define the TypeScript interface first, then the Mongoose schema
+- Use `mongoose.models.ModelName || mongoose.model()` pattern to avoid recompilation in dev
+- Add indexes as schema options, not separate calls
+- Use `timestamps: true` for automatic `createdAt`/`updatedAt`
+
+## Pattern
+
+```typescript
+import mongoose, { Schema, Document } from "mongoose";
+
+export interface IModelName extends Document {
+  field: string;
+  // ...
+}
+
+const modelNameSchema = new Schema<IModelName>(
+  {
+    field: { type: String, required: true },
+  },
+  { timestamps: true }
+);
+
+modelNameSchema.index({ field: 1 });
+
+export const ModelName =
+  mongoose.models.ModelName ||
+  mongoose.model<IModelName>("ModelName", modelNameSchema);
+```
+
+## Reference
+
+See `docs/data-models.md` for the full schema documentation for all models.

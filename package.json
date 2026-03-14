@@ -1,0 +1,39 @@
+{
+  "name": "subs-track",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "cron": "npx tsx src/jobs/runner.ts",
+    "cron:billing": "npx tsx -e \"import('./src/jobs/check-billing-periods').then(m => m.checkBillingPeriods())\"",
+    "cron:reminders": "npx tsx -e \"import('./src/jobs/send-reminders').then(m => m.sendReminders())\""
+  },
+  "dependencies": {
+    "@auth/mongodb-adapter": "^3.11.1",
+    "grammy": "^1.41.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.3.1",
+    "next": "16.1.7",
+    "next-auth": "^5.0.0-beta.30",
+    "node-cron": "^4.2.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "resend": "^6.9.4",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20",
+    "@types/node-cron": "^3.0.11",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.7",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

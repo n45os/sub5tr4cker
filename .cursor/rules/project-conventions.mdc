@@ -1,0 +1,57 @@
+---
+description: Project-wide conventions for SubsTrack
+globs: **/*
+alwaysApply: true
+---
+
+# SubsTrack Conventions
+
+## Project Context
+
+SubsTrack is an open-source Next.js app for managing shared subscriptions. Read `AGENTS.md` at the project root for the full directory map and architecture.
+
+Detailed docs:
+- `docs/PLAN.md` — architecture plan, feature roadmap, billing modes
+- `docs/data-models.md` — Mongoose schema documentation
+- `docs/api-design.md` — API route reference
+
+## Code Style
+
+- Comments: start with lowercase, no trailing period (e.g., `// calculate member share`)
+- Use TypeScript strict mode everywhere
+- Prefer `const` over `let`, never use `var`
+- Use named exports, not default exports (exception: Next.js pages)
+- Import alias: `@/*` maps to `src/*`
+
+## API Routes
+
+- Always validate request body with Zod before processing
+- Check auth with `auth()` from `@/lib/auth` on protected routes
+- Return `{ data: ... }` on success
+- Return `{ error: { code, message, details? } }` on failure
+- Use standard HTTP status codes
+
+## Database
+
+- Mongoose models in `src/models/`, re-exported from `src/models/index.ts`
+- Always call `dbConnect()` from `@/lib/db/mongoose` before model operations in API routes
+- Use Mongoose's built-in validation plus Zod for request validation
+
+## Components
+
+- Use shadcn/ui for primitive components (`src/components/ui/`)
+- Feature-specific components in `src/components/features/<feature>/`
+- Layout components in `src/components/layout/`
+- Prefer server components, use `'use client'` only when needed
+
+## Environment
+
+- All secrets via environment variables, never hardcode
+- Reference `.env.example` for the full variable list
+- Use `process.env.VARIABLE` with runtime checks
+
+## Notifications
+
+- Email templates in `src/lib/email/templates/` as React Email components
+- Telegram helpers in `src/lib/telegram/`
+- Unified dispatch through `src/lib/notifications/service.ts`

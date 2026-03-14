@@ -1,0 +1,55 @@
+---
+description: Conventions for Next.js API route handlers
+globs: src/app/api/**/*.ts
+---
+
+# API Route Conventions
+
+## Structure
+
+Every route handler file should follow this pattern:
+
+1. Imports (auth, models, Zod schemas, db connection)
+2. Zod validation schema(s) for request body
+3. Route handler functions (GET, POST, PATCH, DELETE)
+
+## Auth Check
+
+```typescript
+import { auth } from "@/lib/auth";
+
+export async function GET() {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
+      { status: 401 }
+    );
+  }
+  // ...
+}
+```
+
+## Cron Route Protection
+
+Cron routes must verify the `CRON_SECRET` header:
+
+```typescript
+if (req.headers.get("x-cron-secret") !== process.env.CRON_SECRET) {
+  return NextResponse.json({ error: { code: "UNAUTHORIZED" } }, { status: 401 });
+}
+```
+
+## Database
+
+Always await `dbConnect()` before any Mongoose operation:
+
+```typescript
+import { dbConnect } from "@/lib/db/mongoose";
+
+export async function GET() {
+  await dbConnect();
+  const groups = await Group.find({ admin: session.user.id });
+  // ...
+}
+```

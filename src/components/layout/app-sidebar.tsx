@@ -42,7 +42,7 @@ const navigationItems = [
     title: "Groups",
     href: "/dashboard/groups",
     icon: Users,
-    isActive: (pathname: string) => pathname.startsWith("/dashboard/groups"),
+    isActive: (pathname: string) => pathname === "/dashboard/groups",
   },
   {
     title: "Activity",
@@ -96,9 +96,10 @@ interface AppSidebarProps {
     email?: string | null;
     image?: string | null;
   };
+  groups: Array<{ _id: string; name: string }>;
 }
 
-export function AppSidebar({ user }: AppSidebarProps) {
+export function AppSidebar({ user, groups }: AppSidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -147,9 +148,21 @@ export function AppSidebar({ user }: AppSidebarProps) {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Actions</SidebarGroupLabel>
+          <SidebarGroupLabel>Groups</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              {groups.map((group) => (
+                <SidebarMenuItem key={group._id}>
+                  <SidebarMenuButton
+                    render={<Link href={`/dashboard/groups/${group._id}`} />}
+                    isActive={pathname === `/dashboard/groups/${group._id}`}
+                    tooltip={group.name}
+                  >
+                    <Users className="size-4 shrink-0" />
+                    <span className="truncate">{group.name}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
               <SidebarMenuItem>
                 <SidebarMenuButton
                   render={<Link href="/dashboard/groups/new" />}

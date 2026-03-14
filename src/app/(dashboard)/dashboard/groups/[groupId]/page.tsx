@@ -11,15 +11,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PaymentMatrix } from "@/components/features/billing/payment-matrix";
 import { GroupMembersPanel } from "@/components/features/groups/group-members-panel";
 import { InitializeNotifyButton } from "@/components/features/groups/initialize-notify-button";
@@ -254,127 +245,114 @@ export default async function GroupDetailPage({
         </Card>
       </section>
 
-      <Tabs defaultValue="overview" className="gap-6">
-        <TabsList variant="line" className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="members">Members</TabsTrigger>
-          <TabsTrigger value="billing">Billing</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-        </TabsList>
+      {/* billing & workflow */}
+      <section className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle>Billing setup</CardTitle>
+            <CardDescription>
+              A quick summary of how this group is configured today.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-xl border bg-muted/35 p-4">
+              <p className="text-sm text-muted-foreground">Payment platform</p>
+              <p className="mt-2 font-medium capitalize">
+                {group.payment.platform.replace("_", " ")}
+              </p>
+            </div>
+            <div className="rounded-xl border bg-muted/35 p-4">
+              <p className="text-sm text-muted-foreground">Grace period</p>
+              <p className="font-mono mt-2 font-medium tabular-nums">
+                {group.billing.gracePeriodDays} day
+                {group.billing.gracePeriodDays !== 1 ? "s" : ""}
+              </p>
+            </div>
+            <div className="rounded-xl border bg-muted/35 p-4">
+              <p className="text-sm text-muted-foreground">Admin in split</p>
+              <p className="mt-2 font-medium">
+                {group.billing.adminIncludedInSplit ? "Included" : "Excluded"}
+              </p>
+            </div>
+            <div className="rounded-xl border bg-muted/35 p-4">
+              <p className="text-sm text-muted-foreground">Payment link</p>
+              <p className="mt-2 line-clamp-2 font-medium">
+                {group.payment.link || "No payment link configured"}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
-        <TabsContent value="overview">
-          <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
-            <Card>
-              <CardHeader>
-                <CardTitle>Billing setup</CardTitle>
-                <CardDescription>
-                  A quick summary of how this group is configured today.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-xl border bg-muted/35 p-4">
-                  <p className="text-sm text-muted-foreground">Payment platform</p>
-                  <p className="mt-2 font-medium capitalize">
-                    {group.payment.platform.replace("_", " ")}
-                  </p>
-                </div>
-                <div className="rounded-xl border bg-muted/35 p-4">
-                  <p className="text-sm text-muted-foreground">Grace period</p>
-                  <p className="font-mono mt-2 font-medium tabular-nums">
-                    {group.billing.gracePeriodDays} day
-                    {group.billing.gracePeriodDays !== 1 ? "s" : ""}
-                  </p>
-                </div>
-                <div className="rounded-xl border bg-muted/35 p-4">
-                  <p className="text-sm text-muted-foreground">Admin in split</p>
-                  <p className="mt-2 font-medium">
-                    {group.billing.adminIncludedInSplit ? "Included" : "Excluded"}
-                  </p>
-                </div>
-                <div className="rounded-xl border bg-muted/35 p-4">
-                  <p className="text-sm text-muted-foreground">Payment link</p>
-                  <p className="mt-2 line-clamp-2 font-medium">
-                    {group.payment.link || "No payment link configured"}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>What happens next</CardTitle>
+            <CardDescription>
+              The billing workflow currently attached to this group.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <div className="rounded-xl border p-4">
+              Billing periods use the {group.billing.cycleType} cycle and start on
+              day {group.billing.cycleDay}.
+            </div>
+            <div className="rounded-xl border p-4">
+              Members are reminded after the {group.billing.gracePeriodDays}-day grace
+              window if their payment is still pending.
+            </div>
+            <div className="rounded-xl border p-4">
+              {currentPeriod
+                ? `The latest tracked cycle is ${currentPeriod.periodLabel}.`
+                : "Create or wait for the first billing period to unlock payment tracking."}
+            </div>
+          </CardContent>
+        </Card>
+        {group.role === "admin" ? (
+          <InviteLinkCard groupId={groupId} />
+        ) : null}
+      </section>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>What happens next</CardTitle>
-                <CardDescription>
-                  The billing workflow currently attached to this group.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-muted-foreground">
-                <div className="rounded-xl border p-4">
-                  Billing periods use the {group.billing.cycleType} cycle and start on
-                  day {group.billing.cycleDay}.
-                </div>
-                <div className="rounded-xl border p-4">
-                  Members are reminded after the {group.billing.gracePeriodDays}-day grace
-                  window if their payment is still pending.
-                </div>
-                <div className="rounded-xl border p-4">
-                  {currentPeriod
-                    ? `The latest tracked cycle is ${currentPeriod.periodLabel}.`
-                    : "Create or wait for the first billing period to unlock payment tracking."}
-                </div>
-              </CardContent>
-            </Card>
-            {group.role === "admin" ? (
-              <InviteLinkCard groupId={groupId} />
-            ) : null}
-          </div>
-        </TabsContent>
+      {/* members */}
+      <GroupMembersPanel
+        groupId={groupId}
+        members={group.members}
+        currency={group.billing.currency}
+        isAdmin={group.role === "admin"}
+        periods={periods}
+      />
 
-        <TabsContent value="members">
-          <GroupMembersPanel
-            groupId={groupId}
-            members={group.members}
-            currency={group.billing.currency}
-            isAdmin={group.role === "admin"}
-            periods={periods}
-          />
-        </TabsContent>
+      {/* billing periods */}
+      {!currentPeriod ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>No billing periods yet</CardTitle>
+            <CardDescription>
+              Periods are created automatically on the configured cycle day, or
+              manually for variable billing.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      ) : (
+        <PaymentMatrix
+          groupId={groupId}
+          currency={group.billing.currency}
+          periods={periods}
+          members={group.members.map((m) => ({
+            _id: m._id,
+            nickname: m.nickname,
+            email: m.email,
+          }))}
+          isAdmin={group.role === "admin"}
+          currentMemberId={currentMemberId}
+        />
+      )}
 
-        <TabsContent value="billing">
-          {!currentPeriod ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>No billing periods yet</CardTitle>
-                <CardDescription>
-                  Periods are created automatically on the configured cycle day, or
-                  manually for variable billing.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          ) : (
-            <PaymentMatrix
-              groupId={groupId}
-              currency={group.billing.currency}
-              periods={periods}
-              members={group.members.map((m) => ({
-                _id: m._id,
-                nickname: m.nickname,
-                email: m.email,
-              }))}
-              isAdmin={group.role === "admin"}
-              currentMemberId={currentMemberId}
-            />
-          )}
-        </TabsContent>
-
-        <TabsContent value="notifications">
-          <GroupNotificationsPanel
-            groupId={groupId}
-            isAdmin={group.role === "admin"}
-            initialPreferences={group.notifications}
-            recentNotifications={notifications}
-          />
-        </TabsContent>
-      </Tabs>
+      {/* notifications */}
+      <GroupNotificationsPanel
+        groupId={groupId}
+        isAdmin={group.role === "admin"}
+        initialPreferences={group.notifications}
+        recentNotifications={notifications}
+      />
     </div>
   );
 }

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Outfit, Syne, JetBrains_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, Syne, JetBrains_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
-const outfit = Outfit({
-  variable: "--font-outfit",
+const plusJakartaSans = Plus_Jakarta_Sans({
+  variable: "--font-plus-jakarta-sans",
   subsets: ["latin"],
 });
 
@@ -31,7 +31,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${outfit.variable} ${syne.variable} ${jetbrainsMono.variable} min-h-screen bg-background font-sans antialiased`}
+        className={`${plusJakartaSans.variable} ${syne.variable} ${jetbrainsMono.variable} min-h-screen bg-background font-sans antialiased`}
       >
         <Providers>{children}</Providers>
       </body>

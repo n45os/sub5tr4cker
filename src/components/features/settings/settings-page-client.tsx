@@ -40,40 +40,38 @@ interface SettingsPageClientProps {
   settings: SettingItem[];
 }
 
-const categories: Array<{
-  key: SettingsCategory;
+// display groups: combine small categories so each tab has a meaningful set of fields
+type SettingsTabId = "general" | "notifications" | "security" | "plugins";
+
+const tabs: Array<{
+  id: SettingsTabId;
   label: string;
   description: string;
+  categoryKeys: SettingsCategory[];
 }> = [
   {
-    key: "general",
+    id: "general",
     label: "General",
     description: "Public runtime values shared across the app.",
+    categoryKeys: ["general"],
   },
   {
-    key: "email",
-    label: "Email",
-    description: "Resend credentials and sender configuration.",
+    id: "notifications",
+    label: "Notifications",
+    description: "Email (Resend) and Telegram bot configuration for reminders and follow-ups.",
+    categoryKeys: ["email", "telegram"],
   },
   {
-    key: "telegram",
-    label: "Telegram",
-    description: "Bot delivery settings for reminders and follow-ups.",
+    id: "security",
+    label: "Security & automation",
+    description: "Secrets for confirmation links, Telegram account linking, and protected cron endpoints.",
+    categoryKeys: ["security", "cron"],
   },
   {
-    key: "security",
-    label: "Security",
-    description: "Secrets used for tokens and protected routes.",
-  },
-  {
-    key: "cron",
-    label: "Cron",
-    description: "Scheduled job configuration and secrets.",
-  },
-  {
-    key: "plugins",
+    id: "plugins",
     label: "Plugins",
     description: "Installed plugins and their configuration.",
+    categoryKeys: ["plugins"],
   },
 ];
 
@@ -82,17 +80,15 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
     Object.fromEntries(settings.map((setting) => [setting.key, setting.value]))
   );
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
-  const [savingCategory, setSavingCategory] = useState<SettingsCategory | null>(
-    null
-  );
+  const [savingTab, setSavingTab] = useState<SettingsTabId | null>(null);
   const [testing, setTesting] = useState<"email" | "telegram" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const groupedSettings = useMemo(
+  const groupedByTab = useMemo(
     () =>
-      categories.map((category) => ({
-        ...category,
-        settings: settings.filter((setting) => setting.category === category.key),
+      tabs.map((tab) => ({
+        ...tab,
+        settings: settings.filter((s) => tab.categoryKeys.includes(s.category)),
       })),
     [settings]
   );
@@ -101,36 +97,40 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
     setValues((current) => ({ ...current, [key]: value }));
   }
 
-  async function saveCategory(category: SettingsCategory) {
+  async function saveTab(tabId: SettingsTabId) {
     setMessage(null);
-    setSavingCategory(category);
+    setSavingTab(tabId);
 
     try {
-      const categorySettings = settings
-        .filter((setting) => setting.category === category)
-        .map((setting) => ({
-          key: setting.key,
-          value: values[setting.key] || null,
-        }));
+      const tab = tabs.find((t) => t.id === tabId);
+      const tabSettings = tab
+        ? settings
+            .filter((s) => tab.categoryKeys.includes(s.category))
+            .map((setting) => ({
+              key: setting.key,
+              value: values[setting.key] ?? null,
+            }))
+        : [];
 
       const response = await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ settings: categorySettings }),
+        body: JSON.stringify({ settings: tabSettings }),
       });
       const json = await response.json();
 
       if (!response.ok) {
         setMessage(json.error?.message || "Failed to save settings.");
-        setSavingCategory(null);
+        setSavingTab(null);
         return;
       }
 
-      setMessage(`${category.charAt(0).toUpperCase() + category.slice(1)} settings saved.`);
+      const tabLabel = tabs.find((t) => t.id === tabId)?.label ?? tabId;
+      setMessage(`${tabLabel} settings saved.`);
     } catch {
       setMessage("Failed to save settings.");
     } finally {
-      setSavingCategory(null);
+      setSavingTab(null);
     }
   }
 
@@ -184,112 +184,112 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
 
       <Tabs defaultValue="general" className="gap-6">
         <TabsList variant="line" className="w-full justify-start overflow-x-auto">
-          {categories.map((category) => (
-            <TabsTrigger key={category.key} value={category.key}>
-              {category.label}
+          {tabs.map((tab) => (
+            <TabsTrigger key={tab.id} value={tab.id}>
+              {tab.label}
             </TabsTrigger>
           ))}
         </TabsList>
 
-        {groupedSettings.map((category) => (
-          <TabsContent key={category.key} value={category.key}>
-            {category.key === "plugins" ? (
+        {groupedByTab.map((tab) => (
+          <TabsContent key={tab.id} value={tab.id}>
+            {tab.id === "plugins" ? (
               <PluginsSettingsTab />
             ) : (
-            <Card>
-              <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <CardTitle>{category.label}</CardTitle>
-                  <CardDescription>{category.description}</CardDescription>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {category.key === "email" ? (
-                    <Button
-                      variant="outline"
-                      onClick={() => runTest("email")}
-                      disabled={testing === "email"}
-                    >
-                      {testing === "email" ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Send className="size-4" />
-                      )}
-                      Send test email
-                    </Button>
-                  ) : null}
-                  {category.key === "telegram" ? (
-                    <Button
-                      variant="outline"
-                      onClick={() => runTest("telegram")}
-                      disabled={testing === "telegram"}
-                    >
-                      {testing === "telegram" ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Send className="size-4" />
-                      )}
-                      Send test Telegram
-                    </Button>
-                  ) : null}
-                  <Button
-                    onClick={() => saveCategory(category.key)}
-                    disabled={savingCategory === category.key}
-                  >
-                    {savingCategory === category.key ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : null}
-                    Save {category.label}
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="grid gap-4">
-                {category.settings.map((setting) => (
-                  <div
-                    key={setting.key}
-                    className="grid gap-3 rounded-xl border p-4 lg:grid-cols-[220px_1fr_auto]"
-                  >
-                    <div>
-                      <Label htmlFor={setting.key}>{setting.label}</Label>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {setting.description}
-                      </p>
-                    </div>
-                    <Input
-                      id={setting.key}
-                      type={
-                        setting.isSecret && !revealed[setting.key]
-                          ? "password"
-                          : "text"
-                      }
-                      value={values[setting.key] ?? ""}
-                      placeholder={setting.isSecret ? setting.maskedValue : ""}
-                      onChange={(event) =>
-                        updateValue(setting.key, event.target.value)
-                      }
-                    />
-                    {setting.isSecret ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() =>
-                          setRevealed((current) => ({
-                            ...current,
-                            [setting.key]: !current[setting.key],
-                          }))
-                        }
-                      >
-                        {revealed[setting.key] ? (
-                          <EyeOff className="size-4" />
-                        ) : (
-                          <Eye className="size-4" />
-                        )}
-                        {revealed[setting.key] ? "Hide" : "Reveal"}
-                      </Button>
-                    ) : null}
+              <Card>
+                <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <CardTitle>{tab.label}</CardTitle>
+                    <CardDescription>{tab.description}</CardDescription>
                   </div>
-                ))}
-              </CardContent>
-            </Card>
+                  <div className="flex flex-wrap gap-2">
+                    {tab.id === "notifications" ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          onClick={() => runTest("email")}
+                          disabled={testing === "email"}
+                        >
+                          {testing === "email" ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <Send className="size-4" />
+                          )}
+                          Send test email
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => runTest("telegram")}
+                          disabled={testing === "telegram"}
+                        >
+                          {testing === "telegram" ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <Send className="size-4" />
+                          )}
+                          Send test Telegram
+                        </Button>
+                      </>
+                    ) : null}
+                    <Button
+                      onClick={() => saveTab(tab.id)}
+                      disabled={savingTab === tab.id}
+                    >
+                      {savingTab === tab.id ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : null}
+                      Save {tab.label}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="grid gap-4">
+                  {tab.settings.map((setting) => (
+                    <div
+                      key={setting.key}
+                      className="grid gap-3 rounded-xl border p-4 lg:grid-cols-[220px_1fr_auto]"
+                    >
+                      <div>
+                        <Label htmlFor={setting.key}>{setting.label}</Label>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {setting.description}
+                        </p>
+                      </div>
+                      <Input
+                        id={setting.key}
+                        type={
+                          setting.isSecret && !revealed[setting.key]
+                            ? "password"
+                            : "text"
+                        }
+                        value={values[setting.key] ?? ""}
+                        placeholder={setting.isSecret ? setting.maskedValue : ""}
+                        onChange={(event) =>
+                          updateValue(setting.key, event.target.value)
+                        }
+                      />
+                      {setting.isSecret ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() =>
+                            setRevealed((current) => ({
+                              ...current,
+                              [setting.key]: !current[setting.key],
+                            }))
+                          }
+                        >
+                          {revealed[setting.key] ? (
+                            <EyeOff className="size-4" />
+                          ) : (
+                            <Eye className="size-4" />
+                          )}
+                          {revealed[setting.key] ? "Hide" : "Reveal"}
+                        </Button>
+                      ) : null}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
             )}
           </TabsContent>
         ))}

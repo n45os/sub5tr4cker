@@ -20,10 +20,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PaymentMatrix } from "@/components/features/billing/payment-matrix";
 import { GroupMembersPanel } from "@/components/features/groups/group-members-panel";
 import { InitializeNotifyButton } from "@/components/features/groups/initialize-notify-button";
 import { InviteLinkCard } from "@/components/features/groups/invite-link-card";
 import { GroupNotificationsPanel } from "@/components/features/notifications/group-notifications-panel";
+import { auth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { getServerBaseUrl } from "@/lib/server-url";
 
@@ -72,6 +74,8 @@ interface BillingPeriodItem {
     memberNickname: string;
     amount: number;
     status: string;
+    memberConfirmedAt: string | null;
+    adminConfirmedAt: string | null;
   }>;
   isFullyPaid: boolean;
 }
@@ -107,7 +111,7 @@ async function getBillingPeriods(
 ): Promise<BillingPeriodItem[]> {
   const baseUrl = await getServerBaseUrl();
   const res = await fetch(
-    `${baseUrl}/api/groups/${groupId}/billing?limit=6`,
+    `${baseUrl}/api/groups/${groupId}/billing?limit=24`,
     {
       headers: { cookie: cookieHeader },
       cache: "no-store",
@@ -144,6 +148,7 @@ export default async function GroupDetailPage({
   const { groupId } = await params;
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
+  const session = await auth();
 
   const [group, periods, notifications] = await Promise.all([
     getGroup(groupId, cookieHeader),
@@ -154,6 +159,10 @@ export default async function GroupDetailPage({
   if (!group) notFound();
 
   const currentPeriod = periods[0];
+  const currentMemberId =
+    (session?.user?.email &&
+      group.members.find((m) => m.email === session.user.email)?._id) ??
+    null;
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
@@ -325,6 +334,7 @@ export default async function GroupDetailPage({
             members={group.members}
             currency={group.billing.currency}
             isAdmin={group.role === "admin"}
+            periods={periods}
           />
         </TabsContent>
 
@@ -340,61 +350,18 @@ export default async function GroupDetailPage({
               </CardHeader>
             </Card>
           ) : (
-            <div className="grid gap-4">
-              {periods.map((period) => (
-                <Card key={period._id}>
-                  <CardHeader className="flex flex-row items-start justify-between gap-4">
-                    <div>
-                      <CardTitle>{period.periodLabel}</CardTitle>
-                      <CardDescription>
-                        {period.totalPrice} {group.billing.currency}
-                      </CardDescription>
-                    </div>
-                    <Badge variant={period.isFullyPaid ? "default" : "secondary"}>
-                      {period.isFullyPaid ? "Fully paid" : "In progress"}
-                    </Badge>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Member</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {period.payments.map((payment) => (
-                          <TableRow key={payment.memberId}>
-                            <TableCell className="font-medium">
-                              {payment.memberNickname}
-                            </TableCell>
-                            <TableCell className="font-mono tabular-nums">
-                              {payment.amount} {group.billing.currency}
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  payment.status === "confirmed" ||
-                                  payment.status === "waived"
-                                    ? "default"
-                                    : payment.status === "member_confirmed"
-                                      ? "secondary"
-                                      : "outline"
-                                }
-                                className="capitalize"
-                              >
-                                {payment.status.replace("_", " ")}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <PaymentMatrix
+              groupId={groupId}
+              currency={group.billing.currency}
+              periods={periods}
+              members={group.members.map((m) => ({
+                _id: m._id,
+                nickname: m.nickname,
+                email: m.email,
+              }))}
+              isAdmin={group.role === "admin"}
+              currentMemberId={currentMemberId}
+            />
           )}
         </TabsContent>
 

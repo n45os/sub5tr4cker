@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
+import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group, BillingPeriod } from "@/models";
@@ -87,6 +88,19 @@ export async function POST(
   payment.status = "member_confirmed";
   payment.memberConfirmedAt = new Date();
   await period.save();
+
+  const actorName =
+    (session.user.name as string) ||
+    (session.user.email as string) ||
+    "Unknown";
+  await logAudit({
+    actorId: session.user.id,
+    actorName,
+    action: "payment_self_confirmed",
+    groupId,
+    billingPeriodId: periodId,
+    targetMemberId: member._id.toString(),
+  });
 
   return NextResponse.json({
     data: {

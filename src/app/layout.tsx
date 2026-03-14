@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Syne, JetBrains_Mono } from "next/font/google";
+import { DM_Sans, Space_Grotesk, Syne, JetBrains_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
-const plusJakartaSans = Plus_Jakarta_Sans({
-  variable: "--font-plus-jakarta-sans",
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
+  subsets: ["latin"],
+});
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
   subsets: ["latin"],
 });
 
@@ -31,7 +36,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${plusJakartaSans.variable} ${syne.variable} ${jetbrainsMono.variable} min-h-screen bg-background font-sans antialiased`}
+        className={`${dmSans.variable} ${spaceGrotesk.variable} ${syne.variable} ${jetbrainsMono.variable} min-h-screen bg-background font-sans antialiased`}
       >
         <Providers>{children}</Providers>
       </body>

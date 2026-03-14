@@ -13,5 +13,8 @@ export type { IPriceHistory } from "./price-history";
 export { Notification } from "./notification";
 export type { INotification, NotificationType } from "./notification";
 
+export { AuditEvent } from "./audit-event";
+export type { IAuditEvent, AuditAction } from "./audit-event";
+
 export { Settings } from "./settings";
 export type { ISettings } from "./settings";

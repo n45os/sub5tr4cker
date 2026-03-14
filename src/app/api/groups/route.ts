@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group, BillingPeriod } from "@/models";
@@ -174,6 +175,18 @@ export async function POST(request: NextRequest) {
     },
     members,
     isActive: true,
+  });
+
+  const actorName =
+    (session.user.name as string) ||
+    (session.user.email as string) ||
+    "Unknown";
+  await logAudit({
+    actorId: session.user.id,
+    actorName,
+    action: "group_created",
+    groupId: group._id.toString(),
+    metadata: { name: group.name },
   });
 
   return NextResponse.json({

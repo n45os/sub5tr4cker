@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, UserPlus } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, UserPlus } from "lucide-react";
+import { PaymentStatusBadge } from "@/components/features/billing/payment-status-badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 export interface MemberRow {
   _id: string;
@@ -30,11 +32,32 @@ export interface MemberRow {
   customAmount: number | null;
 }
 
+export interface PeriodPaymentRow {
+  _id: string;
+  periodLabel: string;
+  totalPrice: number;
+  payments: Array<{
+    memberId: string;
+    memberNickname: string;
+    amount: number;
+    status: string;
+    memberConfirmedAt: string | null;
+    adminConfirmedAt: string | null;
+  }>;
+  isFullyPaid: boolean;
+}
+
 interface GroupMembersPanelProps {
   groupId: string;
   members: MemberRow[];
   currency: string;
   isAdmin: boolean;
+  periods?: PeriodPaymentRow[];
+}
+
+function formatDate(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString(undefined, { dateStyle: "short" });
 }
 
 export function GroupMembersPanel({
@@ -42,6 +65,7 @@ export function GroupMembersPanel({
   members,
   currency,
   isAdmin,
+  periods = [],
 }: GroupMembersPanelProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -49,6 +73,7 @@ export function GroupMembersPanel({
   const [customAmount, setCustomAmount] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
 
   async function handleAddMember(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -173,18 +198,22 @@ export function GroupMembersPanel({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8" />
               <TableHead>Nickname</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Custom amount</TableHead>
+              {periods.length > 0 ? (
+                <TableHead className="text-right">Payment summary</TableHead>
+              ) : null}
             </TableRow>
           </TableHeader>
           <TableBody>
             {members.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={4}
-                  className="text-center text-muted-foreground py-8"
+                  colSpan={periods.length > 0 ? 6 : 4}
+                  className="py-8 text-center text-muted-foreground"
                 >
                   {isAdmin
                     ? "No members yet. Use the form above to add someone."
@@ -192,18 +221,110 @@ export function GroupMembersPanel({
                 </TableCell>
               </TableRow>
             ) : (
-              members.map((member) => (
-                <TableRow key={member._id}>
-                  <TableCell className="font-medium">{member.nickname}</TableCell>
-                  <TableCell>{member.email}</TableCell>
-                  <TableCell className="capitalize">{member.role}</TableCell>
-                  <TableCell>
-                    {member.customAmount
-                      ? `${member.customAmount} ${currency}`
-                      : "Auto split"}
-                  </TableCell>
-                </TableRow>
-              ))
+              members.map((member) => {
+                const memberPayments = periods.flatMap((p) => {
+                  const pay = p.payments.find((x) => x.memberId === member._id);
+                  return pay ? [{ period: p, payment: pay }] : [];
+                });
+                const paidCount = memberPayments.filter(
+                  (x) =>
+                    x.payment.status === "confirmed" ||
+                    x.payment.status === "waived"
+                ).length;
+                const overdueCount = memberPayments.filter(
+                  (x) => x.payment.status === "overdue"
+                ).length;
+                const isExpanded = expandedMemberId === member._id;
+
+                return (
+                  <React.Fragment key={member._id}>
+                    <TableRow
+                      key={member._id}
+                      className={cn(
+                        isExpanded && "border-b-0"
+                      )}
+                    >
+                      <TableCell className="w-8">
+                        {periods.length > 0 && memberPayments.length > 0 ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7"
+                            onClick={() =>
+                              setExpandedMemberId((id) =>
+                                id === member._id ? null : member._id
+                              )
+                            }
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="size-4" />
+                            ) : (
+                              <ChevronRight className="size-4" />
+                            )}
+                          </Button>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {member.nickname}
+                      </TableCell>
+                      <TableCell>{member.email}</TableCell>
+                      <TableCell className="capitalize">{member.role}</TableCell>
+                      <TableCell>
+                        {member.customAmount
+                          ? `${member.customAmount} ${currency}`
+                          : "Auto split"}
+                      </TableCell>
+                      {periods.length > 0 ? (
+                        <TableCell className="text-right text-sm text-muted-foreground">
+                          {memberPayments.length === 0 ? (
+                            "—"
+                          ) : (
+                            <>
+                              {paidCount}/{memberPayments.length} periods paid
+                              {overdueCount > 0 && (
+                                <span className="ml-1 text-destructive">
+                                  · {overdueCount} overdue
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </TableCell>
+                      ) : null}
+                    </TableRow>
+                    {isExpanded && memberPayments.length > 0 && (
+                      <TableRow key={`${member._id}-expanded`}>
+                        <TableCell colSpan={periods.length > 0 ? 6 : 4} className="bg-muted/20 p-0">
+                          <div className="px-4 py-3">
+                            <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              Payment history
+                            </p>
+                            <ul className="space-y-2">
+                              {memberPayments.map(({ period, payment }) => (
+                                <li
+                                  key={period._id}
+                                  className="flex flex-wrap items-center gap-3 rounded-md border bg-background px-3 py-2 text-sm"
+                                >
+                                  <span className="font-medium">
+                                    {period.periodLabel}
+                                  </span>
+                                  <span className="font-mono tabular-nums text-muted-foreground">
+                                    {payment.amount} {currency}
+                                  </span>
+                                  <PaymentStatusBadge status={payment.status} />
+                                  <span className="text-xs text-muted-foreground">
+                                    Member: {formatDate(payment.memberConfirmedAt)} · Admin:{" "}
+                                    {formatDate(payment.adminConfirmedAt)}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                );
+              })
             )}
           </TableBody>
         </Table>

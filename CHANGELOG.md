@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0] - 2026-03-18
+
+### Added
+- **Payment matrix** — Billing tab on group detail now shows a grid: periods as rows, members as columns. Each cell is a checkbox-style control: admins can confirm, reject, or waive payment via dropdown; members can mark “I’ve paid” for their own pending/overdue cell. Tooltips show member, amount, status, and confirmation timestamps.
+- **Payment status badges** — New `PaymentStatusBadge` component with distinct colors and icons for confirmed (green), member confirmed (sky blue), pending (amber), overdue (red), and waived (muted). Used on the payments page and in the matrix.
+- **Per-member payment history** — Members tab has expandable rows; each member shows a “X/Y periods paid” summary and, when expanded, a list of periods with amount, status badge, and member/admin confirmation dates. Billing API supports optional `memberId` filter.
+- **Audit events** — New `AuditEvent` model and `logAudit()` helper. Payment confirm/reject/waive, self-confirm, group create/edit, member add/remove/update, and billing period create are logged with actor, action, and context.
+- **Activity log: actions** — Activity API and page support a “source” filter: All, Notifications, or Actions. Actions show user-triggered events (payment confirmed, member added, etc.) with actor name and type-specific icons. Timeline-style layout with distinct styling for notifications vs actions.
+
+### Changed
+- **Fonts** — Body font is now DM Sans, display font is Space Grotesk; Syne is used only for the logo (“sub5tr4cker”). JetBrains Mono unchanged.
+- **Theme** — Accent and primary palette switched from green/teal (hue 130) to sky blue (hue 230) in light and dark mode. New semantic status colors for payment/notification states (`--status-confirmed`, `--status-pending`, etc.).
+- **Billing API** — GET `/api/groups/[groupId]/billing` returns `memberConfirmedAt` and `adminConfirmedAt` per payment. Optional query `memberId` filters periods to that member’s payments. Confirm route accepts action `"waive"` in addition to `"confirm"` and `"reject"`.
+- **Activity page** — Sent tab uses a timeline of cards with type-specific icons and colors; filter bar includes “Show: All / Notifications / Actions”. Upcoming tab styling aligned with new spacing and typography.
+- **Payments page** — Uses `PaymentStatusBadge` and polished filter selects; tabular-nums on date columns.
+
 ## [0.8.0] - 2026-03-18
 
 ### Added

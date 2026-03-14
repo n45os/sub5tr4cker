@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import mongoose from "mongoose";
+import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group } from "@/models";
@@ -91,6 +92,19 @@ export async function POST(
   await group.save();
 
   const added = group.members[group.members.length - 1];
+  const actorName =
+    (session.user.name as string) ||
+    (session.user.email as string) ||
+    "Unknown";
+  await logAudit({
+    actorId: session.user.id,
+    actorName,
+    action: "member_added",
+    groupId,
+    targetMemberId: added._id.toString(),
+    metadata: { email: added.email, nickname: added.nickname },
+  });
+
   return NextResponse.json({
     data: {
       _id: added._id.toString(),

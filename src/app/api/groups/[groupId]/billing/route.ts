@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import mongoose from "mongoose";
+import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group, BillingPeriod } from "@/models";
@@ -44,6 +45,7 @@ export async function GET(
   const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "12", 10)));
   const statusFilter = searchParams.get("status") || undefined;
+  const memberIdFilter = searchParams.get("memberId") || undefined;
 
   await dbConnect();
 
@@ -73,6 +75,9 @@ export async function GET(
   if (statusFilter) {
     query["payments.status"] = statusFilter;
   }
+  if (memberIdFilter && mongoose.isValidObjectId(memberIdFilter)) {
+    query["payments.memberId"] = memberIdFilter;
+  }
 
   const total = await BillingPeriod.countDocuments(query);
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -92,21 +97,35 @@ export async function GET(
       memberNickname: string;
       amount: number;
       status: string;
+      memberConfirmedAt: Date | null;
+      adminConfirmedAt: Date | null;
     }>;
     isFullyPaid: boolean;
   };
-  const list = (periods as PeriodDoc[]).map((p) => ({
-    _id: p._id.toString(),
-    periodLabel: p.periodLabel,
-    totalPrice: p.totalPrice,
-    payments: p.payments.map((pay) => ({
+  const list = (periods as PeriodDoc[]).map((p) => {
+    const payments = p.payments.map((pay) => ({
       memberId: pay.memberId.toString(),
       memberNickname: pay.memberNickname,
       amount: pay.amount,
       status: pay.status,
-    })),
-    isFullyPaid: p.isFullyPaid,
-  }));
+      memberConfirmedAt: pay.memberConfirmedAt
+        ? (pay.memberConfirmedAt as Date).toISOString()
+        : null,
+      adminConfirmedAt: pay.adminConfirmedAt
+        ? (pay.adminConfirmedAt as Date).toISOString()
+        : null,
+    }));
+    const filteredPayments = memberIdFilter
+      ? payments.filter((pay) => pay.memberId === memberIdFilter)
+      : payments;
+    return {
+      _id: p._id.toString(),
+      periodLabel: p.periodLabel,
+      totalPrice: p.totalPrice,
+      payments: filteredPayments,
+      isFullyPaid: p.isFullyPaid,
+    };
+  });
 
   return NextResponse.json({
     data: {
@@ -224,6 +243,22 @@ export async function POST(
     );
   }
   await period.save();
+
+  const actorName =
+    (session.user.name as string) ||
+    (session.user.email as string) ||
+    "Unknown";
+  await logAudit({
+    actorId: session.user.id,
+    actorName,
+    action: "billing_period_created",
+    groupId,
+    billingPeriodId: period._id.toString(),
+    metadata: {
+      periodLabel: period.periodLabel,
+      totalPrice: period.totalPrice,
+    },
+  });
 
   return NextResponse.json({
     data: {

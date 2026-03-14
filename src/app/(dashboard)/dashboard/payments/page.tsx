@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { CreditCard, Receipt, Wallet } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { PaymentStatusBadge } from "@/components/features/billing/payment-status-badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -65,20 +65,6 @@ async function getPayments(
   return json.data ?? null;
 }
 
-function statusVariant(status: string): "default" | "secondary" | "outline" | "destructive" {
-  switch (status) {
-    case "confirmed":
-      return "default";
-    case "member_confirmed":
-      return "secondary";
-    case "overdue":
-      return "destructive";
-    case "waived":
-      return "outline";
-    default:
-      return "outline";
-  }
-}
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -227,7 +213,7 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
             <select
               name="groupId"
               defaultValue={params.groupId ?? ""}
-              className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+              className="h-9 rounded-lg border border-input bg-background px-3 py-1.5 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
             >
               <option value="">All groups</option>
               {groups.map((g) => (
@@ -239,7 +225,7 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
             <select
               name="status"
               defaultValue={params.status ?? ""}
-              className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+              className="h-9 rounded-lg border border-input bg-background px-3 py-1.5 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
             >
               <option value="">All statuses</option>
               <option value="pending">Pending</option>
@@ -295,14 +281,12 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
                         {row.amount.toFixed(2)} {row.currency}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={statusVariant(row.status)}>
-                          {row.status.replace("_", " ")}
-                        </Badge>
+                        <PaymentStatusBadge status={row.status} />
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="tabular-nums text-muted-foreground">
                         {formatDate(row.memberConfirmedAt)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="tabular-nums text-muted-foreground">
                         {formatDate(row.adminConfirmedAt)}
                       </TableCell>
                     </TableRow>

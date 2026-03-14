@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import mongoose from "mongoose";
+import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group, BillingPeriod } from "@/models";
@@ -8,7 +9,7 @@ import type { IMemberPayment } from "@/models";
 
 const confirmSchema = z.object({
   memberId: z.string(),
-  action: z.enum(["confirm", "reject"]),
+  action: z.enum(["confirm", "reject", "waive"]),
   notes: z.string().max(500).optional(),
 });
 
@@ -87,6 +88,9 @@ export async function POST(
   if (parsed.data.action === "confirm") {
     payment.status = "confirmed";
     payment.adminConfirmedAt = new Date();
+  } else if (parsed.data.action === "waive") {
+    payment.status = "waived";
+    payment.adminConfirmedAt = new Date();
   } else {
     payment.status = "pending";
     payment.adminConfirmedAt = null;
@@ -97,6 +101,26 @@ export async function POST(
     (p: IMemberPayment) => p.status === "confirmed" || p.status === "waived"
   );
   await period.save();
+
+  const actorName =
+    (session.user.name as string) ||
+    (session.user.email as string) ||
+    "Unknown";
+  const auditAction =
+    parsed.data.action === "confirm"
+      ? "payment_confirmed"
+      : parsed.data.action === "waive"
+        ? "payment_waived"
+        : "payment_rejected";
+  await logAudit({
+    actorId: session.user.id,
+    actorName,
+    action: auditAction,
+    groupId,
+    billingPeriodId: periodId,
+    targetMemberId: parsed.data.memberId,
+    metadata: { notes: parsed.data.notes },
+  });
 
   return NextResponse.json({
     data: {

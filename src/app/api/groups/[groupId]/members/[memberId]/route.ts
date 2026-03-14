@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import mongoose from "mongoose";
+import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group } from "@/models";
@@ -78,6 +79,19 @@ export async function PATCH(
 
   await group.save();
 
+  const actorName =
+    (session.user.name as string) ||
+    (session.user.email as string) ||
+    "Unknown";
+  await logAudit({
+    actorId: session.user.id,
+    actorName,
+    action: "member_updated",
+    groupId,
+    targetMemberId: memberId,
+    metadata: { nickname: member.nickname },
+  });
+
   return NextResponse.json({
     data: {
       _id: member._id.toString(),
@@ -137,6 +151,19 @@ export async function DELETE(
   member.leftAt = new Date();
   member.isActive = false;
   await group.save();
+
+  const actorName =
+    (session.user.name as string) ||
+    (session.user.email as string) ||
+    "Unknown";
+  await logAudit({
+    actorId: session.user.id,
+    actorName,
+    action: "member_removed",
+    groupId,
+    targetMemberId: memberId,
+    metadata: { nickname: member.nickname, email: member.email },
+  });
 
   return NextResponse.json({ data: { success: true } });
 }

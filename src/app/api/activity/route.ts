@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
-import { Group, BillingPeriod, Notification } from "@/models";
+import { AuditEvent, Group, BillingPeriod, Notification } from "@/models";
 import type { NotificationType } from "@/models";
 
 const NOTIFICATION_TYPES: NotificationType[] = [
@@ -85,6 +85,7 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
   const typeFilter = searchParams.get("type") || undefined;
   const channelFilter = searchParams.get("channel") || undefined;
+  const sourceFilter = searchParams.get("source") || "all"; // "all" | "actions" | "notifications"
 
   if (typeFilter && !NOTIFICATION_TYPES.includes(typeFilter as NotificationType)) {
     return NextResponse.json(
@@ -95,6 +96,12 @@ export async function GET(request: NextRequest) {
   if (channelFilter && !CHANNELS.includes(channelFilter as (typeof CHANNELS)[number])) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid channel filter" } },
+      { status: 400 }
+    );
+  }
+  if (!["all", "actions", "notifications"].includes(sourceFilter)) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: "Invalid source filter" } },
       { status: 400 }
     );
   }
@@ -112,7 +119,7 @@ export async function GET(request: NextRequest) {
   if (allowedGroupIds.length === 0) {
     return NextResponse.json({
       data: {
-        sent: { notifications: [], pagination: { page: 1, totalPages: 0, total: 0 } },
+        sent: { items: [], pagination: { page: 1, totalPages: 0, total: 0 } },
         upcoming: [],
       },
     });
@@ -122,16 +129,99 @@ export async function GET(request: NextRequest) {
   if (typeFilter) sentQuery.type = typeFilter;
   if (channelFilter) sentQuery.channel = channelFilter;
 
-  const totalSent = await Notification.countDocuments(sentQuery);
-  const totalPages = Math.max(1, Math.ceil(totalSent / limit));
-  const sentNotifications = await Notification.find(sentQuery)
-    .sort({ createdAt: -1 })
-    .skip((page - 1) * limit)
-    .limit(limit)
-    .lean();
+  type SentItem =
+    | {
+        source: "notification";
+        _id: string;
+        type: string;
+        channel: string;
+        status: string;
+        subject: string | null;
+        preview: string;
+        recipientEmail: string;
+        groupId: string | null;
+        billingPeriodId: string | null;
+        deliveredAt: string | null;
+        createdAt: string;
+      }
+    | {
+        source: "action";
+        _id: string;
+        type: string;
+        actorName: string;
+        action: string;
+        groupId: string | null;
+        billingPeriodId: string | null;
+        targetMemberId: string | null;
+        metadata: Record<string, unknown>;
+        createdAt: string;
+      };
 
-  const sent = {
-    notifications: sentNotifications.map((n) => ({
+  let sent: {
+    items: SentItem[];
+    pagination: { page: number; totalPages: number; total: number };
+  };
+
+  if (sourceFilter === "notifications") {
+    const totalSent = await Notification.countDocuments(sentQuery);
+    const totalPages = Math.max(1, Math.ceil(totalSent / limit));
+    const sentNotifications = await Notification.find(sentQuery)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+    sent = {
+      items: sentNotifications.map((n) => ({
+        source: "notification" as const,
+        _id: n._id.toString(),
+        type: n.type,
+        channel: n.channel,
+        status: n.status,
+        subject: n.subject,
+        preview: n.preview,
+        recipientEmail: n.recipientEmail,
+        groupId: n.group?.toString() ?? null,
+        billingPeriodId: n.billingPeriod?.toString() ?? null,
+        deliveredAt: n.deliveredAt ? n.deliveredAt.toISOString() : null,
+        createdAt: n.createdAt.toISOString(),
+      })),
+      pagination: { page, totalPages, total: totalSent },
+    };
+  } else if (sourceFilter === "actions") {
+    const actionQuery: Record<string, unknown> = {
+      group: { $in: allowedGroupIds },
+    };
+    const totalActions = await AuditEvent.countDocuments(actionQuery);
+    const totalPages = Math.max(1, Math.ceil(totalActions / limit));
+    const auditEvents = await AuditEvent.find(actionQuery)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+    sent = {
+      items: auditEvents.map((a) => ({
+        source: "action" as const,
+        _id: a._id.toString(),
+        type: "action",
+        actorName: a.actorName,
+        action: a.action,
+        groupId: a.group?.toString() ?? null,
+        billingPeriodId: a.billingPeriod?.toString() ?? null,
+        targetMemberId: a.targetMember?.toString() ?? null,
+        metadata: (a.metadata as Record<string, unknown>) ?? {},
+        createdAt: a.createdAt.toISOString(),
+      })),
+      pagination: { page, totalPages, total: totalActions },
+    };
+  } else {
+    const [notifications, auditEvents] = await Promise.all([
+      Notification.find(sentQuery).sort({ createdAt: -1 }).lean(),
+      AuditEvent.find({ group: { $in: allowedGroupIds } })
+        .sort({ createdAt: -1 })
+        .lean(),
+    ]);
+    const notifItems: SentItem[] = notifications.map((n) => ({
+      source: "notification" as const,
       _id: n._id.toString(),
       type: n.type,
       channel: n.channel,
@@ -143,9 +233,28 @@ export async function GET(request: NextRequest) {
       billingPeriodId: n.billingPeriod?.toString() ?? null,
       deliveredAt: n.deliveredAt ? n.deliveredAt.toISOString() : null,
       createdAt: n.createdAt.toISOString(),
-    })),
-    pagination: { page, totalPages, total: totalSent },
-  };
+    }));
+    const actionItems: SentItem[] = auditEvents.map((a) => ({
+      source: "action" as const,
+      _id: a._id.toString(),
+      type: "action",
+      actorName: a.actorName,
+      action: a.action,
+      groupId: a.group?.toString() ?? null,
+      billingPeriodId: a.billingPeriod?.toString() ?? null,
+      targetMemberId: a.targetMember?.toString() ?? null,
+      metadata: (a.metadata as Record<string, unknown>) ?? {},
+      createdAt: a.createdAt.toISOString(),
+    }));
+    const merged = [...notifItems, ...actionItems].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    const total = merged.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const items = merged.slice((page - 1) * limit, page * limit);
+    sent = { items, pagination: { page, totalPages, total } };
+  }
 
   const now = new Date();
   const upcoming: Array<{

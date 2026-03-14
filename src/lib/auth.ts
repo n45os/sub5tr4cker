@@ -4,12 +4,18 @@ import GoogleProvider from "next-auth/providers/google";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import { MongoClient } from "mongodb";
 
-const clientPromise = new MongoClient(
-  process.env.MONGODB_URI || "mongodb://localhost:27017/substrack"
-).connect();
+let clientPromise: Promise<MongoClient> | null = null;
+
+function getMongoClientPromise(): Promise<MongoClient> {
+  if (!clientPromise) {
+    const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/substrack";
+    clientPromise = new MongoClient(uri).connect();
+  }
+  return clientPromise;
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: MongoDBAdapter(clientPromise),
+  adapter: MongoDBAdapter(getMongoClientPromise),
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",

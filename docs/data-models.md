@@ -113,7 +113,8 @@ A subscription group managed by an admin.
   },
 
   isActive: boolean,                      // soft delete
-  inviteCode: string | null,              // for public invite links
+  inviteCode: string | null,              // for public invite links (null when revoked)
+  inviteLinkEnabled: boolean,             // default: false; when false, join via link is blocked even if inviteCode is set
 
   createdAt: Date,
   updatedAt: Date,
@@ -121,6 +122,8 @@ A subscription group managed by an admin.
 ```
 
 **Indexes**: `admin` (ref), `members.user` (ref), `members.email`, `inviteCode` (sparse unique)
+
+**Invite link semantics:** The admin generates an invite code via POST `/api/groups/[groupId]/invite-link`, which sets `inviteCode` and `inviteLinkEnabled: true`. Users can join at `/invite/[code]` with email and nickname (no login). The admin can lock registration with PATCH (set `enabled: false`); the link stays valid but joins are rejected until re-enabled. DELETE clears `inviteCode` and sets `inviteLinkEnabled: false`, so the old link is invalid.
 
 ## BillingPeriod
 

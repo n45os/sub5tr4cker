@@ -117,6 +117,100 @@ Update member details (nickname, custom amount, active status). Admin only.
 
 Remove a member (soft delete — sets `leftAt` and `isActive: false`). Admin only.
 
+## Invite link (self-join)
+
+Admins can share a link so others can join the group without being added manually. Joining does not require login. The admin can lock registration or revoke the link at any time.
+
+### `GET /api/groups/[groupId]/invite-link`
+
+Get current invite-link status and URL. Admin only.
+
+**Response:**
+```json
+{
+  "data": {
+    "inviteLinkEnabled": true,
+    "inviteCode": "abc12XYZ",
+    "inviteUrl": "https://app.example.com/invite/abc12XYZ"
+  }
+}
+```
+
+When no link exists, `inviteCode` and `inviteUrl` are `null`, and `inviteLinkEnabled` is `false`.
+
+### `POST /api/groups/[groupId]/invite-link`
+
+Generate or rotate the invite code and enable the link. Admin only. Returns the new invite URL.
+
+### `PATCH /api/groups/[groupId]/invite-link`
+
+Toggle whether registration via the link is allowed. Admin only.
+
+**Body:**
+```json
+{
+  "enabled": true
+}
+```
+
+Set `enabled: false` to lock registration (link stays valid but no one can join until re-enabled). Set `enabled: true` to allow joining again.
+
+### `DELETE /api/groups/[groupId]/invite-link`
+
+Revoke the invite link (clear code and disable). Admin only. The previous link stops working.
+
+### `GET /api/invite/[inviteCode]`
+
+Public. Resolve an invite code and return group preview plus whether joining is currently allowed. No auth.
+
+**Response (success):**
+```json
+{
+  "data": {
+    "groupId": "...",
+    "name": "YouTube Premium Family",
+    "description": null,
+    "service": { "name": "YouTube Premium", "icon": null, "url": null },
+    "billing": { "currentPrice": 18, "currency": "EUR", "cycleType": "monthly" },
+    "canJoin": true,
+    "inviteLinkEnabled": true
+  }
+}
+```
+
+**Error codes:** `INVITE_INVALID` (code not found or revoked), `GROUP_INACTIVE`.
+
+### `POST /api/groups/join`
+
+Public. Join a group via invite code. No auth. Body must include the invite code, email, and nickname.
+
+**Body:**
+```json
+{
+  "inviteCode": "abc12XYZ",
+  "email": "newmember@example.com",
+  "nickname": "New Member"
+}
+```
+
+**Response (success):**
+```json
+{
+  "data": {
+    "groupId": "...",
+    "member": {
+      "_id": "...",
+      "email": "newmember@example.com",
+      "nickname": "New Member",
+      "role": "member",
+      "isActive": true
+    }
+  }
+}
+```
+
+**Error codes:** `VALIDATION_ERROR`, `INVITE_INVALID`, `GROUP_INACTIVE`, `INVITE_DISABLED` (registration via link is locked), `ALREADY_MEMBER` (email already in group).
+
 ## Billing Periods
 
 ### `GET /api/groups/[groupId]/billing`
@@ -351,6 +445,9 @@ Common codes:
 - `FORBIDDEN` — not authorized for this action
 - `NOT_FOUND` — resource not found
 - `VALIDATION_ERROR` — request body validation failed
-- `CONFLICT` — duplicate resource
+- `CONFLICT` — duplicate resource (e.g. `ALREADY_MEMBER` for join)
+- `INVITE_INVALID` — invite code not found or revoked
+- `INVITE_DISABLED` — registration via invite link is currently locked
+- `GROUP_INACTIVE` — group is deactivated
 - `RATE_LIMITED` — too many requests
 - `INTERNAL_ERROR` — server error

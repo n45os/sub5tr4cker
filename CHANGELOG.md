@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2026-03-18
+
+### Added
+- **Invite link self-join**: Admins can generate a shareable invite link from the group detail page. Anyone with the link can join the group by entering email and display name (no login required). New endpoints: GET/POST/PATCH/DELETE `/api/groups/[groupId]/invite-link` (admin), GET `/api/invite/[inviteCode]` (public preview), POST `/api/groups/join` (public join).
+- **Invite link controls**: Admin can lock registration (link stays valid but joins are rejected), re-enable it, or revoke the link entirely. Group model adds `inviteLinkEnabled`; `inviteCode` is cleared on revoke.
+- **Public invite page**: `/invite/[inviteCode]` shows group preview and a join form; handles invalid/revoked/disabled states with clear messages.
+- **Invite code utility**: `src/lib/invite-code.ts` for URL-safe random codes with uniqueness check against existing groups.
+
+### Changed
+- Group schema: added `inviteLinkEnabled` (default `false`). Joins via invite require both `inviteCode` and `inviteLinkEnabled`.
+
 ## [0.5.0] - 2026-03-18
 
 ### Added

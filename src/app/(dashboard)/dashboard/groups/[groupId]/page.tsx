@@ -22,6 +22,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GroupMembersPanel } from "@/components/features/groups/group-members-panel";
 import { InitializeNotifyButton } from "@/components/features/groups/initialize-notify-button";
+import { InviteLinkCard } from "@/components/features/groups/invite-link-card";
 import { GroupNotificationsPanel } from "@/components/features/notifications/group-notifications-panel";
 import { cn } from "@/lib/utils";
 import { getServerBaseUrl } from "@/lib/server-url";
@@ -312,6 +313,9 @@ export default async function GroupDetailPage({
                 </div>
               </CardContent>
             </Card>
+            {group.role === "admin" ? (
+              <InviteLinkCard groupId={groupId} />
+            ) : null}
           </div>
         </TabsContent>
 

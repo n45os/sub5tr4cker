@@ -31,7 +31,7 @@ export async function sendEmail(
 ): Promise<{ id: string } | null> {
   const client = await getResend();
   const defaultFrom =
-    (await getSetting("email.fromAddress")) || "SubsTrack <noreply@substrack.app>";
+    (await getSetting("email.fromAddress")) || "sub5tr4cker <noreply@example.com>";
   const from = params.from || defaultFrom;
 
   try {

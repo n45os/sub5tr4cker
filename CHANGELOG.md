@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2026-03-18
+
+### Added
+- **App rename to sub5tr4cker** — Project and UI now use the name sub5tr4cker; repo intended for `n45os/sub5tr4cker` on GitHub.
+- **Email footer** — All transactional emails include a footer with app name, link to GitHub repo (https://github.com/n45os/sub5tr4cker), and an unsubscribe link when applicable.
+- **Unsubscribe from reminder emails** — Members can click “Unsubscribe” in reminder, invite, and price-change emails to stop receiving those emails for that group. GET `/api/unsubscribe/[token]` handles the action and redirects to `/unsubscribed`.
+- **Admin Telegram on unsubscribe** — When a member unsubscribes from emails, the group admin receives a Telegram notification (if Telegram is linked).
+
+### Changed
+- Group member schema: added `unsubscribedFromEmail` (default `false`). Reminder, invite, and price-change flows skip email for unsubscribed members (Telegram still used when configured).
+- Default email “from” and settings placeholder updated to sub5tr4cker.
+
 ## [0.6.0] - 2026-03-18
 
 ### Added

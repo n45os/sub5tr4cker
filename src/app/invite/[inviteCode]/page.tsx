@@ -46,7 +46,7 @@ export default async function InvitePage({ params }: PageProps) {
           href="/"
           className="font-display text-xl font-semibold text-foreground"
         >
-          SubsTrack
+          sub5tr4cker
         </Link>
         <div className="w-full max-w-md rounded-xl border bg-card p-6 text-center shadow-sm">
           <h1 className="font-display text-xl font-semibold text-foreground">
@@ -73,7 +73,7 @@ export default async function InvitePage({ params }: PageProps) {
           href="/"
           className="font-display text-xl font-semibold text-foreground"
         >
-          SubsTrack
+          sub5tr4cker
         </Link>
         <div className="w-full max-w-md rounded-xl border bg-card p-6 text-center shadow-sm">
           <p className="text-sm text-muted-foreground">Loading…</p>
@@ -88,7 +88,7 @@ export default async function InvitePage({ params }: PageProps) {
         href="/"
         className="font-display text-xl font-semibold text-foreground"
       >
-        SubsTrack
+        sub5tr4cker
       </Link>
       <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-sm">
         <div className="mb-6">

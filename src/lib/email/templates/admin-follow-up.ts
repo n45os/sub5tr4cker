@@ -1,3 +1,5 @@
+import { buildEmailFooterHtml } from "@/lib/email/footer";
+
 export interface AdminFollowUpTemplateParams {
   groupName: string;
   periodLabel: string;
@@ -33,6 +35,9 @@ export function buildAdminFollowUpEmailHtml(
     <p>The following members say they've paid for <strong>${params.groupName}</strong> — ${params.periodLabel}:</p>
     <pre>${memberList}</pre>
     <p>Please verify their payments in the dashboard.</p>
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
+      ${buildEmailFooterHtml({})}
+    </div>
   `;
 }
 

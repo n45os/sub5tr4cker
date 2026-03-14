@@ -1,9 +1,13 @@
+import { buildEmailFooterHtml } from "@/lib/email/footer";
+
 export interface PriceChangeTemplateParams {
   groupName: string;
   serviceName: string;
   oldPrice: number;
   newPrice: number;
   currency: string;
+  /** optional; when set, footer includes unsubscribe link */
+  unsubscribeUrl?: string | null;
 }
 
 export const priceChangeSampleParams: PriceChangeTemplateParams = {
@@ -50,7 +54,7 @@ export function buildPriceChangeEmailHtml(
           <p>Your next billing cycle will use the new amount. If you have any questions, contact your group admin.</p>
         </div>
         <div class="footer">
-          <p>Sent by SubsTrack</p>
+          ${buildEmailFooterHtml({ unsubscribeUrl: params.unsubscribeUrl ?? null })}
         </div>
       </div>
     </body>

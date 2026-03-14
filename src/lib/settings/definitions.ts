@@ -41,7 +41,7 @@ export const settingsDefinitions: SettingsDefinition[] = [
     description: "Default sender shown on outgoing emails.",
     isSecret: false,
     envVar: "EMAIL_FROM",
-    defaultValue: "SubsTrack <noreply@substrack.app>",
+    defaultValue: "sub5tr4cker <noreply@example.com>",
   },
   {
     key: "telegram.botToken",

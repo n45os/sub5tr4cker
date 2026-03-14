@@ -10,6 +10,8 @@ export interface IGroupMember {
   leftAt: Date | null;
   isActive: boolean;
   customAmount: number | null;
+  /** when true, do not send reminder/invite/price-change emails to this member */
+  unsubscribedFromEmail: boolean;
 }
 
 export interface IGroup extends Document {
@@ -68,6 +70,7 @@ const groupMemberSchema = new Schema<IGroupMember>({
   leftAt: { type: Date, default: null },
   isActive: { type: Boolean, default: true },
   customAmount: { type: Number, default: null },
+  unsubscribedFromEmail: { type: Boolean, default: false },
 });
 
 const groupSchema = new Schema<IGroup>(

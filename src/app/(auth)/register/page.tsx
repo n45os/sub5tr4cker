@@ -63,7 +63,7 @@ export default function RegisterPage() {
             href="/"
             className="font-display text-xl font-semibold text-zinc-900 dark:text-zinc-100"
           >
-            SubsTrack
+            sub5tr4cker
           </Link>
           <h1 className="font-display mt-4 text-2xl font-bold text-zinc-900 dark:text-zinc-100">
             Create an account

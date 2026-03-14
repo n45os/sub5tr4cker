@@ -11,6 +11,7 @@ import {
   buildGroupInviteTelegramText,
 } from "@/lib/email/templates/group-invite";
 import { getBot } from "@/lib/telegram/bot";
+import { createUnsubscribeToken, getUnsubscribeUrl } from "@/lib/tokens";
 
 function buildBillingSummary(group: IGroup): string {
   const { billing } = group;
@@ -111,17 +112,26 @@ export async function POST(
   for (const member of activeMembers) {
     let telegramChatId: number | null = null;
     let preferences = { email: true, telegram: false };
+    const sendEmail = !member.unsubscribedFromEmail;
 
     if (member.user) {
       const user = await User.findById(member.user);
       if (user) {
         telegramChatId = user.telegram?.chatId ?? null;
         preferences = {
-          email: user.notificationPreferences?.email ?? true,
+          email: sendEmail && (user.notificationPreferences?.email ?? true),
           telegram: user.notificationPreferences?.telegram ?? false,
         };
+      } else {
+        preferences.email = sendEmail;
       }
+    } else {
+      preferences.email = sendEmail;
     }
+
+    const unsubscribeUrl = sendEmail
+      ? await getUnsubscribeUrl(await createUnsubscribeToken(member._id.toString(), groupIdStr))
+      : null;
 
     const params = {
       memberName: member.nickname,
@@ -136,6 +146,7 @@ export async function POST(
       isPublic,
       appUrl: normalizedAppUrl,
       telegramBotUsername,
+      unsubscribeUrl,
     };
 
     const emailHtml = buildGroupInviteEmailHtml(params);

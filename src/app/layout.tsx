@@ -19,7 +19,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SubsTrack",
+  title: "sub5tr4cker",
   description: "Track shared subscriptions and automate payment reminders",
 };
 

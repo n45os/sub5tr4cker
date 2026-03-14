@@ -1,3 +1,5 @@
+import { buildEmailFooterHtml } from "@/lib/email/footer";
+
 export interface PaymentReminderTemplateParams {
   memberName: string;
   groupName: string;
@@ -9,6 +11,8 @@ export interface PaymentReminderTemplateParams {
   confirmUrl: string | null;
   ownerName: string;
   extraText: string | null;
+  /** optional; when set, footer includes repo link and unsubscribe link */
+  unsubscribeUrl?: string | null;
 }
 
 export const paymentReminderSampleParams: PaymentReminderTemplateParams = {
@@ -19,7 +23,7 @@ export const paymentReminderSampleParams: PaymentReminderTemplateParams = {
   currency: "EUR",
   paymentPlatform: "revolut",
   paymentLink: "https://revolut.me/example",
-  confirmUrl: "https://subs-track.app/api/confirm/example-token",
+  confirmUrl: "https://example.com/api/confirm/example-token",
   ownerName: "Nassos",
   extraText: "Please pay before the end of the week so access stays uninterrupted.",
 };
@@ -68,7 +72,7 @@ export function buildPaymentReminderEmailHtml(
           <p>Thank you!</p>
         </div>
         <div class="footer">
-          <p>Sent by SubsTrack</p>
+          ${buildEmailFooterHtml({ unsubscribeUrl: params.unsubscribeUrl ?? null })}
         </div>
       </div>
     </body>

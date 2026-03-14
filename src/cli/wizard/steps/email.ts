@@ -25,7 +25,7 @@ export async function runEmailStep(
   state.settings["email.fromAddress"] = await prompter.text({
     message: "Default from address",
     initialValue: state.settings["email.fromAddress"],
-    placeholder: "SubsTrack <noreply@yourdomain.com>",
+    placeholder: "sub5tr4cker <noreply@yourdomain.com>",
     validate: (value) =>
       !value.trim() ? "From address is required" : undefined,
   });

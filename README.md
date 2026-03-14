@@ -1,12 +1,12 @@
-# SubsTrack
+# sub5tr4cker
 
 Track shared subscriptions, automate payment reminders, and keep everyone honest.
 
-One person pays for a shared service (YouTube Premium, Netflix, Spotify, a utility bill) and SubsTrack handles splitting costs, sending reminders, and tracking who has paid.
+One person pays for a shared service (YouTube Premium, Netflix, Spotify, a utility bill) and sub5tr4cker handles splitting costs, sending reminders, and tracking who has paid.
 
 ## Why
 
-If you've ever managed a shared subscription, you know the pain: spreadsheets, manual Revolut requests, chasing people on WhatsApp. SubsTrack replaces all of that with a clean web UI, automated email/Telegram reminders, and a confirmation flow so everyone stays in sync.
+If you've ever managed a shared subscription, you know the pain: spreadsheets, manual Revolut requests, chasing people on WhatsApp. sub5tr4cker replaces all of that with a clean web UI, automated email/Telegram reminders, and a confirmation flow so everyone stays in sync.
 
 ## Features
 
@@ -47,8 +47,8 @@ If you've ever managed a shared subscription, you know the pain: spreadsheets, m
 
 ```bash
 # clone the repo
-git clone https://github.com/yourusername/subs-track.git
-cd subs-track
+git clone https://github.com/n45os/sub5tr4cker.git
+cd sub5tr4cker
 
 # install dependencies
 pnpm install

@@ -86,13 +86,13 @@ export function AppSidebar({ user }: AppSidebarProps) {
             <SidebarMenuButton
               size="lg"
               render={<Link href="/dashboard" />}
-              tooltip="SubsTrack"
+              tooltip="sub5tr4cker"
             >
               <div className="flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground">
                 <CreditCard className="size-4" />
               </div>
               <div className="grid flex-1 text-left leading-tight">
-                <span className="font-display truncate font-semibold">SubsTrack</span>
+                <span className="font-display truncate font-semibold">sub5tr4cker</span>
                 <span className="font-mono truncate text-xs text-muted-foreground">
                   Subscription ops
                 </span>
@@ -150,7 +150,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
             </Avatar>
             <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
               <p className="truncate text-sm font-medium">
-                {user.name || "SubsTrack user"}
+                {user.name || "sub5tr4cker user"}
               </p>
               <p className="truncate text-xs text-muted-foreground">
                 {user.email || "No email"}

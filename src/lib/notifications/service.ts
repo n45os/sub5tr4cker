@@ -4,6 +4,7 @@ import {
 } from "@/lib/email/templates/price-change";
 import { InlineKeyboard } from "grammy";
 import { dbConnect } from "@/lib/db/mongoose";
+import { createUnsubscribeToken, getUnsubscribeUrl } from "@/lib/tokens";
 import { Notification, NotificationType, User } from "@/models";
 import type { IGroup } from "@/models";
 import { Types } from "mongoose";
@@ -149,6 +150,9 @@ type PriceChangeTarget = {
   telegramChatId?: number | null;
   userId?: string | null;
   preferences?: { email: boolean; telegram: boolean };
+  /** set for group members; used to build unsubscribe URL and respect unsubscribedFromEmail */
+  memberId?: string;
+  unsubscribedFromEmail?: boolean;
 };
 
 // send price-change announcements to admin and all active members when group price is updated
@@ -198,11 +202,13 @@ export async function sendPriceChangeAnnouncements(
     });
   }
 
+  const groupIdStr = group._id.toString();
   for (const member of group.members) {
     if (!member.isActive || member.leftAt) continue;
     const key = member.email.toLowerCase();
     if (targets.has(key)) continue;
 
+    const sendEmail = !member.unsubscribedFromEmail;
     if (member.user) {
       const user = await User.findById(member.user);
       if (user) {
@@ -211,9 +217,11 @@ export async function sendPriceChangeAnnouncements(
           telegramChatId: user.telegram?.chatId ?? null,
           userId: user._id.toString(),
           preferences: {
-            email: user.notificationPreferences?.email ?? true,
+            email: sendEmail && (user.notificationPreferences?.email ?? true),
             telegram: user.notificationPreferences?.telegram ?? false,
           },
+          memberId: member._id.toString(),
+          unsubscribedFromEmail: member.unsubscribedFromEmail,
         });
         continue;
       }
@@ -223,20 +231,43 @@ export async function sendPriceChangeAnnouncements(
       email: member.email,
       telegramChatId: null,
       userId: null,
-      preferences: { email: true, telegram: false },
+      preferences: { email: sendEmail, telegram: false },
+      memberId: member._id.toString(),
+      unsubscribedFromEmail: member.unsubscribedFromEmail,
     });
   }
 
-  const groupId = group._id.toString();
   for (const target of targets.values()) {
     try {
-      await sendNotification(target, {
-        type: "price_change",
-        subject,
-        emailHtml,
-        telegramText,
-        groupId,
+      const unsubscribeUrl =
+        target.memberId && !target.unsubscribedFromEmail
+          ? await getUnsubscribeUrl(
+              await createUnsubscribeToken(target.memberId, groupIdStr)
+            )
+          : null;
+      const emailHtml = buildPriceChangeEmailHtml({
+        groupName,
+        serviceName,
+        oldPrice: previousPrice,
+        newPrice,
+        currency,
+        unsubscribeUrl,
       });
+      await sendNotification(
+        {
+          email: target.email,
+          telegramChatId: target.telegramChatId ?? null,
+          userId: target.userId ?? null,
+          preferences: target.preferences,
+        },
+        {
+          type: "price_change",
+          subject,
+          emailHtml,
+          telegramText,
+          groupId: groupIdStr,
+        }
+      );
     } catch (error) {
       console.error(
         `price-change notification failed for ${target.email}:`,

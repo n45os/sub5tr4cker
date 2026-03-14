@@ -90,3 +90,16 @@ export async function sendPriceChange(
 
   return sendTelegramMessage({ chatId, text });
 }
+
+// notify group admin when a member unsubscribes from emails (or similar actions)
+export async function sendAdminUnsubscribeNotification(
+  chatId: number,
+  memberNickname: string,
+  memberEmail: string,
+  groupName: string
+): Promise<number | null> {
+  const text =
+    `📧 <b>Email unsubscribe</b>\n\n` +
+    `<b>${memberNickname}</b> (${memberEmail}) unsubscribed from reminder emails for <b>${groupName}</b>.`;
+  return sendTelegramMessage({ chatId, text });
+}

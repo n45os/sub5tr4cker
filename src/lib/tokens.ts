@@ -122,3 +122,57 @@ export async function verifyLinkToken(token: string): Promise<LinkPayload | null
     return null;
   }
 }
+
+export interface UnsubscribePayload {
+  memberId: string;
+  groupId: string;
+  exp: number;
+}
+
+export async function createUnsubscribeToken(
+  memberId: string,
+  groupId: string,
+  expiresInDays = 365
+): Promise<string> {
+  const payload: UnsubscribePayload = {
+    memberId,
+    groupId,
+    exp: Date.now() + expiresInDays * 24 * 60 * 60 * 1000,
+  };
+  const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const secret = await getConfirmationSecret();
+  const signature = crypto
+    .createHmac("sha256", secret)
+    .update(data)
+    .digest("base64url");
+  return `${data}.${signature}`;
+}
+
+export async function verifyUnsubscribeToken(
+  token: string
+): Promise<UnsubscribePayload | null> {
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [data, signature] = parts;
+  const secret = await getConfirmationSecret();
+  const expectedSignature = crypto
+    .createHmac("sha256", secret)
+    .update(data)
+    .digest("base64url");
+  if (signature !== expectedSignature) return null;
+  try {
+    const payload: UnsubscribePayload = JSON.parse(
+      Buffer.from(data, "base64url").toString()
+    );
+    if (Date.now() > payload.exp) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+export async function getUnsubscribeUrl(token: string): Promise<string> {
+  const baseUrl =
+    (await getSetting("general.appUrl")) || "http://localhost:3054";
+  return `${baseUrl}/api/unsubscribe/${token}`;
+}

@@ -6,7 +6,7 @@ export default function Home() {
       <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
           <span className="font-display font-semibold text-zinc-900 dark:text-zinc-100">
-            SubsTrack
+            sub5tr4cker
           </span>
           <nav className="flex items-center gap-6">
             <Link
@@ -29,7 +29,7 @@ export default function Home() {
           Track shared subscriptions. Automate reminders.
         </h1>
         <p className="mt-6 max-w-xl text-lg text-zinc-600 dark:text-zinc-400">
-          One person pays the bill; SubsTrack splits the cost, sends payment reminders, and tracks who has paid — with email and Telegram.
+          One person pays the bill; sub5tr4cker splits the cost, sends payment reminders, and tracks who has paid — with email and Telegram.
         </p>
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
           <Link

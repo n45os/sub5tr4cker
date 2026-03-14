@@ -18,9 +18,9 @@ export function registerHandlers(bot: Bot): void {
     }
 
     await ctx.reply(
-      "Welcome to SubsTrack!\n\n" +
+      "Welcome to sub5tr4cker!\n\n" +
         "I help you manage shared subscription payments.\n\n" +
-        "Link your account from the SubsTrack web app to get started."
+        "Link your account from the sub5tr4cker web app to get started."
     );
   });
 
@@ -193,7 +193,7 @@ async function handleAccountLink(
 ): Promise<void> {
   const payload = await verifyLinkToken(linkToken);
   if (!payload) {
-    await ctx.reply("This link has expired or is invalid. Generate a new one from the SubsTrack app.");
+    await ctx.reply("This link has expired or is invalid. Generate a new one from the sub5tr4cker app.");
     return;
   }
 

@@ -1,3 +1,5 @@
+import { buildEmailFooterHtml } from "@/lib/email/footer";
+
 export interface GroupInviteTemplateParams {
   memberName: string;
   groupName: string;
@@ -11,6 +13,8 @@ export interface GroupInviteTemplateParams {
   isPublic: boolean;
   appUrl: string | null;
   telegramBotUsername: string | null;
+  /** optional; when set, footer includes unsubscribe link */
+  unsubscribeUrl?: string | null;
 }
 
 export const groupInviteSampleParams: GroupInviteTemplateParams = {
@@ -25,7 +29,7 @@ export const groupInviteSampleParams: GroupInviteTemplateParams = {
   paymentInstructions: "Use reference 'YouTube' and pay before the 5th.",
   isPublic: true,
   appUrl: "https://substrack.example.com",
-  telegramBotUsername: "SubsTrackBot",
+  telegramBotUsername: "sub5tr4ckerBot",
 };
 
 export function buildGroupInviteEmailHtml(
@@ -120,7 +124,7 @@ export function buildGroupInviteEmailHtml(
           ${publicCtas}
         </div>
         <div class="footer">
-          <p>Sent by SubsTrack</p>
+          ${buildEmailFooterHtml({ unsubscribeUrl: params.unsubscribeUrl ?? null })}
         </div>
       </div>
     </body>

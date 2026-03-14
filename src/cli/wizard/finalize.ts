@@ -24,7 +24,7 @@ export async function loadCurrentConfig(rootDir: string): Promise<SetupState> {
     settings: {
       "general.appUrl": "http://localhost:3054",
       "email.apiKey": "",
-      "email.fromAddress": "SubsTrack <noreply@substrack.app>",
+      "email.fromAddress": "sub5tr4cker <noreply@example.com>",
       "telegram.botToken": "",
       "telegram.webhookSecret": "",
       "security.confirmationSecret": generateSecret(),

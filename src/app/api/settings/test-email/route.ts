@@ -15,11 +15,11 @@ export async function POST() {
   const appUrl = (await getSetting("general.appUrl")) || "http://localhost:3054";
   const result = await sendEmail({
     to: session.user.email,
-    subject: "SubsTrack settings test email",
+    subject: "sub5tr4cker settings test email",
     html: `
       <div style="font-family: Inter, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;">
         <div style="border-radius: 18px; border: 1px solid #e4e4e7; padding: 24px;">
-          <p style="margin: 0 0 8px; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #71717a;">SubsTrack</p>
+          <p style="margin: 0 0 8px; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #71717a;">sub5tr4cker</p>
           <h1 style="margin: 0 0 12px; font-size: 24px;">Email settings look good</h1>
           <p style="margin: 0 0 16px; color: #52525b;">This test email confirms the current email configuration can send messages successfully.</p>
           <p style="margin: 0; color: #71717a;">Workspace URL: ${appUrl}</p>

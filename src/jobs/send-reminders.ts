@@ -2,7 +2,7 @@ import { dbConnect } from "@/lib/db/mongoose";
 import { BillingPeriod, Group, User } from "@/models";
 import { sendNotification } from "@/lib/notifications/service";
 import { paymentConfirmationKeyboard } from "@/lib/telegram/keyboards";
-import { getConfirmationUrl } from "@/lib/tokens";
+import { getConfirmationUrl, createUnsubscribeToken, getUnsubscribeUrl } from "@/lib/tokens";
 import {
   buildPaymentReminderEmailHtml,
   buildPaymentReminderTelegramText,
@@ -84,7 +84,12 @@ async function sendReminderToMember(
   const paymentLink = group.payment.link;
   const currency = period.currency || "€";
 
-  // build email HTML
+  const sendEmail = !member?.unsubscribedFromEmail;
+  const unsubscribeUrl = sendEmail && member
+    ? await getUnsubscribeUrl(await createUnsubscribeToken(payment.memberId.toString(), group._id.toString()))
+    : null;
+
+  // build email HTML (only used when sendEmail; preferences checked in sendNotification)
   const emailHtml = buildPaymentReminderEmailHtml({
     memberName: payment.memberNickname,
     groupName: group.name,
@@ -96,6 +101,7 @@ async function sendReminderToMember(
     confirmUrl,
     ownerName: "the admin",
     extraText: group.announcements.extraText,
+    unsubscribeUrl,
   });
 
   // build telegram text + keyboard
@@ -110,7 +116,7 @@ async function sendReminderToMember(
       telegramChatId: user?.telegram?.chatId,
       userId: user?._id?.toString(),
       preferences: {
-        email: user?.notificationPreferences?.email ?? true,
+        email: sendEmail && (user?.notificationPreferences?.email ?? true),
         telegram: user?.notificationPreferences?.telegram ?? false,
       },
     },

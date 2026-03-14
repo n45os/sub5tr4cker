@@ -31,7 +31,7 @@ export async function POST() {
   const messageId = await sendTelegramMessage({
     chatId: user.telegram.chatId,
     text:
-      `🧪 <b>SubsTrack test message</b>\n\n` +
+      `🧪 <b>sub5tr4cker test message</b>\n\n` +
       `Your Telegram configuration is working and ready to send reminders.`,
   });
 

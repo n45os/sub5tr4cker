@@ -21,11 +21,11 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: DocsPageProps): Promise<Metadata> {
   const { slug } = await params;
   const fullSlug = slug && slug.length > 0 ? slug.join("/") : null;
-  if (!fullSlug) return { title: "Documentation | SubsTrack" };
+  if (!fullSlug) return { title: "Documentation | sub5tr4cker" };
   const doc = getDocContent(fullSlug);
   if (!doc) return {};
   return {
-    title: `${doc.title} | SubsTrack Docs`,
+    title: `${doc.title} | sub5tr4cker Docs`,
     description: doc.description ?? undefined,
   };
 }
@@ -42,7 +42,7 @@ export default async function DocsPage({ params }: DocsPageProps) {
         <main className="docs-index">
           <h1>Documentation</h1>
           <p>
-            User guides and technical reference for SubsTrack — shared subscription tracking and payment reminders.
+            User guides and technical reference for sub5tr4cker — shared subscription tracking and payment reminders.
           </p>
           {DOCS_SECTIONS.map((section) => (
             <section key={section.title} className="docs-index-section">

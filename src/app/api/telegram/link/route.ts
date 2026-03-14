@@ -24,7 +24,7 @@ export async function POST() {
   try {
     const bot = await getBot();
     const me = await bot.api.getMe();
-    const username = me.username || "SubsTrackBot";
+    const username = me.username || "sub5tr4ckerBot";
     const linkToken = await createLinkToken(session.user.id, 15);
     const baseUrl = "https://t.me";
     const deepLink = `${baseUrl}/${username}?start=link_${linkToken}`;

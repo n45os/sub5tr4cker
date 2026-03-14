@@ -226,7 +226,7 @@ export function GroupForm({
             <Sparkles className="size-3" />
             {mode === "create" ? "Setup flow" : "Configuration"}
           </Badge>
-          <h2 className="text-2xl font-semibold tracking-tight">
+          <h2 className="font-display text-2xl font-semibold tracking-tight">
             {pageCopy.title}
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">

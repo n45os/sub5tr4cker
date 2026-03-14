@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { CalendarDays, CreditCard, Pencil, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import {
   Card,
   CardContent,
@@ -164,7 +164,7 @@ export default async function GroupDetailPage({
             </Badge>
           </div>
           <div>
-            <h2 className="text-3xl font-semibold tracking-tight">{group.name}</h2>
+            <h2 className="font-display text-3xl font-semibold tracking-tight">{group.name}</h2>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
               {group.description ||
                 "No extra description yet. Use the edit view to add payment notes, account context, or membership rules."}

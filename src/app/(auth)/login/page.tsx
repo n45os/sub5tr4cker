@@ -41,11 +41,11 @@ export default function LoginPage() {
         <div className="text-center">
           <Link
             href="/"
-            className="text-xl font-semibold text-zinc-900 dark:text-zinc-100"
+            className="font-display text-xl font-semibold text-zinc-900 dark:text-zinc-100"
           >
             SubsTrack
           </Link>
-          <h1 className="mt-4 text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+          <h1 className="font-display mt-4 text-2xl font-bold text-zinc-900 dark:text-zinc-100">
             Sign in
           </h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">

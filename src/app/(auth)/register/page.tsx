@@ -38,7 +38,7 @@ export default function RegisterPage() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4 dark:bg-zinc-950">
         <div className="w-full max-w-sm space-y-6 text-center">
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+          <h1 className="font-display text-2xl font-bold text-zinc-900 dark:text-zinc-100">
             Account created
           </h1>
           <p className="text-zinc-600 dark:text-zinc-400">
@@ -61,11 +61,11 @@ export default function RegisterPage() {
         <div className="text-center">
           <Link
             href="/"
-            className="text-xl font-semibold text-zinc-900 dark:text-zinc-100"
+            className="font-display text-xl font-semibold text-zinc-900 dark:text-zinc-100"
           >
             SubsTrack
           </Link>
-          <h1 className="mt-4 text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+          <h1 className="font-display mt-4 text-2xl font-bold text-zinc-900 dark:text-zinc-100">
             Create an account
           </h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">

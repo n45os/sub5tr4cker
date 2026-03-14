@@ -5,7 +5,7 @@ export default function Home() {
     <div className="flex min-h-screen flex-col bg-zinc-50 font-sans dark:bg-zinc-950">
       <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
-          <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+          <span className="font-display font-semibold text-zinc-900 dark:text-zinc-100">
             SubsTrack
           </span>
           <nav className="flex items-center gap-6">
@@ -25,7 +25,7 @@ export default function Home() {
         </div>
       </header>
       <main className="flex flex-1 flex-col items-center justify-center px-4 py-24 text-center">
-        <h1 className="max-w-2xl text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-5xl">
+        <h1 className="font-display max-w-2xl text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-5xl">
           Track shared subscriptions. Automate reminders.
         </h1>
         <p className="mt-6 max-w-xl text-lg text-zinc-600 dark:text-zinc-400">

@@ -158,7 +158,7 @@ export function AppHeader({ user }: AppHeaderProps) {
             ))}
           </div>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{meta.title}</h1>
+            <h1 className="font-display text-2xl font-semibold tracking-tight">{meta.title}</h1>
             <p className="text-sm text-muted-foreground">{meta.description}</p>
           </div>
         </div>

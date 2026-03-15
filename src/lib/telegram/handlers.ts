@@ -363,7 +363,12 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
   }
   await group.save();
 
-  const shouldSendWelcomeEmail = !wasAccepted;
+  // send welcome email at most once per user (atomic claim)
+  const welcomeEmailClaimed = await User.findOneAndUpdate(
+    { _id: user._id, welcomeEmailSentAt: null },
+    { $set: { welcomeEmailSentAt: now } }
+  );
+  const shouldSendWelcomeEmail = !wasAccepted && !!welcomeEmailClaimed;
   if (shouldSendWelcomeEmail) {
     const appUrlSetting = await getSetting("general.appUrl");
     const baseUrl = (appUrlSetting?.trim() || "http://localhost:3054").replace(

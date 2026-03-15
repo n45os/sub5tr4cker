@@ -22,6 +22,8 @@ export interface IUser extends Document {
     telegram: boolean;
     reminderFrequency: "once" | "daily" | "every_3_days";
   };
+  /** set when the user has received the one-time welcome/invite email (magic link or Telegram onboarding) */
+  welcomeEmailSentAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -64,6 +66,7 @@ const userSchema = new Schema<IUser>(
         default: "every_3_days",
       },
     },
+    welcomeEmailSentAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

@@ -37,6 +37,7 @@ The person using the platform. Can be an instance admin (first user or promoted)
     telegram: boolean,                    // default: false (until linked)
     reminderFrequency: 'once' | 'daily' | 'every_3_days',  // default: 'every_3_days'
   },
+  welcomeEmailSentAt: Date | null,        // set when the one-time welcome/invite email has been sent
 
   createdAt: Date,
   updatedAt: Date,

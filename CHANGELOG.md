@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.24.2] - 2026-03-19
+
+### Fixed
+
+- **Welcome email once per user** — The welcome/invite email (with magic link or member portal) is now sent at most once per user. Previously it could be sent again each time the user opened the invite link or entered the app. A `welcomeEmailSentAt` field on the User model and atomic checks in both the invite-accept API and the Telegram invite-link handler ensure only the first onboarding path sends the email.
+
 ## [0.24.1] - 2026-03-19
 
 ### Added

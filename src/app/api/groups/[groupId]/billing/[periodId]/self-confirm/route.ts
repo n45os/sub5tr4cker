@@ -1,23 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import mongoose from "mongoose";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group, BillingPeriod } from "@/models";
 import type { IGroupMember, IMemberPayment } from "@/models";
+import { verifyMemberPortalToken } from "@/lib/tokens";
+
+const selfConfirmSchema = z.object({
+  memberToken: z.string().optional(),
+});
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ groupId: string; periodId: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json(
-      { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
-      { status: 401 }
-    );
-  }
-
   const { groupId, periodId } = await context.params;
   if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(periodId)) {
     return NextResponse.json(
@@ -28,6 +26,20 @@ export async function POST(
 
   await dbConnect();
 
+  const parsed = selfConfirmSchema.safeParse(await request.json().catch(() => ({})));
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Invalid request body",
+          details: parsed.error.flatten(),
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   const group = await Group.findById(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
@@ -36,15 +48,55 @@ export async function POST(
     );
   }
 
-  const userId = session.user.id;
-  const userEmail = (session.user.email as string) || "";
+  const session = await auth();
+  const memberToken = parsed.data.memberToken;
 
-  const member = group.members.find(
-    (m: IGroupMember) =>
-      m.isActive &&
-      !m.leftAt &&
-      (m.user?.toString() === userId || m.email === userEmail)
-  );
+  let member: IGroupMember | undefined;
+  let actorId: string;
+  let actorName: string;
+
+  if (memberToken) {
+    const payload = await verifyMemberPortalToken(memberToken);
+    if (!payload || payload.groupId !== groupId) {
+      return NextResponse.json(
+        { error: { code: "UNAUTHORIZED", message: "Invalid member link" } },
+        { status: 401 }
+      );
+    }
+
+    member = group.members.find(
+      (m: IGroupMember) =>
+        m.isActive &&
+        !m.leftAt &&
+        m._id.toString() === payload.memberId
+    );
+    actorId = payload.memberId;
+    actorName = member?.nickname || member?.email || "Member";
+  } else {
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
+    const userEmail = (session.user.email as string) || "";
+
+    member = group.members.find(
+      (m: IGroupMember) =>
+        m.isActive &&
+        !m.leftAt &&
+        (m.user?.toString() === userId || m.email === userEmail)
+    );
+    actorId = session.user.id;
+    actorName =
+      (session.user.name as string) ||
+      (session.user.email as string) ||
+      member?.nickname ||
+      "Unknown";
+  }
+
   if (!member) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "You are not a member of this group" } },
@@ -89,12 +141,8 @@ export async function POST(
   payment.memberConfirmedAt = new Date();
   await period.save();
 
-  const actorName =
-    (session.user.name as string) ||
-    (session.user.email as string) ||
-    "Unknown";
   await logAudit({
-    actorId: session.user.id,
+    actorId,
     actorName,
     action: "payment_self_confirmed",
     groupId,

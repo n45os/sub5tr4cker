@@ -89,6 +89,37 @@ export default async function MemberPortalPage({
 
   const confirmed = query.confirmed === "true";
   const joined = query.joined === "true";
+  const memberViewGroup = {
+    _id: group._id.toString(),
+    name: group.name,
+    description: group.description ?? null,
+    service: {
+      name: group.service.name,
+      icon: group.service.icon ?? null,
+      url: group.service.url ?? null,
+    },
+    billing: {
+      mode: group.billing.mode,
+      currentPrice: group.billing.currentPrice,
+      currency: group.billing.currency,
+      cycleDay: group.billing.cycleDay,
+      cycleType: group.billing.cycleType,
+      adminIncludedInSplit: group.billing.adminIncludedInSplit,
+      fixedMemberAmount: group.billing.fixedMemberAmount ?? null,
+      gracePeriodDays: group.billing.gracePeriodDays,
+    },
+    payment: {
+      platform: group.payment.platform,
+      link: group.payment.link ?? null,
+      instructions: group.payment.instructions ?? null,
+    },
+    memberCount: activeMembers.length,
+    myMembership: {
+      _id: member._id.toString(),
+      nickname: member.nickname,
+      role: member.role,
+    },
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -122,20 +153,7 @@ export default async function MemberPortalPage({
         )}
 
         <MemberGroupView
-          group={{
-            _id: group._id.toString(),
-            name: group.name,
-            description: group.description,
-            service: group.service,
-            billing: group.billing,
-            payment: group.payment,
-            memberCount: activeMembers.length,
-            myMembership: {
-              _id: member._id.toString(),
-              nickname: member.nickname,
-              role: member.role,
-            },
-          }}
+          group={memberViewGroup}
           periods={memberPeriods}
           currentMemberId={member._id.toString()}
           memberToken={token}

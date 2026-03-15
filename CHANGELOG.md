@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.23.1] - 2026-03-19
+
+### Fixed
+
+- **Backfilled period share recalculation** — When a member is added into existing billing periods, equal-split and variable periods now recalculate unadjusted payment amounts for all included members instead of only appending the new member. This keeps backfilled periods aligned with the updated group split.
+
 ## [0.23.0] - 2026-03-19
 
 ### Added

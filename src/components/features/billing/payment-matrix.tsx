@@ -78,6 +78,7 @@ interface PaymentMatrixProps {
   members: MemberColumn[];
   isAdmin: boolean;
   currentMemberId: string | null;
+  memberToken?: string;
   onPeriodsChange?: (periods: PeriodRow[]) => void;
 }
 
@@ -156,6 +157,7 @@ export function PaymentMatrix({
   members,
   isAdmin,
   currentMemberId,
+  memberToken,
   onPeriodsChange,
 }: PaymentMatrixProps) {
   const [periods, setPeriods] = useState<PeriodRow[]>(initialPeriods);
@@ -225,9 +227,11 @@ export function PaymentMatrix({
   const [selectedPeriods, setSelectedPeriods] = useState<Set<string>>(new Set());
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [confirmingPayment, setConfirmingPayment] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const togglePeriodSelection = useCallback(
     (periodId: string) => {
+      setConfirmError(null);
       setSelectedPeriods((prev) => {
         const next = new Set(prev);
         if (next.has(periodId)) {
@@ -251,29 +255,54 @@ export function PaymentMatrix({
   const confirmSelectedPayments = useCallback(async () => {
     if (!currentMemberId || selectedPeriods.size === 0) return;
     setConfirmingPayment(true);
+    setConfirmError(null);
     const periodIds = Array.from(selectedPeriods);
+    const failedPeriodIds: string[] = [];
     for (const periodId of periodIds) {
       const key = `${periodId}-${currentMemberId}`;
       setLoadingCell(key);
       try {
         const res = await fetch(
           `/api/groups/${groupId}/billing/${periodId}/self-confirm`,
-          { method: "POST" }
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(memberToken ? { memberToken } : {}),
+          }
         );
+        const json = await res.json();
         if (res.ok) {
           updateCell(periodId, currentMemberId, {
             status: "member_confirmed",
             memberConfirmedAt: new Date().toISOString(),
           });
+        } else {
+          failedPeriodIds.push(periodId);
+          setErrorCell(key);
+          setConfirmError(
+            json?.error?.message || "Could not confirm the selected payment"
+          );
+          setTimeout(() => setErrorCell(null), 2500);
         }
+      } catch {
+        failedPeriodIds.push(periodId);
+        setErrorCell(key);
+        setConfirmError("Something went wrong while confirming the selected payment");
+        setTimeout(() => setErrorCell(null), 2500);
       } finally {
         setLoadingCell(null);
       }
     }
-    setSelectedPeriods(new Set());
-    setConfirmDialogOpen(false);
+
+    if (failedPeriodIds.length === 0) {
+      setSelectedPeriods(new Set());
+      setConfirmDialogOpen(false);
+    } else {
+      setSelectedPeriods(new Set(failedPeriodIds));
+    }
+
     setConfirmingPayment(false);
-  }, [groupId, currentMemberId, selectedPeriods, updateCell]);
+  }, [groupId, currentMemberId, memberToken, selectedPeriods, updateCell]);
 
   // adjustment dialog state
   const [adjustDialog, setAdjustDialog] = useState<{
@@ -701,7 +730,7 @@ export function PaymentMatrix({
                     </DropdownMenu>
                   ) : (
                     <Tooltip>
-                      <TooltipTrigger asChild>{cellButton}</TooltipTrigger>
+                      <TooltipTrigger render={cellButton} />
                       <TooltipContent side="top" className="max-w-xs">
                         {tooltipContent}
                       </TooltipContent>
@@ -758,13 +787,19 @@ export function PaymentMatrix({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setSelectedPeriods(new Set())}
+              onClick={() => {
+                setSelectedPeriods(new Set());
+                setConfirmError(null);
+              }}
             >
               Clear
             </Button>
             <Button
               size="sm"
-              onClick={() => setConfirmDialogOpen(true)}
+              onClick={() => {
+                setConfirmError(null);
+                setConfirmDialogOpen(true);
+              }}
             >
               <Check className="mr-2 size-4" />
               Confirm payment
@@ -774,7 +809,13 @@ export function PaymentMatrix({
       )}
 
       {/* member confirm dialog */}
-      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+      <Dialog
+        open={confirmDialogOpen}
+        onOpenChange={(open) => {
+          setConfirmDialogOpen(open);
+          if (!open) setConfirmError(null);
+        }}
+      >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Confirm payment?</DialogTitle>
@@ -787,6 +828,11 @@ export function PaymentMatrix({
               The admin will verify your payment.
             </DialogDescription>
           </DialogHeader>
+          {confirmError && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {confirmError}
+            </div>
+          )}
           <div className="space-y-2 py-2">
             {Array.from(selectedPeriods).map((periodId) => {
               const period = periods.find((p) => p._id === periodId);

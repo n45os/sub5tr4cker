@@ -1,6 +1,10 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { CalendarDays, CheckCircle, Clock, CreditCard, AlertTriangle, ExternalLink, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import {
   Card,
@@ -60,6 +64,8 @@ interface MemberGroupViewProps {
   memberToken?: string;
 }
 
+const MEMBER_PERIOD_PREVIEW_COUNT = 6;
+
 /** Member-safe group content: no members list, no notifications, no edit/invite. Reused by dashboard and standalone member page. */
 export function MemberGroupView({
   group,
@@ -67,11 +73,18 @@ export function MemberGroupView({
   currentMemberId,
   memberToken,
 }: MemberGroupViewProps) {
+  const [showAllPeriods, setShowAllPeriods] = useState(false);
   const currentPeriod = periods[0];
   const myMembership = group.myMembership;
   const membersForMatrix = myMembership
     ? [{ _id: myMembership._id, nickname: myMembership.nickname, email: "" }]
     : [];
+  const visiblePeriods = useMemo(() => {
+    if (!memberToken || showAllPeriods) return periods;
+    return periods.slice(0, MEMBER_PERIOD_PREVIEW_COUNT);
+  }, [memberToken, periods, showAllPeriods]);
+  const hasHiddenPeriods =
+    !!memberToken && periods.length > MEMBER_PERIOD_PREVIEW_COUNT && !showAllPeriods;
 
   // compute financial summary for the current member
   const myPayments = currentMemberId
@@ -186,7 +199,11 @@ export function MemberGroupView({
               <div>
                 <CardTitle>Your payment status</CardTitle>
                 <CardDescription>
-                  Your amount and status per period.{!memberToken && " Open the full list to see all."}
+                  Your amount and status per period.
+                  {!memberToken && " Open the full list to see all."}
+                  {memberToken &&
+                    periods.length > MEMBER_PERIOD_PREVIEW_COUNT &&
+                    " Showing the latest periods first."}
                 </CardDescription>
               </div>
               {!memberToken && (
@@ -203,11 +220,33 @@ export function MemberGroupView({
               <PaymentMatrix
                 groupId={group._id}
                 currency={group.billing.currency}
-                periods={periods}
+                periods={visiblePeriods}
                 members={membersForMatrix}
                 isAdmin={false}
                 currentMemberId={currentMemberId}
+                memberToken={memberToken}
               />
+              {memberToken && periods.length > MEMBER_PERIOD_PREVIEW_COUNT && (
+                <div className="mt-4 flex justify-end">
+                  {hasHiddenPeriods ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAllPeriods(true)}
+                    >
+                      Load all periods
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowAllPeriods(false)}
+                    >
+                      Show less
+                    </Button>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -34,9 +34,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${dmSans.variable} ${spaceGrotesk.variable} ${syne.variable} ${jetbrainsMono.variable} min-h-screen bg-background font-sans antialiased`}
+        suppressHydrationWarning
       >
         <Providers>{children}</Providers>
       </body>

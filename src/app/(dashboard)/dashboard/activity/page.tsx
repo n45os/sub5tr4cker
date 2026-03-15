@@ -494,23 +494,36 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps) 
                         {evt.summary}
                       </p>
                       <ul className="mt-1 space-y-1 text-sm">
-                        {evt.groups.map((g) => (
-                          <li key={String(g.groupId)}>
-                            <Link
-                              href={`/dashboard/groups/${String(g.groupId)}`}
-                              className="text-primary hover:underline"
-                            >
-                              {g.groupName}
-                            </Link>
-                            <span className="text-muted-foreground">
-                              {" "}
-                              — {g.periodLabel}
-                              {g.recipientCount != null
-                                ? ` (${g.recipientCount} recipient${g.recipientCount !== 1 ? "s" : ""})`
-                                : ""}
-                            </span>
-                          </li>
-                        ))}
+                        {evt.groups.map((g) => {
+                          const raw = g.groupId;
+                          const groupId =
+                            typeof raw === "string"
+                              ? raw
+                              : raw && typeof raw === "object" && "_id" in raw
+                                ? String((raw as { _id: unknown })._id)
+                                : "";
+                          return (
+                            <li key={groupId || g.groupName}>
+                              {groupId ? (
+                                <Link
+                                  href={`/dashboard/groups/${groupId}`}
+                                  className="text-primary hover:underline"
+                                >
+                                  {g.groupName}
+                                </Link>
+                              ) : (
+                                <span className="text-primary">{g.groupName}</span>
+                              )}
+                              <span className="text-muted-foreground">
+                                {" "}
+                                — {g.periodLabel}
+                                {g.recipientCount != null
+                                  ? ` (${g.recipientCount} recipient${g.recipientCount !== 1 ? "s" : ""})`
+                                  : ""}
+                              </span>
+                            </li>
+                          );
+                        })}
                       </ul>
                     </li>
                   ))}

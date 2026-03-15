@@ -298,8 +298,12 @@ export async function GET(request: NextRequest) {
         (p) => p.status === "pending" || p.status === "overdue"
       ).length;
       if (recipientCount === 0) continue;
+      const groupIdStr =
+        typeof period.group === "object" && period.group !== null && "_id" in period.group
+          ? String((period.group as { _id: unknown })._id)
+          : String(period.group);
       groupsInRun.push({
-        groupId: (period.group as { toString: () => string }).toString(),
+        groupId: groupIdStr,
         groupName: group.name,
         periodLabel: period.periodLabel,
         recipientCount,
@@ -337,8 +341,12 @@ export async function GET(request: NextRequest) {
       if (!group?.name) continue;
       const g = await Group.findById(group._id);
       if (!g?.isActive || g.notifications?.followUpsEnabled === false) continue;
+      const groupIdStr =
+        typeof period.group === "object" && period.group !== null && "_id" in period.group
+          ? String((period.group as { _id: unknown })._id)
+          : String(period.group);
       groupsInRun.push({
-        groupId: (period.group as { toString: () => string }).toString(),
+        groupId: groupIdStr,
         groupName: group.name,
         periodLabel: period.periodLabel,
       });

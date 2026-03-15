@@ -11,7 +11,7 @@ import {
   Minus,
   UserCheck,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -395,11 +395,14 @@ export function MemberPaymentList({
                 <p className="text-sm text-muted-foreground">{paymentInstructions}</p>
               )}
               {paymentLink && (
-                <Button asChild variant="outline" className="w-full">
-                  <Link href={paymentLink} target="_blank" rel="noreferrer">
-                    Open payment link
-                  </Link>
-                </Button>
+                <Link
+                  href={paymentLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={cn(buttonVariants({ variant: "outline" }), "w-full")}
+                >
+                  Open payment link
+                </Link>
               )}
             </div>
           )}

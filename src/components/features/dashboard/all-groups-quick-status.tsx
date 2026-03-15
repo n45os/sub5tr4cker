@@ -61,25 +61,25 @@ export function AllGroupsQuickStatus() {
 
   return (
     <AllGroupsQuickStatusCard>
-      <div className="grid gap-4">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-xl border bg-muted/40 p-3">
-            <p className="text-xs text-muted-foreground">Groups</p>
+      <div className="grid min-w-0 gap-4">
+        <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-4 *:min-w-0">
+          <div className="min-w-0 rounded-xl border bg-muted/40 p-3">
+            <p className="truncate text-xs text-muted-foreground">Groups</p>
             <p className="font-mono text-lg font-semibold tabular-nums">{data.totalGroups}</p>
           </div>
-          <div className="rounded-xl border bg-muted/40 p-3">
-            <p className="text-xs text-muted-foreground">Needing attention</p>
+          <div className="min-w-0 rounded-xl border bg-muted/40 p-3">
+            <p className="truncate text-xs text-muted-foreground">Needing attention</p>
             <p className="font-mono text-lg font-semibold tabular-nums">{data.groupsWithPendingOverdue}</p>
           </div>
-          <div className="rounded-xl border bg-muted/40 p-3">
-            <p className="text-xs text-muted-foreground">Pending / Overdue</p>
+          <div className="min-w-0 rounded-xl border bg-muted/40 p-3">
+            <p className="truncate text-xs text-muted-foreground">Pending / Overdue</p>
             <p className="font-mono text-lg font-semibold tabular-nums">
               {data.pendingCount} / {data.overdueCount}
             </p>
           </div>
           {data.memberConfirmedCount > 0 ? (
-            <div className="rounded-xl border bg-muted/40 p-3">
-              <p className="text-xs text-muted-foreground">Awaiting your confirm</p>
+            <div className="min-w-0 rounded-xl border bg-muted/40 p-3">
+              <p className="truncate text-xs text-muted-foreground">Awaiting your confirm</p>
               <p className="font-mono text-lg font-semibold tabular-nums">{data.memberConfirmedCount}</p>
             </div>
           ) : null}

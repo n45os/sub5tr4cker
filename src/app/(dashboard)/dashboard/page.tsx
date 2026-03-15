@@ -47,8 +47,8 @@ export default async function DashboardPage() {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-      <section className="grid gap-4 lg:grid-cols-[1.5fr_repeat(3,1fr)]">
+    <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 overflow-x-hidden">
+      <section className="grid gap-4 lg:grid-cols-[1.5fr_repeat(3,1fr)] *:min-w-0">
         <Card className="border-border/70 bg-gradient-to-br from-card via-card to-muted/40 shadow-sm">
           <CardHeader>
             <Badge variant="outline" className="w-fit">
@@ -100,7 +100,7 @@ export default async function DashboardPage() {
         <AllGroupsQuickStatus />
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1.8fr_1fr]">
+      <section className="grid gap-4 lg:grid-cols-[1.8fr_1fr] *:min-w-0">
         <Card>
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
@@ -131,7 +131,7 @@ export default async function DashboardPage() {
                 </Link>
               </div>
             ) : (
-              <ul className="grid gap-5 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
+              <ul className="grid gap-5 grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
                 {groups.map((group) => (
                   <li key={group._id}>
                     <GroupCard group={group} />

@@ -19,7 +19,7 @@ User ──┬── owns ──── Group ──── has many ──── 
 
 ## User
 
-- **Fields**: name, email (unique), emailVerified, image, hashedPassword, telegram (chatId, username, linkedAt), notificationPreferences (email, telegram, reminderFrequency), timestamps.
+- **Fields**: name, email (unique), emailVerified, image, hashedPassword, telegram (chatId, username, linkedAt), notificationPreferences (email, telegram, reminderFrequency), welcomeEmailSentAt (one-time welcome/invite email sent), timestamps.
 - **Indexes**: email (unique), telegram.chatId (sparse unique).
 
 ## Group

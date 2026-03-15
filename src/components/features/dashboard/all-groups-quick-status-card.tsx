@@ -12,7 +12,7 @@ interface AllGroupsQuickStatusCardProps {
 
 export function AllGroupsQuickStatusCard({ children }: AllGroupsQuickStatusCardProps) {
   return (
-    <Card>
+    <Card className="min-w-0">
       <CardHeader>
         <CardTitle>All groups quick status</CardTitle>
         <CardDescription>

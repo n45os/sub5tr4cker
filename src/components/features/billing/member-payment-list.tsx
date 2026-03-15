@@ -241,13 +241,15 @@ export function MemberPaymentList({
                 ) : selectable ? (
                   <div
                     className={cn(
-                      "flex size-5 shrink-0 items-center justify-center rounded-md border-2 transition-all duration-150",
+                      "flex size-5 items-center justify-center rounded-md border transition-all duration-150",
                       selected
                         ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                        : "border-input bg-background hover:border-primary/50 hover:bg-accent/50"
+                        : "border-input bg-background hover:border-primary/50 hover:bg-muted/30"
                     )}
                   >
-                    {selected && <Check className="size-3.5 text-primary-foreground" strokeWidth={2.5} />}
+                    {selected && (
+                      <Check className="size-3 text-primary-foreground" strokeWidth={2.5} />
+                    )}
                   </div>
                 ) : (
                   statusIcon(pay.status)

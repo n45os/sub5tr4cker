@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.25.0] - 2026-03-19
+
+### Added
+
+- **Notify unpaid: choose groups, members, and channel** — The dashboard "Notify all unpaid" flow now lets admins select which groups to include, which members (payments) to notify via checkboxes, and which channel to use for the batch: "Both (respect preferences)", "Email only", or "Telegram only". POST `/api/dashboard/notify-unpaid` accepts optional `groupIds`, `paymentIds`, and `channelPreference`; existing behavior is unchanged when no body is sent.
+
 ## [0.24.2] - 2026-03-19
 
 ### Fixed

@@ -1,5 +1,5 @@
 <!-- context-status: active -->
-<!-- last-updated: 2026-03-18 -->
+<!-- last-updated: 2026-03-19 -->
 
 # SubsTrack — Project Context
 
@@ -42,6 +42,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 - Settings: GET/PATCH /api/settings, POST /api/settings/test-email, POST /api/settings/test-telegram
 - Auth: /api/auth/[...nextauth], POST /api/register
 - Telegram: POST /api/telegram/webhook, POST /api/telegram/link
+- Dashboard: GET /api/dashboard/quick-status, GET/POST /api/dashboard/notify-unpaid (POST accepts optional groupIds, paymentIds, channelPreference)
 - Cron: POST /api/cron/billing, reminders, follow-ups, notification-tasks (x-cron-secret)
 - Confirm: GET /api/confirm/[token] (email "I paid")
 

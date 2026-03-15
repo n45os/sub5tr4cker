@@ -83,6 +83,22 @@ Admin confirms a member’s payment. Body: `memberId`, `action` (`confirm` | `re
 
 Trigger notifications manually. Body: `type`, `message`, `channels`. Admin only.
 
+## Dashboard
+
+Admin-only. Used by the dashboard home (quick status and bulk notify).
+
+### `GET /api/dashboard/quick-status`
+
+Aggregate unpaid/overdue counts across admin’s groups.
+
+### `GET /api/dashboard/notify-unpaid`
+
+Preview unpaid reminder candidates (by group, period, payment) with eligibility and skip reasons. No body.
+
+### `POST /api/dashboard/notify-unpaid`
+
+Send payment reminders. Optional body: `groupIds` (string[]), `paymentIds` (string[]), `channelPreference` (`"email"` | `"telegram"` | `"both"`). Omitted fields mean “all”. Response: `{ "data": { "emailSent", "telegramSent", "skipped", "failed" } }`.
+
 ## Cron
 
 All cron routes require header: `x-cron-secret: <secret>`.

@@ -355,6 +355,37 @@ Record a price change. Admin only.
 }
 ```
 
+## Dashboard
+
+Admin-only endpoints for the dashboard home (quick status and bulk notify).
+
+### `GET /api/dashboard/quick-status`
+
+Aggregate unpaid and overdue counts across all groups where the user is admin.
+
+### `GET /api/dashboard/notify-unpaid`
+
+Preview unpaid reminder candidates: by group, period, and payment, with per-payment eligibility (sendEmail, sendTelegram) and skip reasons. No body.
+
+### `POST /api/dashboard/notify-unpaid`
+
+Send payment reminders to unpaid (pending/overdue) members. Optional body to narrow scope:
+
+**Body (all optional):**
+```json
+{
+  "groupIds": ["groupId1", "groupId2"],
+  "paymentIds": ["paymentId1", "paymentId2"],
+  "channelPreference": "email"
+}
+```
+
+- `groupIds` — only process periods in these groups (must be admin’s groups). Omit for all groups.
+- `paymentIds` — only send to these payment IDs. Omit for all eligible payments.
+- `channelPreference` — `"email"` | `"telegram"` | `"both"` (default). For this batch, restrict to one channel or use both per member preferences.
+
+**Response:** `{ "data": { "emailSent", "telegramSent", "skipped", "failed" } }`.
+
 ## Telegram
 
 ### `POST /api/telegram/webhook`

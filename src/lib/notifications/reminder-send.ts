@@ -22,14 +22,21 @@ export interface SendReminderResult {
 type GroupDoc = IGroup & { _id: { toString: () => string }; members: IGroup["members"] };
 type PeriodDoc = IBillingPeriod & { _id: { toString: () => string }; periodLabel: string; currency: string };
 
+export type ChannelOverride = "email" | "telegram" | "both";
+
 /** send a single payment reminder (respects eligibility; no-op if no channel reachable) */
 export async function sendReminderForPayment(
   group: GroupDoc,
   period: PeriodDoc,
-  payment: PaymentLike
+  payment: PaymentLike,
+  options?: { channelOverride?: ChannelOverride }
 ): Promise<SendReminderResult> {
   const eligibility = await getReminderEligibility({ group, period, payment });
-  if (!eligibility.sendEmail && !eligibility.sendTelegram) {
+  let sendEmail = eligibility.sendEmail;
+  let sendTelegram = eligibility.sendTelegram;
+  if (options?.channelOverride === "email") sendTelegram = false;
+  if (options?.channelOverride === "telegram") sendEmail = false;
+  if (!sendEmail && !sendTelegram) {
     return { emailSent: false, telegramSent: false };
   }
 
@@ -51,7 +58,7 @@ export async function sendReminderForPayment(
   const priceNote = (period as IBillingPeriod).priceNote ?? null;
 
   const unsubscribeUrl =
-    eligibility.sendEmail && member
+    sendEmail && member
       ? await getUnsubscribeUrl(
           await createUnsubscribeToken(
             payment.memberId.toString(),
@@ -88,8 +95,8 @@ export async function sendReminderForPayment(
       telegramChatId: user?.telegram?.chatId,
       userId: user?._id?.toString(),
       preferences: {
-        email: eligibility.sendEmail,
-        telegram: eligibility.sendTelegram,
+        email: sendEmail,
+        telegram: sendTelegram,
       },
     },
     {

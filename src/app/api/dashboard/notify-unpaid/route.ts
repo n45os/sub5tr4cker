@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
 import { BillingPeriod, Group } from "@/models";
 import { getReminderEligibility } from "@/lib/notifications/reminder-targeting";
-import { sendReminderForPayment } from "@/lib/notifications/reminder-send";
+import { sendReminderForPayment, type ChannelOverride } from "@/lib/notifications/reminder-send";
 import type { SkipReason } from "@/lib/notifications/reminder-targeting";
 import type { IMemberPayment } from "@/models/billing-period";
+
+const postNotifyUnpaidSchema = z.object({
+  groupIds: z.array(z.string()).optional(),
+  paymentIds: z.array(z.string()).optional(),
+  channelPreference: z.enum(["email", "telegram", "both"]).optional(),
+});
 
 // admin-only: list unpaid reminder candidates (no grace period) and build preview or send
 export async function GET() {
@@ -147,7 +154,7 @@ export async function GET() {
   });
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json(
@@ -155,6 +162,19 @@ export async function POST() {
       { status: 401 }
     );
   }
+
+  let body: z.infer<typeof postNotifyUnpaidSchema> = {};
+  try {
+    const raw = await req.json();
+    body = postNotifyUnpaidSchema.parse(raw ?? {});
+  } catch {
+    return NextResponse.json(
+      { error: { code: "BAD_REQUEST", message: "Invalid request body" } },
+      { status: 400 }
+    );
+  }
+
+  const channelPreference: ChannelOverride = body.channelPreference ?? "both";
 
   await dbConnect();
 
@@ -170,7 +190,17 @@ export async function POST() {
     ],
   }).exec();
 
-  const groupIds = groups.map((g) => g._id);
+  const adminGroupIds = new Set(groups.map((g) => g._id.toString()));
+  const filterGroupIds =
+    body.groupIds?.length && body.groupIds.every((id) => adminGroupIds.has(id))
+      ? new Set(body.groupIds)
+      : null;
+  const filterPaymentIds =
+    body.paymentIds?.length ? new Set(body.paymentIds) : null;
+
+  const groupIds = filterGroupIds
+    ? Array.from(filterGroupIds)
+    : groups.map((g) => g._id);
   const periods = await BillingPeriod.find({
     group: { $in: groupIds },
     isFullyPaid: false,
@@ -196,15 +226,26 @@ export async function POST() {
     for (const payment of period.payments) {
       const p = payment as IMemberPayment;
       if (p.status !== "pending" && p.status !== "overdue") continue;
+      if (
+        filterPaymentIds &&
+        !filterPaymentIds.has((p._id as { toString: () => string }).toString())
+      )
+        continue;
 
       try {
         const eligibility = await getReminderEligibility({ group, period, payment: p });
-        if (!eligibility.sendEmail && !eligibility.sendTelegram) {
+        let sendEmail = eligibility.sendEmail;
+        let sendTelegram = eligibility.sendTelegram;
+        if (channelPreference === "email") sendTelegram = false;
+        if (channelPreference === "telegram") sendEmail = false;
+        if (!sendEmail && !sendTelegram) {
           skipped += 1;
           continue;
         }
 
-        const result = await sendReminderForPayment(group, period, p);
+        const result = await sendReminderForPayment(group, period, p, {
+          channelOverride: channelPreference,
+        });
         if (result.emailSent) emailSent += 1;
         if (result.telegramSent) telegramSent += 1;
         if (result.emailSent || result.telegramSent) periodRecipientCount += 1;

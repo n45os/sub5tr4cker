@@ -21,6 +21,10 @@ import { MemberGroupView } from "@/components/features/groups/member-group-view"
 import { CollapsibleNotificationsPanel } from "@/components/features/notifications/collapsible-notifications-panel";
 import { auth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import {
+  DEFAULT_MAX_FUTURE_PERIODS,
+  orderPeriodsForDisplay,
+} from "@/lib/billing/period-display";
 import { getServerBaseUrl } from "@/lib/server-url";
 
 interface MemberRow {
@@ -162,11 +166,17 @@ export default async function GroupDetailPage({
   const memberCount = group.memberCount ?? members.length;
   const myMembership = group.myMembership;
 
-  const [periods, notifications] = await Promise.all([
-    getBillingPeriods(groupId, cookieHeader, 6),
+  const [periodsRaw, notifications] = await Promise.all([
+    getBillingPeriods(groupId, cookieHeader, 12),
     getNotifications(groupId, cookieHeader, isAdmin),
   ]);
-
+  // current first, then past, max 2 future periods; take first 6 for preview
+  const periods = orderPeriodsForDisplay(periodsRaw, {
+    maxFuture: DEFAULT_MAX_FUTURE_PERIODS,
+  }).slice(
+    0,
+    6
+  );
   const currentPeriod = periods[0];
   const acceptedCount = isAdmin
     ? members.filter((m) => !!m.acceptedAt).length
@@ -311,8 +321,9 @@ export default async function GroupDetailPage({
       {!currentPeriod ? (
         <NoPeriodsCard groupId={groupId} cycleDay={group.billing.cycleDay} />
       ) : (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div className="w-fit max-w-full">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
               <CardTitle>Billing periods</CardTitle>
               <CardDescription>
@@ -338,6 +349,7 @@ export default async function GroupDetailPage({
             />
           </CardContent>
         </Card>
+        </div>
       )}
 
       <GroupMembersPanel

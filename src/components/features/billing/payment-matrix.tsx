@@ -36,6 +36,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { getPeriodDisplayState } from "@/lib/billing/period-display";
 import { cn } from "@/lib/utils";
 
 export interface PaymentCell {
@@ -412,44 +413,46 @@ export function PaymentMatrix({
 
   return (
     <div className="overflow-x-auto rounded-lg border bg-card">
-      <table className="w-full min-w-[360px] border-collapse text-xs">
+      <table className="w-max min-w-[360px] border-collapse text-xs">
         <thead>
           <tr className="border-b bg-muted/30">
-            <th className="sticky left-0 z-10 min-w-[100px] border-r bg-muted/50 px-2.5 py-2 text-left font-medium">
+            <th className="sticky left-0 z-10 min-w-[110px] border-r bg-muted/50 px-3 py-2.5 text-left font-medium">
               Period
             </th>
             {columnOrder.map((mem) => (
               <th
                 key={mem._id}
                 className={cn(
-                  "min-w-[72px] px-2 py-2 text-center font-medium",
+                  "min-w-[80px] px-3 py-2.5 text-center font-medium",
                   currentMemberId === mem._id && "bg-primary/10"
                 )}
               >
                 <div className="truncate" title={mem.nickname}>
                   {mem.nickname}
                 </div>
-                <div className="font-mono text-[10px] tabular-nums text-muted-foreground">
-                  {(() => {
-                    const pay = getPaymentByMemberId(
-                      periods[0]?.payments ?? [],
-                      mem._id
-                    );
-                    return pay ? `${effectiveAmount(pay)} ${currency}` : "—";
-                  })()}
-                </div>
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {periods.map((period) => (
+          {periods.map((period) => {
+            const { isCurrent, isPast } = getPeriodDisplayState(period);
+            return (
             <tr
               key={period._id}
-              className="border-b last:border-b-0 hover:bg-muted/20"
+              className={cn(
+                "border-b last:border-b-0 hover:bg-muted/20",
+                isCurrent && "bg-primary/10 ring-inset ring-l-2 ring-primary",
+                isPast && "bg-muted/25"
+              )}
             >
-              <td className="sticky left-0 z-10 border-r bg-card px-2.5 py-1.5">
-                <div className="flex items-center gap-1">
+              <td
+                className={cn(
+                  "sticky left-0 z-10 border-r px-3 py-2",
+                  isCurrent ? "bg-primary/10" : isPast ? "bg-muted/25" : "bg-card"
+                )}
+              >
+                <div className="flex items-center gap-1.5">
                   <span className="font-medium">{period.periodLabel}</span>
                   {period.priceNote && (
                     <Tooltip>
@@ -494,12 +497,12 @@ export function PaymentMatrix({
                   {period.totalPrice} {currency}
                 </div>
                 {period.periodStart && period.periodEnd && (
-                  <div className="mt-0.5 text-[10px] text-muted-foreground">
+                  <div className="mt-1 text-[10px] text-muted-foreground">
                     {formatDateRange(period.periodStart, period.periodEnd)}
                   </div>
                 )}
                 {period.isFullyPaid && (
-                  <span className="mt-0.5 inline-block text-[10px] text-status-confirmed">
+                  <span className="mt-1 inline-block text-[10px] text-status-confirmed">
                     Fully paid
                   </span>
                 )}
@@ -524,7 +527,7 @@ export function PaymentMatrix({
 
                 if (!payment) {
                   return (
-                    <td key={mem._id} className="px-2 py-1.5 text-center">
+                    <td key={mem._id} className="px-3 py-2 text-center">
                       <span className="text-muted-foreground">—</span>
                     </td>
                   );
@@ -677,8 +680,11 @@ export function PaymentMatrix({
                   (payment.memberConfirmedAt || payment.adminConfirmedAt);
 
                 return (
-                  <td key={mem._id} className="px-2 py-1.5">
-                    <div className="flex flex-col items-center gap-0.5">
+                  <td key={mem._id} className="px-3 py-2">
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                        {effectiveAmount(payment)} {currency}
+                      </div>
                       <div className="relative inline-flex">
                         {interactiveCell}
                         {payment.adjustedAmount != null && (
@@ -686,13 +692,12 @@ export function PaymentMatrix({
                         )}
                       </div>
                       {hasConfirmedDates && (
-                        <div className="text-[9px] text-muted-foreground leading-tight">
+                        <div className="text-[10px] text-muted-foreground text-center leading-snug space-y-0.5">
                           {payment.memberConfirmedAt && (
-                            <span>Member: {formatDateShort(payment.memberConfirmedAt)}</span>
+                            <div>Member: {formatDateShort(payment.memberConfirmedAt)}</div>
                           )}
-                          {payment.memberConfirmedAt && payment.adminConfirmedAt && " · "}
                           {payment.adminConfirmedAt && (
-                            <span>Admin: {formatDateShort(payment.adminConfirmedAt)}</span>
+                            <div>Admin: {formatDateShort(payment.adminConfirmedAt)}</div>
                           )}
                         </div>
                       )}
@@ -701,7 +706,8 @@ export function PaymentMatrix({
                 );
               })}
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
 
@@ -718,12 +724,13 @@ export function PaymentMatrix({
               <DialogHeader>
                 <DialogTitle>Generate future periods</DialogTitle>
                 <DialogDescription>
-                  Create billing periods ahead of time so members can pay in advance.
+                  Choose how many months ahead to create. Members can mark payment for
+                  future periods if they want to prepay.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="advanceMonths">Months ahead (1–12)</Label>
+                  <Label htmlFor="advanceMonths">How many months ahead? (1–12)</Label>
                   <Input
                     id="advanceMonths"
                     type="number"

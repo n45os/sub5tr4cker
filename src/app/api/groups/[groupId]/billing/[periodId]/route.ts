@@ -131,3 +131,54 @@ export async function PATCH(
     },
   });
 }
+
+export async function DELETE(
+  _request: NextRequest,
+  context: { params: Promise<{ groupId: string; periodId: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
+      { status: 401 }
+    );
+  }
+
+  const { groupId, periodId } = await context.params;
+  if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(periodId)) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: "Invalid group or period id" } },
+      { status: 400 }
+    );
+  }
+
+  await dbConnect();
+
+  const group = await Group.findById(groupId);
+  if (!group || !group.isActive) {
+    return NextResponse.json(
+      { error: { code: "NOT_FOUND", message: "Group not found" } },
+      { status: 404 }
+    );
+  }
+
+  if (group.admin.toString() !== session.user.id) {
+    return NextResponse.json(
+      { error: { code: "FORBIDDEN", message: "Only the admin can delete billing periods" } },
+      { status: 403 }
+    );
+  }
+
+  const period = await BillingPeriod.findOneAndDelete({
+    _id: periodId,
+    group: groupId,
+  });
+  if (!period) {
+    return NextResponse.json(
+      { error: { code: "NOT_FOUND", message: "Billing period not found" } },
+      { status: 404 }
+    );
+  }
+
+  return NextResponse.json({ data: { deleted: true } });
+}

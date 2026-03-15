@@ -6,6 +6,7 @@ import { dbConnect } from "@/lib/db/mongoose";
 import { generateUniqueInviteCode } from "@/lib/invite-code";
 import { Group, BillingPeriod } from "@/models";
 import { getNextPeriodStart } from "@/lib/billing/calculator";
+import { createPeriodIfDue } from "@/lib/billing/periods";
 import type { IGroup, IGroupMember } from "@/models";
 
 const createGroupSchema = z.object({
@@ -199,6 +200,13 @@ export async function POST(request: NextRequest) {
     groupId: group._id.toString(),
     metadata: { name: group.name },
   });
+
+  // create first billing period immediately if the current cycle has started (so user sees it right away)
+  try {
+    await createPeriodIfDue(group, new Date());
+  } catch (err) {
+    // don't fail group creation if period creation fails (e.g. no members yet)
+  }
 
   return NextResponse.json({
     data: {

@@ -7,10 +7,12 @@ import {
   Info,
   Loader2,
   Minus,
+  MoreVertical,
   Pencil,
+  Trash2,
   UserCheck,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -50,6 +52,8 @@ export interface PaymentCell {
 export interface PeriodRow {
   _id: string;
   periodLabel: string;
+  periodStart?: string;
+  periodEnd?: string;
   totalPrice: number;
   priceNote?: string | null;
   payments: PaymentCell[];
@@ -82,6 +86,21 @@ function formatDate(iso: string | null): string {
     dateStyle: "short",
     timeStyle: "short",
   });
+}
+
+function formatDateShort(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+function formatDateRange(startIso: string | undefined, endIso: string | undefined): string | null {
+  if (!startIso || !endIso) return null;
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  return `${start.toLocaleDateString(undefined, { day: "numeric", month: "short" })} – ${end.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`;
 }
 
 function getPaymentByMemberId(
@@ -289,6 +308,74 @@ export function PaymentMatrix({
     }
   }, [adjustDialog, groupId, updateCell]);
 
+  // edit period dialog (admin)
+  const [editPeriodDialog, setEditPeriodDialog] = useState<{
+    periodId: string;
+    periodLabel: string;
+    totalPrice: string;
+    priceNote: string;
+  } | null>(null);
+  const [editPeriodSaving, setEditPeriodSaving] = useState(false);
+  const [editPeriodDeleting, setEditPeriodDeleting] = useState(false);
+  const [editPeriodDeleteConfirm, setEditPeriodDeleteConfirm] = useState(false);
+
+  const deletePeriod = useCallback(async () => {
+    if (!editPeriodDialog) return;
+    setEditPeriodDeleting(true);
+    try {
+      const res = await fetch(
+        `/api/groups/${groupId}/billing/${editPeriodDialog.periodId}`,
+        { method: "DELETE" },
+      );
+      if (res.ok) {
+        setPeriods((prev) => prev.filter((p) => p._id !== editPeriodDialog.periodId));
+        setEditPeriodDialog(null);
+        setEditPeriodDeleteConfirm(false);
+      }
+    } finally {
+      setEditPeriodDeleting(false);
+    }
+  }, [editPeriodDialog, groupId]);
+
+  const saveEditPeriod = useCallback(async () => {
+    if (!editPeriodDialog) return;
+    const totalPrice = parseFloat(editPeriodDialog.totalPrice);
+    if (!Number.isFinite(totalPrice) || totalPrice <= 0) return;
+    setEditPeriodSaving(true);
+    try {
+      const res = await fetch(
+        `/api/groups/${groupId}/billing/${editPeriodDialog.periodId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            totalPrice,
+            priceNote: editPeriodDialog.priceNote.trim() || null,
+          }),
+        },
+      );
+      if (res.ok) {
+        const json = await res.json();
+        const data = json.data;
+        setPeriods((prev) =>
+          prev.map((p) =>
+            p._id === editPeriodDialog.periodId
+              ? {
+                  ...p,
+                  totalPrice: data.totalPrice,
+                  priceNote: data.priceNote ?? null,
+                  isFullyPaid: data.isFullyPaid,
+                }
+              : p,
+          ),
+        );
+        setEditPeriodDialog(null);
+      }
+    } finally {
+      setEditPeriodSaving(false);
+    }
+  }, [editPeriodDialog, groupId]);
+
   // advance periods state
   const [advanceOpen, setAdvanceOpen] = useState(false);
   const [advanceMonths, setAdvanceMonths] = useState("3");
@@ -325,24 +412,24 @@ export function PaymentMatrix({
 
   return (
     <div className="overflow-x-auto rounded-lg border bg-card">
-      <table className="w-full min-w-[400px] border-collapse text-sm">
+      <table className="w-full min-w-[360px] border-collapse text-xs">
         <thead>
           <tr className="border-b bg-muted/30">
-            <th className="sticky left-0 z-10 min-w-[120px] border-r bg-muted/50 px-4 py-3 text-left font-medium">
+            <th className="sticky left-0 z-10 min-w-[100px] border-r bg-muted/50 px-2.5 py-2 text-left font-medium">
               Period
             </th>
             {columnOrder.map((mem) => (
               <th
                 key={mem._id}
                 className={cn(
-                  "min-w-[100px] px-3 py-3 text-center font-medium",
+                  "min-w-[72px] px-2 py-2 text-center font-medium",
                   currentMemberId === mem._id && "bg-primary/10"
                 )}
               >
                 <div className="truncate" title={mem.nickname}>
                   {mem.nickname}
                 </div>
-                <div className="font-mono text-xs tabular-nums text-muted-foreground">
+                <div className="font-mono text-[10px] tabular-nums text-muted-foreground">
                   {(() => {
                     const pay = getPaymentByMemberId(
                       periods[0]?.payments ?? [],
@@ -361,8 +448,8 @@ export function PaymentMatrix({
               key={period._id}
               className="border-b last:border-b-0 hover:bg-muted/20"
             >
-              <td className="sticky left-0 z-10 border-r bg-card px-4 py-2">
-                <div className="flex items-center gap-1.5">
+              <td className="sticky left-0 z-10 border-r bg-card px-2.5 py-1.5">
+                <div className="flex items-center gap-1">
                   <span className="font-medium">{period.periodLabel}</span>
                   {period.priceNote && (
                     <Tooltip>
@@ -374,12 +461,45 @@ export function PaymentMatrix({
                       </TooltipContent>
                     </Tooltip>
                   )}
+                  {isAdmin && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        className={cn(
+                          buttonVariants({ variant: "ghost", size: "icon-xs" }),
+                          "shrink-0"
+                        )}
+                        aria-label="Edit period"
+                      >
+                        <MoreVertical className="size-3" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        <DropdownMenuItem
+                          onClick={() =>
+                            setEditPeriodDialog({
+                              periodId: period._id,
+                              periodLabel: period.periodLabel,
+                              totalPrice: String(period.totalPrice),
+                              priceNote: period.priceNote ?? "",
+                            })
+                          }
+                        >
+                          <Pencil className="mr-2 size-3.5" />
+                          Edit period
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
-                <div className="font-mono text-xs tabular-nums text-muted-foreground">
+                <div className="font-mono text-[10px] tabular-nums text-muted-foreground">
                   {period.totalPrice} {currency}
                 </div>
+                {period.periodStart && period.periodEnd && (
+                  <div className="mt-0.5 text-[10px] text-muted-foreground">
+                    {formatDateRange(period.periodStart, period.periodEnd)}
+                  </div>
+                )}
                 {period.isFullyPaid && (
-                  <span className="mt-1 inline-block text-xs text-status-confirmed">
+                  <span className="mt-0.5 inline-block text-[10px] text-status-confirmed">
                     Fully paid
                   </span>
                 )}
@@ -404,7 +524,7 @@ export function PaymentMatrix({
 
                 if (!payment) {
                   return (
-                    <td key={mem._id} className="px-3 py-2 text-center">
+                    <td key={mem._id} className="px-2 py-1.5 text-center">
                       <span className="text-muted-foreground">—</span>
                     </td>
                   );
@@ -425,7 +545,7 @@ export function PaymentMatrix({
                       (isAdmin && !canAdminConfirm && !isConfirmedOrWaived)
                     }
                     className={cn(
-                      "mx-auto flex h-9 w-9 items-center justify-center rounded-lg border transition-all hover:opacity-90 disabled:cursor-default disabled:opacity-70",
+                      "mx-auto flex h-7 w-7 items-center justify-center rounded-md border transition-all hover:opacity-90 disabled:cursor-default disabled:opacity-70",
                       cellStatusClasses(payment.status),
                       (canAdminConfirm || canSelfConfirm) &&
                         "cursor-pointer hover:ring-2 hover:ring-primary/50",
@@ -488,7 +608,7 @@ export function PaymentMatrix({
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         className={cn(
-                          "mx-auto flex h-9 w-9 items-center justify-center rounded-lg border transition-all hover:opacity-90 disabled:cursor-default disabled:opacity-70",
+                          "mx-auto flex h-7 w-7 items-center justify-center rounded-md border transition-all hover:opacity-90 disabled:cursor-default disabled:opacity-70",
                           cellStatusClasses(payment.status),
                           (canAdminConfirm || canSelfConfirm) &&
                             "cursor-pointer hover:ring-2 hover:ring-primary/50",
@@ -552,12 +672,29 @@ export function PaymentMatrix({
                     </Tooltip>
                   );
 
+                const hasConfirmedDates =
+                  (payment.status === "confirmed" || payment.status === "waived") &&
+                  (payment.memberConfirmedAt || payment.adminConfirmedAt);
+
                 return (
-                  <td key={mem._id} className="px-3 py-2">
-                    <div className="relative inline-flex">
-                      {interactiveCell}
-                      {payment.adjustedAmount != null && (
-                        <span className="absolute -right-1 -top-1 size-2.5 rounded-full bg-amber-500" title="Amount adjusted" />
+                  <td key={mem._id} className="px-2 py-1.5">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <div className="relative inline-flex">
+                        {interactiveCell}
+                        {payment.adjustedAmount != null && (
+                          <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-amber-500" title="Amount adjusted" />
+                        )}
+                      </div>
+                      {hasConfirmedDates && (
+                        <div className="text-[9px] text-muted-foreground leading-tight">
+                          {payment.memberConfirmedAt && (
+                            <span>Member: {formatDateShort(payment.memberConfirmedAt)}</span>
+                          )}
+                          {payment.memberConfirmedAt && payment.adminConfirmedAt && " · "}
+                          {payment.adminConfirmedAt && (
+                            <span>Admin: {formatDateShort(payment.adminConfirmedAt)}</span>
+                          )}
+                        </div>
                       )}
                     </div>
                   </td>
@@ -610,6 +747,111 @@ export function PaymentMatrix({
           </Dialog>
         </>
       )}
+
+      {/* edit period dialog */}
+      <Dialog
+        open={!!editPeriodDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditPeriodDialog(null);
+            setEditPeriodDeleteConfirm(false);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {editPeriodDeleteConfirm ? "Delete period?" : "Edit period"}
+            </DialogTitle>
+            <DialogDescription>
+              {editPeriodDeleteConfirm
+                ? `Remove ${editPeriodDialog?.periodLabel} and all its payment records. This cannot be undone.`
+                : `Update total price or add a note for ${editPeriodDialog?.periodLabel}. Member amounts stay as-is unless you adjust them per cell.`}
+            </DialogDescription>
+          </DialogHeader>
+          {editPeriodDeleteConfirm ? (
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                onClick={() => setEditPeriodDeleteConfirm(false)}
+                disabled={editPeriodDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={deletePeriod}
+                disabled={editPeriodDeleting}
+              >
+                {editPeriodDeleting && (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                )}
+                <Trash2 className="mr-2 size-4" />
+                Delete
+              </Button>
+            </DialogFooter>
+          ) : (
+            <>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-totalPrice">Total price ({currency})</Label>
+                  <Input
+                    id="edit-totalPrice"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editPeriodDialog?.totalPrice ?? ""}
+                    onChange={(e) =>
+                      setEditPeriodDialog((prev) =>
+                        prev ? { ...prev, totalPrice: e.target.value } : null,
+                      )
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-priceNote">Price note (optional)</Label>
+                  <Textarea
+                    id="edit-priceNote"
+                    placeholder="e.g. prorated, price increase"
+                    rows={2}
+                    value={editPeriodDialog?.priceNote ?? ""}
+                    onChange={(e) =>
+                      setEditPeriodDialog((prev) =>
+                        prev ? { ...prev, priceNote: e.target.value } : null,
+                      )
+                    }
+                  />
+                </div>
+              </div>
+              <DialogFooter className="flex-col gap-2 sm:flex-row">
+                <Button
+                  variant="ghost"
+                  className="mr-auto text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => setEditPeriodDeleteConfirm(true)}
+                  disabled={editPeriodSaving}
+                >
+                  <Trash2 className="mr-2 size-4" />
+                  Delete period
+                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditPeriodDialog(null)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={saveEditPeriod} disabled={editPeriodSaving}>
+                    {editPeriodSaving && (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    )}
+                    Save
+                  </Button>
+                </div>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* adjustment dialog */}
       <Dialog open={!!adjustDialog} onOpenChange={(open) => !open && setAdjustDialog(null)}>

@@ -65,6 +65,7 @@ type BillingPaymentLike = {
 type BillingPeriodLike = {
   _id: { toString: () => string };
   periodStart: Date;
+  periodEnd?: Date;
   periodLabel: string;
   totalPrice: number;
   isFullyPaid: boolean;
@@ -195,6 +196,9 @@ export function filterBillingForMember(
   return periods.map((period) => ({
     _id: period._id.toString(),
     periodStart: (period.periodStart as Date).toISOString().slice(0, 10),
+    periodEnd: period.periodEnd
+      ? (period.periodEnd as Date).toISOString().slice(0, 10)
+      : undefined,
     periodLabel: period.periodLabel,
     totalPrice: period.totalPrice,
     isFullyPaid: period.isFullyPaid,

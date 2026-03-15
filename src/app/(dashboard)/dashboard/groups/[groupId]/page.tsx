@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { AlertTriangle, CalendarDays, CreditCard, Pencil, Users } from "lucide-react";
+import { AlertTriangle, CalendarDays, CreditCard, ExternalLink, Pencil, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import {
@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ImportHistoryDialog } from "@/components/features/billing/import-history-dialog";
+import { NoPeriodsCard } from "@/components/features/billing/no-periods-card";
 import { PaymentMatrix } from "@/components/features/billing/payment-matrix";
 import { GroupMembersPanel } from "@/components/features/groups/group-members-panel";
 import { InitializeNotifyButton } from "@/components/features/groups/initialize-notify-button";
@@ -70,6 +71,7 @@ interface GroupDetail {
 interface BillingPeriodItem {
   _id: string;
   periodStart: string;
+  periodEnd?: string;
   periodLabel: string;
   totalPrice: number;
   payments: Array<{
@@ -110,11 +112,12 @@ async function getGroup(
 
 async function getBillingPeriods(
   groupId: string,
-  cookieHeader: string
+  cookieHeader: string,
+  limit = 24
 ): Promise<BillingPeriodItem[]> {
   const baseUrl = await getServerBaseUrl();
   const res = await fetch(
-    `${baseUrl}/api/groups/${groupId}/billing?limit=24`,
+    `${baseUrl}/api/groups/${groupId}/billing?limit=${limit}`,
     {
       headers: { cookie: cookieHeader },
       cache: "no-store",
@@ -160,7 +163,7 @@ export default async function GroupDetailPage({
   const myMembership = group.myMembership;
 
   const [periods, notifications] = await Promise.all([
-    getBillingPeriods(groupId, cookieHeader),
+    getBillingPeriods(groupId, cookieHeader, 6),
     getNotifications(groupId, cookieHeader, isAdmin),
   ]);
 
@@ -304,26 +307,37 @@ export default async function GroupDetailPage({
         </Card>
       </section>
 
-      {/* payment board — the primary view */}
+      {/* payment board — recent 6 periods + link to full page */}
       {!currentPeriod ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No billing periods yet</CardTitle>
-            <CardDescription>
-              Periods are created automatically on the configured cycle day, or
-              manually for variable billing.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <NoPeriodsCard groupId={groupId} cycleDay={group.billing.cycleDay} />
       ) : (
-        <PaymentMatrix
-          groupId={groupId}
-          currency={group.billing.currency}
-          periods={periods}
-          members={members.map((m) => ({ _id: m._id, nickname: m.nickname, email: m.email }))}
-          isAdmin
-          currentMemberId={currentMemberId}
-        />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div>
+              <CardTitle>Billing periods</CardTitle>
+              <CardDescription>
+                Latest 6 periods. Open the full list to edit, add, or view history.
+              </CardDescription>
+            </div>
+            <Link
+              href={`/dashboard/groups/${groupId}/billing`}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")}
+            >
+              <ExternalLink className="mr-2 size-4" />
+              View all periods
+            </Link>
+          </CardHeader>
+          <CardContent>
+            <PaymentMatrix
+              groupId={groupId}
+              currency={group.billing.currency}
+              periods={periods}
+              members={members.map((m) => ({ _id: m._id, nickname: m.nickname, email: m.email }))}
+              isAdmin
+              currentMemberId={currentMemberId}
+            />
+          </CardContent>
+        </Card>
       )}
 
       <GroupMembersPanel

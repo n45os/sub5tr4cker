@@ -79,7 +79,8 @@ export async function GET(
     session.user.id,
     (session.user.email as string) || ""
   );
-  if (!memberEntry) {
+  // admins may not be in the members array; members must have an entry
+  if (access === "member" && !memberEntry) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Not authorized to view this group" } },
       { status: 403 }
@@ -87,7 +88,9 @@ export async function GET(
   }
 
   const effectiveMemberId =
-    access === "member" ? memberEntry._id.toString() : memberIdFilter;
+    access === "member" && memberEntry
+      ? memberEntry._id.toString()
+      : memberIdFilter;
 
   const query: Record<string, unknown> = { group: groupId };
   if (statusFilter) {
@@ -109,6 +112,7 @@ export async function GET(
   type PeriodDoc = {
     _id: { toString: () => string };
     periodStart: Date;
+    periodEnd: Date;
     periodLabel: string;
     totalPrice: number;
     priceNote?: string | null;
@@ -148,6 +152,7 @@ export async function GET(
     return {
       _id: p._id.toString(),
       periodStart: (p.periodStart as Date).toISOString().slice(0, 10),
+      periodEnd: (p.periodEnd as Date).toISOString().slice(0, 10),
       periodLabel: p.periodLabel,
       totalPrice: p.totalPrice,
       priceNote: p.priceNote ?? null,

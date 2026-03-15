@@ -1,5 +1,7 @@
-import { CalendarDays, CheckCircle, Clock, CreditCard, AlertTriangle, Users } from "lucide-react";
+import Link from "next/link";
+import { CalendarDays, CheckCircle, Clock, CreditCard, AlertTriangle, ExternalLink, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button-variants";
 import {
   Card,
   CardContent,
@@ -178,14 +180,28 @@ export function MemberGroupView({
           </CardHeader>
         </Card>
       ) : (
-        <PaymentMatrix
-          groupId={group._id}
-          currency={group.billing.currency}
-          periods={periods}
-          members={membersForMatrix}
-          isAdmin={false}
-          currentMemberId={currentMemberId}
-        />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle>Your payment status</CardTitle>
+            <Link
+              href={`/dashboard/groups/${group._id}/billing`}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              <ExternalLink className="mr-2 size-4" />
+              View all periods
+            </Link>
+          </CardHeader>
+          <CardContent>
+            <PaymentMatrix
+              groupId={group._id}
+              currency={group.billing.currency}
+              periods={periods}
+              members={membersForMatrix}
+              isAdmin={false}
+              currentMemberId={currentMemberId}
+            />
+          </CardContent>
+        </Card>
       )}
 
       <section className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">

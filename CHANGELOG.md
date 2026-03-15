@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.23.3] - 2026-03-19
+
+### Fixed
+
+- **Delivery log: no more bogus Telegram "failed" for members without Telegram** — When a member has no Telegram linked or has Telegram notifications off, the channel is now treated as skipped instead of attempted; the notification service no longer logs a "failed" Telegram row for those cases. The recent delivery log only shows real send attempts per channel.
+- **Member list: email/Telegram connection status** — Admin group payload now includes per-member `emailConnected`, `telegramConnected`, and `unsubscribedFromEmail` (from the same eligibility rules used for reminders). The member table shows "Email connected" / "Email unsubscribed" and "Telegram connected" / "Telegram not linked" under each member's status so admins can see which channels are reachable.
+
 ## [0.23.2] - 2026-03-19
 
 ### Fixed

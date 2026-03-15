@@ -1,17 +1,24 @@
 import type { Session } from "next-auth";
 import type { IGroupMember } from "@/models";
 
+/** when members.user is populated (e.g. for admin payload), minimal user shape for channel status */
+type PopulatedMemberUser = {
+  telegram?: { chatId: number } | null;
+  notificationPreferences?: { email?: boolean; telegram?: boolean } | null;
+};
+
 type GroupMemberLike = {
   _id: { toString: () => string };
   email: string;
   nickname: string;
   role: string;
   customAmount?: number | null;
-  user?: { toString: () => string } | null;
+  user?: { toString: () => string } | PopulatedMemberUser | null;
   acceptedAt?: Date | null;
   billingStartsAt?: Date | null;
   isActive?: boolean;
   leftAt?: Date | null;
+  unsubscribedFromEmail?: boolean;
 };
 
 type GroupLike = {
@@ -134,18 +141,34 @@ export function filterGroupForMember(
       role: access,
       members: group.members
         .filter((m) => m.isActive && !m.leftAt)
-        .map((m) => ({
-          _id: m._id.toString(),
-          email: m.email,
-          nickname: m.nickname,
-          role: m.role,
-          customAmount: m.customAmount ?? null,
-          hasAccount: !!m.user,
-          acceptedAt: m.acceptedAt ? (m.acceptedAt as Date).toISOString() : null,
-          billingStartsAt: m.billingStartsAt
-            ? (m.billingStartsAt as Date).toISOString().slice(0, 10)
-            : null,
-        })),
+        .map((m) => {
+          const u =
+            m.user &&
+            typeof m.user === "object" &&
+            "notificationPreferences" in (m.user as object)
+              ? (m.user as PopulatedMemberUser)
+              : null;
+          const unsubscribed = (m as GroupMemberLike).unsubscribedFromEmail ?? false;
+          return {
+            _id: m._id.toString(),
+            email: m.email,
+            nickname: m.nickname,
+            role: m.role,
+            customAmount: m.customAmount ?? null,
+            hasAccount: !!m.user,
+            acceptedAt: m.acceptedAt ? (m.acceptedAt as Date).toISOString() : null,
+            billingStartsAt: m.billingStartsAt
+              ? (m.billingStartsAt as Date).toISOString().slice(0, 10)
+              : null,
+            emailConnected:
+              !unsubscribed && (u?.notificationPreferences?.email ?? true),
+            telegramConnected: !!(
+              u?.telegram?.chatId &&
+              (u?.notificationPreferences?.telegram ?? false)
+            ),
+            unsubscribedFromEmail: unsubscribed,
+          };
+        }),
     };
   }
 

@@ -44,6 +44,12 @@ export interface MemberRow {
   acceptedAt?: string | null;
   /** first period member owes; null = from join date */
   billingStartsAt?: string | null;
+  /** admin only: email notifications reachable for this member */
+  emailConnected?: boolean;
+  /** admin only: Telegram linked and notifications enabled */
+  telegramConnected?: boolean;
+  /** admin only: member unsubscribed from group emails */
+  unsubscribedFromEmail?: boolean;
 }
 
 export interface PeriodPaymentRow {
@@ -1157,39 +1163,74 @@ export function GroupMembersPanel({
                       </TableCell>
                       <TableCell>{member.email}</TableCell>
                       <TableCell>
-                        {member.hasAccount === false ? (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary" className="font-normal">
-                              Invite pending
+                        <div className="flex flex-col gap-1.5">
+                          {member.hasAccount === false ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="secondary" className="font-normal">
+                                Invite pending
+                              </Badge>
+                              {isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={() => handleResendInvite(member._id)}
+                                  disabled={resendingMemberId === member._id}
+                                >
+                                  {resendingMemberId === member._id ? (
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                  ) : (
+                                    "Resend invite"
+                                  )}
+                                </Button>
+                              )}
+                            </div>
+                          ) : member.acceptedAt ? (
+                            <Badge
+                              variant="outline"
+                              className="w-fit border-emerald-200 bg-emerald-50 text-emerald-700"
+                            >
+                              Accepted {formatDate(member.acceptedAt)}
                             </Badge>
-                            {isAdmin && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={() => handleResendInvite(member._id)}
-                                disabled={resendingMemberId === member._id}
-                              >
-                                {resendingMemberId === member._id ? (
-                                  <Loader2 className="size-3.5 animate-spin" />
-                                ) : (
-                                  "Resend invite"
-                                )}
-                              </Button>
+                          ) : (
+                            <Badge variant="outline" className="w-fit font-normal">
+                              Account linked
+                            </Badge>
+                          )}
+                          {isAdmin &&
+                            (member.emailConnected !== undefined ||
+                              member.telegramConnected !== undefined) && (
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                                <span
+                                  className={
+                                    member.unsubscribedFromEmail
+                                      ? "text-muted-foreground"
+                                      : member.emailConnected
+                                        ? "text-foreground"
+                                        : "text-muted-foreground"
+                                  }
+                                >
+                                  <Mail className="mr-0.5 inline size-3.5" />
+                                  {member.unsubscribedFromEmail
+                                    ? "Email unsubscribed"
+                                    : member.emailConnected
+                                      ? "Email connected"
+                                      : "Email —"}
+                                </span>
+                                <span
+                                  className={
+                                    member.telegramConnected
+                                      ? "text-foreground"
+                                      : "text-muted-foreground"
+                                  }
+                                >
+                                  {member.telegramConnected
+                                    ? "Telegram connected"
+                                    : "Telegram not linked"}
+                                </span>
+                              </div>
                             )}
-                          </div>
-                        ) : member.acceptedAt ? (
-                          <Badge
-                            variant="outline"
-                            className="border-emerald-200 bg-emerald-50 text-emerald-700"
-                          >
-                            Accepted {formatDate(member.acceptedAt)}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="font-normal">
-                            Account linked
-                          </Badge>
-                        )}
+                        </div>
                       </TableCell>
                       <TableCell className="capitalize">{member.role}</TableCell>
                       <TableCell className="text-muted-foreground">

@@ -72,7 +72,11 @@ export async function GET(
   }
 
   await dbConnect();
-  const group = await Group.findById(groupId);
+  const group = await Group.findById(groupId).populate({
+    path: "members.user",
+    model: "User",
+    select: "telegram notificationPreferences",
+  });
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },

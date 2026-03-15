@@ -21,6 +21,8 @@ export interface ChannelSendTarget {
 
 export interface ChannelSendResult {
   sent: boolean;
+  /** when true, channel was not applicable (no link, pref off, etc.) — do not log as failed */
+  skipped?: boolean;
   externalId?: string | null;
 }
 
@@ -42,7 +44,7 @@ function createEmailChannel(): NotificationChannel {
     isBuiltIn: true,
     async send(target, message) {
       if (!target.email || target.preferences?.email === false) {
-        return { sent: false };
+        return { sent: false, skipped: true };
       }
       const result = await sendEmail({
         to: target.email,
@@ -66,7 +68,7 @@ function createTelegramChannel(): NotificationChannel {
         !target.telegramChatId ||
         target.preferences?.telegram === false
       ) {
-        return { sent: false };
+        return { sent: false, skipped: true };
       }
       const messageId = await sendTelegramMessage({
         chatId: target.telegramChatId,

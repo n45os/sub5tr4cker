@@ -32,6 +32,9 @@ interface MemberRow {
   hasAccount: boolean;
   acceptedAt: string | null;
   billingStartsAt: string | null;
+  emailConnected?: boolean;
+  telegramConnected?: boolean;
+  unsubscribedFromEmail?: boolean;
 }
 
 interface GroupDetail {

@@ -74,38 +74,44 @@ export async function sendNotification(
   for (const channel of channels) {
     const sendResult = await channel.send(targetPayload, message, context);
     const channelKey = channel.id as "email" | "telegram";
+    // only log when channel was actually attempted; skip log for inapplicable channels
+    const attempted = !sendResult.skipped;
     if (channelKey === "email") {
       result.email.sent = sendResult.sent;
       result.email.id = sendResult.externalId ?? undefined;
-      await logNotification({
-        recipientEmail: target.email,
-        recipientId: target.userId,
-        channel: "email",
-        type: content.type,
-        subject: content.subject,
-        preview: content.subject,
-        status: sendResult.sent ? "sent" : "failed",
-        externalId: sendResult.externalId ?? null,
-        groupId: content.groupId,
-        billingPeriodId: content.billingPeriodId,
-      });
+      if (attempted) {
+        await logNotification({
+          recipientEmail: target.email,
+          recipientId: target.userId,
+          channel: "email",
+          type: content.type,
+          subject: content.subject,
+          preview: content.subject,
+          status: sendResult.sent ? "sent" : "failed",
+          externalId: sendResult.externalId ?? null,
+          groupId: content.groupId,
+          billingPeriodId: content.billingPeriodId,
+        });
+      }
     } else if (channelKey === "telegram") {
       result.telegram.sent = sendResult.sent;
       result.telegram.messageId = sendResult.externalId
         ? Number(sendResult.externalId)
         : undefined;
-      await logNotification({
-        recipientEmail: target.email,
-        recipientId: target.userId,
-        channel: "telegram",
-        type: content.type,
-        subject: null,
-        preview: content.telegramText.substring(0, 100),
-        status: sendResult.sent ? "sent" : "failed",
-        externalId: sendResult.externalId ?? null,
-        groupId: content.groupId,
-        billingPeriodId: content.billingPeriodId,
-      });
+      if (attempted) {
+        await logNotification({
+          recipientEmail: target.email,
+          recipientId: target.userId,
+          channel: "telegram",
+          type: content.type,
+          subject: null,
+          preview: content.telegramText.substring(0, 100),
+          status: sendResult.sent ? "sent" : "failed",
+          externalId: sendResult.externalId ?? null,
+          groupId: content.groupId,
+          billingPeriodId: content.billingPeriodId,
+        });
+      }
     }
   }
 

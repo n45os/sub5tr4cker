@@ -122,7 +122,9 @@ export async function POST(
     });
     if (existing) continue;
 
-    const shares = calculateShares(group, undefined, start);
+    // use current active members for past periods so we always create the period;
+    // admin can then record or import history (members who joined later can be waived)
+    const shares = calculateShares(group, undefined, undefined);
     if (shares.length === 0) continue;
 
     const payments = await Promise.all(

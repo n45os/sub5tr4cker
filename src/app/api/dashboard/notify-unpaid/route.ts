@@ -3,8 +3,13 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
 import { BillingPeriod, Group } from "@/models";
+import { getSetting } from "@/lib/settings/service";
 import { getReminderEligibility } from "@/lib/notifications/reminder-targeting";
 import { sendReminderForPayment, type ChannelOverride } from "@/lib/notifications/reminder-send";
+import {
+  sendAggregatedReminder,
+  type AggregatedPaymentInput,
+} from "@/lib/notifications/aggregated-reminder-send";
 import type { SkipReason } from "@/lib/notifications/reminder-targeting";
 import type { IMemberPayment } from "@/models/billing-period";
 
@@ -28,6 +33,8 @@ export async function GET() {
 
   const adminId = session.user.id;
   const now = new Date();
+  const aggregateReminders =
+    (await getSetting("notifications.aggregateReminders")) === "true";
 
   const groups = await Group.find({
     admin: adminId,
@@ -141,9 +148,116 @@ export async function GET() {
     });
   }
 
+  type PaymentEligibility = {
+    paymentId: string;
+    memberEmail: string;
+    memberNickname: string;
+    amount: number;
+    currency: string;
+    status: string;
+    sendEmail: boolean;
+    sendTelegram: boolean;
+    skipReasons: SkipReason[];
+    groupId: string;
+    groupName: string;
+    periodId: string;
+    periodLabel: string;
+  };
+
+  const byUser: Array<{
+    memberEmail: string;
+    memberNickname: string;
+    totalAmount: number;
+    sendEmail: boolean;
+    sendTelegram: boolean;
+    skipReasons: SkipReason[];
+    payments: Array<{
+      paymentId: string;
+      groupId: string;
+      groupName: string;
+      periodId: string;
+      periodLabel: string;
+      amount: number;
+      currency: string;
+      status: string;
+    }>;
+  }> = [];
+
+  if (aggregateReminders) {
+    const byEmail = new Map<
+      string,
+      {
+        memberNickname: string;
+        sendEmail: boolean;
+        sendTelegram: boolean;
+        skipReasons: Set<SkipReason>;
+        payments: PaymentEligibility[];
+      }
+    >();
+    for (const ge of byGroup) {
+      for (const pe of ge.periods) {
+        for (const pay of pe.payments) {
+          const el: PaymentEligibility = {
+            paymentId: pay.paymentId,
+            memberEmail: pay.memberEmail,
+            memberNickname: pay.memberNickname,
+            amount: pay.amount,
+            currency: pay.currency,
+            status: pay.status,
+            sendEmail: pay.sendEmail,
+            sendTelegram: pay.sendTelegram,
+            skipReasons: pay.skipReasons,
+            groupId: ge.groupId,
+            groupName: ge.groupName,
+            periodId: pe.periodId,
+            periodLabel: pe.periodLabel,
+          };
+          let entry = byEmail.get(pay.memberEmail);
+          if (!entry) {
+            entry = {
+              memberNickname: pay.memberNickname,
+              sendEmail: false,
+              sendTelegram: false,
+              skipReasons: new Set(),
+              payments: [],
+            };
+            byEmail.set(pay.memberEmail, entry);
+          }
+          entry.payments.push(el);
+          if (pay.sendEmail) entry.sendEmail = true;
+          if (pay.sendTelegram) entry.sendTelegram = true;
+          for (const r of pay.skipReasons) entry.skipReasons.add(r);
+        }
+      }
+    }
+    for (const [email, entry] of byEmail) {
+      const totalAmount = entry.payments.reduce((s, p) => s + p.amount, 0);
+      byUser.push({
+        memberEmail: email,
+        memberNickname: entry.memberNickname,
+        totalAmount,
+        sendEmail: entry.sendEmail,
+        sendTelegram: entry.sendTelegram,
+        skipReasons: Array.from(entry.skipReasons),
+        payments: entry.payments.map((p) => ({
+          paymentId: p.paymentId,
+          groupId: p.groupId,
+          groupName: p.groupName,
+          periodId: p.periodId,
+          periodLabel: p.periodLabel,
+          amount: p.amount,
+          currency: p.currency,
+          status: p.status,
+        })),
+      });
+    }
+  }
+
   return NextResponse.json({
     data: {
       byGroup,
+      byUser: aggregateReminders ? byUser : undefined,
+      aggregateReminders,
       summary: {
         totalPayments,
         totalSendEmail,
@@ -180,6 +294,8 @@ export async function POST(req: Request) {
 
   const adminId = session.user.id;
   const now = new Date();
+  const aggregateReminders =
+    (await getSetting("notifications.aggregateReminders")) === "true";
 
   const groups = await Group.find({
     admin: adminId,
@@ -217,23 +333,27 @@ export async function POST(req: Request) {
 
   const periodIdsUpdated = new Set<string>();
 
-  for (const period of periods) {
-    const group = period.group as InstanceType<typeof Group>;
-    if (!group || typeof group !== "object" || Array.isArray(group)) continue;
-
-    let periodRecipientCount = 0;
-
-    for (const payment of period.payments) {
-      const p = payment as IMemberPayment;
-      if (p.status !== "pending" && p.status !== "overdue") continue;
-      if (
-        filterPaymentIds &&
-        !filterPaymentIds.has((p._id as { toString: () => string }).toString())
-      )
-        continue;
-
-      try {
-        const eligibility = await getReminderEligibility({ group, period, payment: p });
+  if (aggregateReminders) {
+    const byEmail = new Map<
+      string,
+      { memberNickname: string; inputs: AggregatedPaymentInput[] }
+    >();
+    for (const period of periods) {
+      const group = period.group as InstanceType<typeof Group>;
+      if (!group || typeof group !== "object" || Array.isArray(group)) continue;
+      for (const payment of period.payments) {
+        const p = payment as IMemberPayment;
+        if (p.status !== "pending" && p.status !== "overdue") continue;
+        if (
+          filterPaymentIds &&
+          !filterPaymentIds.has((p._id as { toString: () => string }).toString())
+        )
+          continue;
+        const eligibility = await getReminderEligibility({
+          group,
+          period,
+          payment: p,
+        });
         let sendEmail = eligibility.sendEmail;
         let sendTelegram = eligibility.sendTelegram;
         if (channelPreference === "email") sendTelegram = false;
@@ -242,29 +362,118 @@ export async function POST(req: Request) {
           skipped += 1;
           continue;
         }
-
-        const result = await sendReminderForPayment(group, period, p, {
-          channelOverride: channelPreference,
-        });
+        const input: AggregatedPaymentInput = {
+          group: group as AggregatedPaymentInput["group"],
+          period: period as AggregatedPaymentInput["period"],
+          payment: p,
+        };
+        let entry = byEmail.get(p.memberEmail);
+        if (!entry) {
+          entry = { memberNickname: p.memberNickname, inputs: [] };
+          byEmail.set(p.memberEmail, entry);
+        }
+        entry.inputs.push(input);
+      }
+    }
+    const periodRecipientCounts = new Map<string, number>();
+    for (const [memberEmail, { memberNickname, inputs }] of byEmail) {
+      if (inputs.length === 0) continue;
+      try {
+        const result = await sendAggregatedReminder(
+          memberEmail,
+          memberNickname,
+          inputs,
+          { channelOverride: channelPreference }
+        );
         if (result.emailSent) emailSent += 1;
         if (result.telegramSent) telegramSent += 1;
-        if (result.emailSent || result.telegramSent) periodRecipientCount += 1;
+        if (result.emailSent || result.telegramSent) {
+          const periodIds = new Set(
+            inputs.map((i) =>
+              (i.period._id as { toString: () => string }).toString()
+            )
+          );
+          for (const periodIdStr of periodIds) {
+            periodIdsUpdated.add(periodIdStr);
+            periodRecipientCounts.set(
+              periodIdStr,
+              (periodRecipientCounts.get(periodIdStr) ?? 0) + 1
+            );
+          }
+        }
       } catch {
         failed += 1;
       }
     }
-
-    if (periodRecipientCount > 0) {
-      const periodIdStr = (period._id as { toString: () => string }).toString();
-      if (!periodIdsUpdated.has(periodIdStr)) {
-        periodIdsUpdated.add(periodIdStr);
+    for (const periodIdStr of periodIdsUpdated) {
+      const period = periods.find(
+        (pr) => (pr._id as { toString: () => string }).toString() === periodIdStr
+      );
+      if (period) {
+        const recipientCount = periodRecipientCounts.get(periodIdStr) ?? 1;
         period.reminders.push({
           sentAt: new Date(),
           channel: "email",
-          recipientCount: periodRecipientCount,
+          recipientCount,
           type: period.reminders.length === 0 ? "initial" : "follow_up",
         });
         await period.save();
+      }
+    }
+  } else {
+    for (const period of periods) {
+      const group = period.group as InstanceType<typeof Group>;
+      if (!group || typeof group !== "object" || Array.isArray(group)) continue;
+
+      let periodRecipientCount = 0;
+
+      for (const payment of period.payments) {
+        const p = payment as IMemberPayment;
+        if (p.status !== "pending" && p.status !== "overdue") continue;
+        if (
+          filterPaymentIds &&
+          !filterPaymentIds.has((p._id as { toString: () => string }).toString())
+        )
+          continue;
+
+        try {
+          const eligibility = await getReminderEligibility({
+            group,
+            period,
+            payment: p,
+          });
+          let sendEmail = eligibility.sendEmail;
+          let sendTelegram = eligibility.sendTelegram;
+          if (channelPreference === "email") sendTelegram = false;
+          if (channelPreference === "telegram") sendEmail = false;
+          if (!sendEmail && !sendTelegram) {
+            skipped += 1;
+            continue;
+          }
+
+          const result = await sendReminderForPayment(group, period, p, {
+            channelOverride: channelPreference,
+          });
+          if (result.emailSent) emailSent += 1;
+          if (result.telegramSent) telegramSent += 1;
+          if (result.emailSent || result.telegramSent) periodRecipientCount += 1;
+        } catch {
+          failed += 1;
+        }
+      }
+
+      if (periodRecipientCount > 0) {
+        const periodIdStr = (period._id as { toString: () => string }).toString();
+        if (!periodIdsUpdated.has(periodIdStr)) {
+          periodIdsUpdated.add(periodIdStr);
+          period.reminders.push({
+            sentAt: new Date(),
+            channel: "email",
+            recipientCount: periodRecipientCount,
+            type: period.reminders.length === 0 ? "initial" : "follow_up",
+          });
+          await period.save();
+        }
       }
     }
   }

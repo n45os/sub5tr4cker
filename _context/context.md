@@ -10,7 +10,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 - **Stack**: Next.js 15 (App Router), MongoDB/Mongoose, Auth.js v5, Resend, grammy, node-cron, persisted notification task queue (ScheduledTask)
 - **UI**: Tailwind CSS + shadcn/ui with a sidebar dashboard shell, richer cards, tabs, and settings surfaces
 - **Origin**: Migrated from a Google Sheets + Apps Script setup (see `docs/legacy/`)
-- **Phase**: Core MVP plus dashboard refresh, editable groups, DB-backed app settings, notification previews, per-group email accent color, automated-message badge in emails, and setup CLI
+- **Phase**: Core MVP plus dashboard refresh, editable groups, DB-backed app settings, notification previews, per-group email accent color, automated-message badge in emails, setup CLI, aggregated reminders by user (optional), and profile email/Telegram toggles
 
 ## Key Directories
 
@@ -42,7 +42,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 - Settings: GET/PATCH /api/settings, POST /api/settings/test-email, POST /api/settings/test-telegram
 - Auth: /api/auth/[...nextauth], POST /api/register
 - Telegram: POST /api/telegram/webhook, POST /api/telegram/link
-- Dashboard: GET /api/dashboard/quick-status, GET/POST /api/dashboard/notify-unpaid (POST accepts optional groupIds, paymentIds, channelPreference)
+- Dashboard: GET /api/dashboard/quick-status, GET/POST /api/dashboard/notify-unpaid (POST accepts optional groupIds, paymentIds, channelPreference; when notifications.aggregateReminders is on, reminders are grouped by member email)
 - Cron: POST /api/cron/billing, reminders, follow-ups, notification-tasks (x-cron-secret)
 - Confirm: GET /api/confirm/[token] (email "I paid")
 

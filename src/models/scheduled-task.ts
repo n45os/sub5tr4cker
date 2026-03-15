@@ -2,6 +2,7 @@ import mongoose, { Schema, Document, Types } from "mongoose";
 
 export type ScheduledTaskType =
   | "payment_reminder"
+  | "aggregated_payment_reminder"
   | "admin_confirmation_request"
   | "price_change"
   | "invite"
@@ -14,12 +15,20 @@ export type ScheduledTaskStatus =
   | "failed";
 
 export interface IScheduledTaskPayload {
-  groupId: string;
+  groupId?: string;
   billingPeriodId?: string;
   memberId?: string;
   paymentId?: string;
   /** optional: restrict to one channel; if absent, worker sends to all eligible channels */
   channel?: "email" | "telegram";
+  /** for aggregated_payment_reminder: user email and list of payments to include */
+  memberEmail?: string;
+  payments?: Array<{
+    groupId: string;
+    billingPeriodId: string;
+    memberId: string;
+    paymentId: string;
+  }>;
   [key: string]: unknown;
 }
 
@@ -45,6 +54,7 @@ const scheduledTaskSchema = new Schema<IScheduledTask>(
       type: String,
       enum: [
         "payment_reminder",
+        "aggregated_payment_reminder",
         "admin_confirmation_request",
         "price_change",
         "invite",

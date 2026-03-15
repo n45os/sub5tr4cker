@@ -1,16 +1,27 @@
 import { dbConnect } from "@/lib/db/mongoose";
 import { BillingPeriod, Group } from "@/models";
+import { getSetting } from "@/lib/settings/service";
 import { enqueueTask } from "@/lib/tasks/queue";
+
+type PaymentRef = {
+  groupId: string;
+  billingPeriodId: string;
+  memberId: string;
+  paymentId: string;
+};
 
 /**
  * Scan for unpaid billing periods past grace period and enqueue one
- * payment_reminder task per eligible payment. Idempotency key includes
+ * payment_reminder task per eligible payment (or one aggregated_payment_reminder
+ * per unique member email when aggregation is enabled). Idempotency key includes
  * period, payment, and run date so we only enqueue once per payment per day.
  */
 export async function enqueueReminders(): Promise<number> {
   await dbConnect();
 
   const now = new Date();
+  const aggregateReminders =
+    (await getSetting("notifications.aggregateReminders")) === "true";
   let enqueued = 0;
 
   const periods = await BillingPeriod.find({
@@ -18,6 +29,47 @@ export async function enqueueReminders(): Promise<number> {
     periodStart: { $lt: now },
     "payments.status": { $in: ["pending", "overdue"] },
   }).populate("group");
+
+  if (aggregateReminders) {
+    const byEmail = new Map<string, PaymentRef[]>();
+    for (const period of periods) {
+      const group = period.group as InstanceType<typeof Group> | null;
+      if (!group || typeof group !== "object" || Array.isArray(group)) continue;
+      if (!group.isActive) continue;
+      if (group.notifications?.remindersEnabled === false) continue;
+
+      const graceDays = group.billing.gracePeriodDays ?? 3;
+      const graceDate = new Date(period.periodStart);
+      graceDate.setDate(graceDate.getDate() + graceDays);
+      if (now < graceDate) continue;
+
+      const groupId = (group._id as { toString: () => string }).toString();
+      const billingPeriodId = (period._id as { toString: () => string }).toString();
+
+      for (const payment of period.payments) {
+        if (payment.status !== "pending" && payment.status !== "overdue") continue;
+        const memberEmail = payment.memberEmail;
+        const ref: PaymentRef = {
+          groupId,
+          billingPeriodId,
+          memberId: (payment.memberId as { toString: () => string }).toString(),
+          paymentId: (payment._id as { toString: () => string }).toString(),
+        };
+        const list = byEmail.get(memberEmail) ?? [];
+        list.push(ref);
+        byEmail.set(memberEmail, list);
+      }
+    }
+    for (const [memberEmail, payments] of byEmail) {
+      const task = await enqueueTask({
+        type: "aggregated_payment_reminder",
+        runAt: now,
+        payload: { memberEmail, payments },
+      });
+      if (task) enqueued++;
+    }
+    return enqueued;
+  }
 
   for (const period of periods) {
     const group = await Group.findById(period.group);

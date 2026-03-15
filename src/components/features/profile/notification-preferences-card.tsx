@@ -17,10 +17,7 @@ import {
 type ReminderFrequency = "once" | "daily" | "every_3_days";
 
 type NotificationPreferencesCardProps = {
-  email: boolean;
-  telegram: boolean;
   reminderFrequency: ReminderFrequency;
-  telegramLinked: boolean;
 };
 
 const FREQUENCY_LABELS: Record<ReminderFrequency, string> = {
@@ -30,14 +27,9 @@ const FREQUENCY_LABELS: Record<ReminderFrequency, string> = {
 };
 
 export function NotificationPreferencesCard({
-  email: initialEmail,
-  telegram: initialTelegram,
   reminderFrequency: initialReminderFrequency,
-  telegramLinked,
 }: NotificationPreferencesCardProps) {
   const router = useRouter();
-  const [email, setEmail] = useState(initialEmail);
-  const [telegram, setTelegram] = useState(initialTelegram);
   const [reminderFrequency, setReminderFrequency] =
     useState<ReminderFrequency>(initialReminderFrequency);
   const [loading, setLoading] = useState(false);
@@ -45,15 +37,10 @@ export function NotificationPreferencesCard({
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    setEmail(initialEmail);
-    setTelegram(initialTelegram);
     setReminderFrequency(initialReminderFrequency);
-  }, [initialEmail, initialTelegram, initialReminderFrequency]);
+  }, [initialReminderFrequency]);
 
-  const hasChanges =
-    email !== initialEmail ||
-    telegram !== initialTelegram ||
-    reminderFrequency !== initialReminderFrequency;
+  const hasChanges = reminderFrequency !== initialReminderFrequency;
 
   async function handleSave() {
     setError(null);
@@ -64,11 +51,7 @@ export function NotificationPreferencesCard({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          notificationPreferences: {
-            email,
-            telegram: telegramLinked ? telegram : undefined,
-            reminderFrequency,
-          },
+          notificationPreferences: { reminderFrequency },
         }),
       });
       const json = await res.json();
@@ -100,37 +83,6 @@ export function NotificationPreferencesCard({
           Preferences saved.
         </p>
       ) : null}
-
-      <div className="flex items-center justify-between gap-4">
-        <div className="space-y-0.5">
-          <Label htmlFor="pref-email">Email notifications</Label>
-          <p className="text-xs text-muted-foreground">
-            Receive reminders and updates by email
-          </p>
-        </div>
-        <Switch
-          id="pref-email"
-          checked={email}
-          onCheckedChange={setEmail}
-        />
-      </div>
-
-      <div className="flex items-center justify-between gap-4">
-        <div className="space-y-0.5">
-          <Label htmlFor="pref-telegram">Telegram notifications</Label>
-          <p className="text-xs text-muted-foreground">
-            {telegramLinked
-              ? "Receive reminders and confirmation nudges via Telegram"
-              : "Link your Telegram account above to enable"}
-          </p>
-        </div>
-        <Switch
-          id="pref-telegram"
-          checked={telegram}
-          onCheckedChange={setTelegram}
-          disabled={!telegramLinked}
-        />
-      </div>
 
       <div className="grid gap-2">
         <Label htmlFor="pref-frequency">Reminder frequency</Label>

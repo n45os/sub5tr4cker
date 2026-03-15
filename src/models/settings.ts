@@ -18,7 +18,7 @@ const settingsSchema = new Schema<ISettings>(
     value: { type: String, default: null },
     category: {
       type: String,
-      enum: ["general", "email", "telegram", "security", "cron", "plugin"],
+      enum: ["general", "email", "telegram", "notifications", "security", "cron", "plugin"],
       required: true,
     },
     isSecret: { type: Boolean, default: false },

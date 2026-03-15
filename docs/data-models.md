@@ -240,7 +240,7 @@ Queue for notification delivery. Cron (or other producers) enqueue tasks; a work
 ```typescript
 {
   _id: ObjectId,
-  type: 'payment_reminder' | 'admin_confirmation_request' | 'price_change' | 'invite' | 'follow_up',
+  type: 'payment_reminder' | 'aggregated_payment_reminder' | 'admin_confirmation_request' | 'price_change' | 'invite' | 'follow_up',
   status: 'pending' | 'locked' | 'completed' | 'failed',
   runAt: Date,                            // when the task is due
   lockedAt: Date | null,                  // set when a worker claims the task
@@ -251,11 +251,13 @@ Queue for notification delivery. Cron (or other producers) enqueue tasks; a work
   completedAt: Date | null,               // set when status becomes completed
   idempotencyKey: string,                 // unique per business event and run window
   payload: {                              // type-specific payload
-    groupId: string,
+    groupId?: string,
     billingPeriodId?: string,
     memberId?: string,
     paymentId?: string,
     channel?: 'email' | 'telegram',
+    memberEmail?: string,                 // for aggregated_payment_reminder
+    payments?: Array<{ groupId, billingPeriodId, memberId, paymentId }>,  // for aggregated_payment_reminder
     [key: string]: unknown,
   },
   createdAt: Date,
@@ -277,7 +279,7 @@ from the dashboard instead of editing env files.
   _id: ObjectId,
   key: string,                            // e.g. "email.apiKey"
   value: string | null,                   // encrypted for secret values when saved from the app
-  category: 'general' | 'email' | 'telegram' | 'security' | 'cron',
+  category: 'general' | 'email' | 'telegram' | 'notifications' | 'security' | 'cron',
   isSecret: boolean,
   label: string,
   description: string,

@@ -2,6 +2,7 @@ export type SettingsCategory =
   | "general"
   | "email"
   | "telegram"
+  | "notifications"
   | "security"
   | "cron"
   | "plugin";
@@ -66,6 +67,16 @@ export const settingsDefinitions: SettingsDefinition[] = [
     description: "Secret token used to validate webhook calls from Telegram.",
     isSecret: true,
     envVar: "TELEGRAM_WEBHOOK_SECRET",
+  },
+  {
+    key: "notifications.aggregateReminders",
+    category: "notifications",
+    label: "Aggregate reminders by user",
+    description:
+      "When enabled, members with the same email across groups receive a single combined notification instead of one per group.",
+    isSecret: false,
+    envVar: "AGGREGATE_REMINDERS",
+    defaultValue: "false",
   },
   {
     key: "security.confirmationSecret",

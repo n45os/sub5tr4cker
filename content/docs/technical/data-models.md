@@ -47,7 +47,7 @@ User ──┬── owns ──── Group ──── has many ──── 
 
 Queue for notification delivery. Producers enqueue tasks; a worker claims and executes them.
 
-- **Fields**: type (payment_reminder, admin_confirmation_request, etc.), status (pending | locked | completed | failed), runAt, lockedAt, lockedBy, attempts, maxAttempts, lastError, completedAt, idempotencyKey, payload (groupId, billingPeriodId, memberId, paymentId, …), timestamps.
+- **Fields**: type (payment_reminder, aggregated_payment_reminder, admin_confirmation_request, etc.), status (pending | locked | completed | failed), runAt, lockedAt, lockedBy, attempts, maxAttempts, lastError, completedAt, idempotencyKey, payload (groupId, billingPeriodId, memberId, paymentId; for aggregated_payment_reminder: memberEmail, payments[]), timestamps.
 - **Lifecycle**: pending → locked (on claim) → completed or failed; failed tasks retry with backoff.
 
 ## Confirmation token

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.26.0] - 2026-03-19
+
+### Added
+
+- **Aggregated reminders by user** — Admins can enable "Aggregate reminders by user" in Settings → Notifications. When on, members with the same email across groups receive a single combined notification (one email and/or one Telegram) instead of one per group. Manual "Notify all unpaid" and cron enqueued reminders both respect this setting. New `aggregated_payment_reminder` task type and aggregated email/Telegram templates.
+- **Profile: email and Telegram toggles** — On the profile page, "Unsubscribe from emails" (global opt-out) and a Telegram notification toggle next to the linked account let members control how they receive reminders.
+
+### Changed
+
+- **Notify unpaid dialog** — When aggregation is enabled, the dialog shows a "By user" preview and summary counts as users (one notification per user) instead of per-payment.
+- **Notification preferences** — Reminder frequency remains in its own card; email opt-out and Telegram toggle are now in the Email card and Telegram card respectively.
+
 ## [0.25.0] - 2026-03-19
 
 ### Added

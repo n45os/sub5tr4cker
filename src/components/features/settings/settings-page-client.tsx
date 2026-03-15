@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PluginsSettingsTab } from "./plugins-settings-tab";
 
@@ -20,6 +21,7 @@ type SettingsCategory =
   | "general"
   | "email"
   | "telegram"
+  | "notifications"
   | "security"
   | "cron"
   | "plugin"
@@ -66,7 +68,7 @@ const tabs: Array<{
     id: "notifications",
     label: "Notifications",
     description: "Email (Resend) and Telegram bot configuration for reminders and follow-ups.",
-    categoryKeys: ["email", "telegram"],
+    categoryKeys: ["email", "telegram", "notifications"],
   },
   {
     id: "security",
@@ -364,38 +366,55 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
                           {setting.description}
                         </p>
                       </div>
-                      <Input
-                        id={setting.key}
-                        type={
-                          setting.isSecret && !revealed[setting.key]
-                            ? "password"
-                            : "text"
-                        }
-                        value={values[setting.key] ?? ""}
-                        placeholder={setting.isSecret ? setting.maskedValue : ""}
-                        onChange={(event) =>
-                          updateValue(setting.key, event.target.value)
-                        }
-                      />
-                      {setting.isSecret ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() =>
-                            setRevealed((current) => ({
-                              ...current,
-                              [setting.key]: !current[setting.key],
-                            }))
+                      {setting.key === "notifications.aggregateReminders" ? (
+                        <Switch
+                          id={setting.key}
+                          checked={values[setting.key] === "true"}
+                          onCheckedChange={(checked) =>
+                            updateValue(
+                              setting.key,
+                              checked ? "true" : "false"
+                            )
                           }
-                        >
-                          {revealed[setting.key] ? (
-                            <EyeOff className="size-4" />
-                          ) : (
-                            <Eye className="size-4" />
-                          )}
-                          {revealed[setting.key] ? "Hide" : "Reveal"}
-                        </Button>
-                      ) : null}
+                        />
+                      ) : (
+                        <>
+                          <Input
+                            id={setting.key}
+                            type={
+                              setting.isSecret && !revealed[setting.key]
+                                ? "password"
+                                : "text"
+                            }
+                            value={values[setting.key] ?? ""}
+                            placeholder={
+                              setting.isSecret ? setting.maskedValue : ""
+                            }
+                            onChange={(event) =>
+                              updateValue(setting.key, event.target.value)
+                            }
+                          />
+                          {setting.isSecret ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() =>
+                                setRevealed((current) => ({
+                                  ...current,
+                                  [setting.key]: !current[setting.key],
+                                }))
+                              }
+                            >
+                              {revealed[setting.key] ? (
+                                <EyeOff className="size-4" />
+                              ) : (
+                                <Eye className="size-4" />
+                              )}
+                              {revealed[setting.key] ? "Hide" : "Reveal"}
+                            </Button>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   ))}
                 </CardContent>

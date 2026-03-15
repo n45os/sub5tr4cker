@@ -14,9 +14,11 @@ export function buildIdempotencyKey(
   switch (type) {
     case "payment_reminder":
       return `payment_reminder:${payload.billingPeriodId}:${payload.paymentId}:${day}`;
+    case "aggregated_payment_reminder":
+      return `aggregated_payment_reminder:${payload.memberEmail ?? ""}:${day}`;
     case "admin_confirmation_request":
       return `admin_confirmation_request:${payload.groupId}:${payload.billingPeriodId}:${day}`;
     default:
-      return `${type}:${payload.groupId}:${payload.billingPeriodId ?? ""}:${payload.memberId ?? ""}:${day}`;
+      return `${type}:${payload.groupId ?? ""}:${payload.billingPeriodId ?? ""}:${payload.memberId ?? ""}:${day}`;
   }
 }

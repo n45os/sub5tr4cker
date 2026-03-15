@@ -48,6 +48,7 @@ Copy `.env.example` to `.env.local` (or set in your host’s env) and fill in th
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `APP_URL` | No | Same as `NEXTAUTH_URL` in practice; used for building confirmation links. Defaults to `NEXTAUTH_URL`. |
+| `AGGREGATE_REMINDERS` | No | When set to `true`, members with the same email across groups receive one combined reminder per run (DB setting `notifications.aggregateReminders` overrides this when set in the app). |
 | `NODE_ENV` | No | `development` or `production`. |
 
 ## Example

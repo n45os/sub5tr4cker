@@ -3,6 +3,10 @@ import type { IScheduledTask } from "@/models/scheduled-task";
 import type { IMemberPayment } from "@/models/billing-period";
 import { Group, BillingPeriod } from "@/models";
 import { sendReminderForPayment } from "@/lib/notifications/reminder-send";
+import {
+  sendAggregatedReminder,
+  type AggregatedPaymentInput,
+} from "@/lib/notifications/aggregated-reminder-send";
 import { sendAdminConfirmationNudge } from "@/lib/notifications/admin-nudge";
 import { completeTask, failTask } from "./queue";
 
@@ -11,10 +15,17 @@ import { completeTask, failTask } from "./queue";
  */
 export async function executeTask(task: IScheduledTask): Promise<void> {
   const payload = task.payload as {
-    groupId: string;
+    groupId?: string;
     billingPeriodId?: string;
     memberId?: string;
     paymentId?: string;
+    memberEmail?: string;
+    payments?: Array<{
+      groupId: string;
+      billingPeriodId: string;
+      memberId: string;
+      paymentId: string;
+    }>;
   };
 
   try {
@@ -37,6 +48,41 @@ export async function executeTask(task: IScheduledTask): Promise<void> {
           throw new Error("payment not found");
         }
         await sendReminderForPayment(group, period, payment);
+        break;
+      }
+      case "aggregated_payment_reminder": {
+        if (!payload.memberEmail || !payload.payments?.length) {
+          throw new Error(
+            "aggregated_payment_reminder task missing memberEmail or payments"
+          );
+        }
+        const inputs: AggregatedPaymentInput[] = [];
+        for (const ref of payload.payments) {
+          const group = await Group.findById(ref.groupId);
+          const period = await BillingPeriod.findById(ref.billingPeriodId).populate(
+            "group"
+          );
+          if (!group || !period) continue;
+          const payment = period.payments.find(
+            (p: IMemberPayment) =>
+              (p._id as Types.ObjectId).toString() === ref.paymentId
+          );
+          if (!payment) continue;
+          inputs.push({
+            group: group as AggregatedPaymentInput["group"],
+            period: period as AggregatedPaymentInput["period"],
+            payment,
+          });
+        }
+        if (inputs.length === 0) {
+          throw new Error("aggregated_payment_reminder: no valid payments found");
+        }
+        const memberName = inputs[0].payment.memberNickname;
+        await sendAggregatedReminder(
+          payload.memberEmail,
+          memberName,
+          inputs
+        );
         break;
       }
       case "admin_confirmation_request": {

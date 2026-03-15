@@ -1,28 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 type TelegramLinkCardProps = {
   isLinked: boolean;
   username: string | null;
   linkedAt: string | null;
+  /** when linked: receive reminders and confirmation nudges via Telegram */
+  telegramNotifications?: boolean;
 };
 
 export function TelegramLinkCard({
   isLinked,
   username,
   linkedAt,
+  telegramNotifications: initialTelegramNotifications = false,
 }: TelegramLinkCardProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [telegramNotifications, setTelegramNotifications] = useState(
+    initialTelegramNotifications
+  );
   const [pendingLink, setPendingLink] = useState<{
     deepLink: string;
     botUsername: string;
   } | null>(null);
+
+  useEffect(() => {
+    setTelegramNotifications(initialTelegramNotifications);
+  }, [initialTelegramNotifications]);
 
   async function handleConnect() {
     setError(null);
@@ -88,6 +100,30 @@ export function TelegramLinkCard({
       dateStyle: "medium",
     });
 
+  async function handleTelegramNotificationsChange(checked: boolean) {
+    setTelegramNotifications(checked);
+    setError(null);
+    try {
+      const res = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          notificationPreferences: { telegram: checked },
+        }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        setTelegramNotifications(initialTelegramNotifications);
+        setError(json.error?.message ?? "Failed to update.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setTelegramNotifications(initialTelegramNotifications);
+      setError("Failed to update.");
+    }
+  }
+
   if (isLinked) {
     return (
       <div className="space-y-4">
@@ -103,6 +139,21 @@ export function TelegramLinkCard({
           {linkedDate ? (
             <p className="text-muted-foreground">Linked on {linkedDate}</p>
           ) : null}
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <Label htmlFor="telegram-notifications">
+              Receive notifications via Telegram
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Reminders and confirmation nudges
+            </p>
+          </div>
+          <Switch
+            id="telegram-notifications"
+            checked={telegramNotifications}
+            onCheckedChange={handleTelegramNotificationsChange}
+          />
         </div>
         <Button
           type="button"

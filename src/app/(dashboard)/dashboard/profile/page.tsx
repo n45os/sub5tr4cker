@@ -12,6 +12,7 @@ import { ProfileEmailForm } from "@/components/features/profile/profile-email-fo
 import { ProfilePasswordForm } from "@/components/features/profile/profile-password-form";
 import { TelegramLinkCard } from "@/components/features/profile/telegram-link-card";
 import { NotificationPreferencesCard } from "@/components/features/profile/notification-preferences-card";
+import { UnsubscribeEmailCard } from "@/components/features/profile/unsubscribe-email-card";
 import { User } from "@/models";
 
 export default async function ProfilePage() {
@@ -81,6 +82,7 @@ export default async function ProfilePage() {
             isLinked={isLinked}
             username={telegramUsername}
             linkedAt={telegramLinkedAt}
+            telegramNotifications={prefTelegram}
           />
         </CardContent>
       </Card>
@@ -89,16 +91,25 @@ export default async function ProfilePage() {
         <CardHeader>
           <CardTitle>Notification preferences</CardTitle>
           <CardDescription>
-            Choose how you want to receive payment reminders and updates.
+            How often to receive payment reminders (when enabled).
           </CardDescription>
         </CardHeader>
         <CardContent>
           <NotificationPreferencesCard
-            email={prefEmail}
-            telegram={prefTelegram}
             reminderFrequency={prefReminderFrequency}
-            telegramLinked={isLinked}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Email</CardTitle>
+          <CardDescription>
+            Control whether you receive any notification emails.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <UnsubscribeEmailCard receiveEmail={prefEmail} />
         </CardContent>
       </Card>
     </div>

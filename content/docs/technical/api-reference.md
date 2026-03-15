@@ -93,7 +93,7 @@ Aggregate unpaid/overdue counts across admin’s groups.
 
 ### `GET /api/dashboard/notify-unpaid`
 
-Preview unpaid reminder candidates (by group, period, payment) with eligibility and skip reasons. No body.
+Preview unpaid reminder candidates (by group, period, payment) with eligibility and skip reasons. No body. When `notifications.aggregateReminders` is enabled, response includes `byUser` (grouped by member email) and `aggregateReminders: true`.
 
 ### `POST /api/dashboard/notify-unpaid`
 

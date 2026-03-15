@@ -32,6 +32,25 @@ interface PreviewPayment {
   skipReasons: SkipReason[];
 }
 
+interface PreviewByUserEntry {
+  memberEmail: string;
+  memberNickname: string;
+  totalAmount: number;
+  sendEmail: boolean;
+  sendTelegram: boolean;
+  skipReasons: SkipReason[];
+  payments: Array<{
+    paymentId: string;
+    groupId: string;
+    groupName: string;
+    periodId: string;
+    periodLabel: string;
+    amount: number;
+    currency: string;
+    status: string;
+  }>;
+}
+
 interface PreviewSummary {
   byGroup: Array<{
     groupId: string;
@@ -42,6 +61,8 @@ interface PreviewSummary {
       payments: PreviewPayment[];
     }>;
   }>;
+  byUser?: PreviewByUserEntry[];
+  aggregateReminders?: boolean;
   summary: {
     totalPayments: number;
     totalSendEmail: number;
@@ -161,14 +182,44 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
   const selectedCounts = useMemo(() => {
     let email = 0;
     let telegram = 0;
-    if (!preview) return { email: 0, telegram: 0, total: 0 };
+    if (!preview) return { email: 0, telegram: 0, total: 0, userCount: 0 };
+    if (preview.aggregateReminders && preview.byUser?.length) {
+      const selectedUserEmails = new Set<string>();
+      for (const u of preview.byUser) {
+        const hasSelected =
+          u.payments.some(
+            (p) =>
+              selectedPaymentIds.has(p.paymentId) &&
+              selectedGroupIds.has(p.groupId)
+          );
+        if (hasSelected) selectedUserEmails.add(u.memberEmail);
+      }
+      for (const u of preview.byUser) {
+        if (!selectedUserEmails.has(u.memberEmail)) continue;
+        if (channelPreference === "email" && u.sendEmail) email += 1;
+        else if (channelPreference === "telegram" && u.sendTelegram) telegram += 1;
+        else {
+          if (u.sendEmail) email += 1;
+          if (u.sendTelegram) telegram += 1;
+        }
+      }
+      return {
+        email,
+        telegram,
+        total: Array.from(selectedPaymentIds).filter((id) =>
+          eligiblePaymentIdsForSelection.has(id)
+        ).length,
+        userCount: selectedUserEmails.size,
+      };
+    }
     for (const g of preview.byGroup) {
       if (!selectedGroupIds.has(g.groupId)) continue;
       for (const per of g.periods) {
         for (const p of per.payments) {
           if (!selectedPaymentIds.has(p.paymentId)) continue;
           if (channelPreference === "email" && p.sendEmail) email += 1;
-          else if (channelPreference === "telegram" && p.sendTelegram) telegram += 1;
+          else if (channelPreference === "telegram" && p.sendTelegram)
+            telegram += 1;
           else {
             if (p.sendEmail) email += 1;
             if (p.sendTelegram) telegram += 1;
@@ -182,6 +233,7 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
       total: Array.from(selectedPaymentIds).filter((id) =>
         eligiblePaymentIdsForSelection.has(id)
       ).length,
+      userCount: 0,
     };
   }, [
     preview,
@@ -227,7 +279,9 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
   }, []);
 
   const canSend =
-    selectedCounts.total > 0 &&
+    (preview?.aggregateReminders
+      ? selectedCounts.userCount > 0
+      : selectedCounts.total > 0) &&
     (selectedCounts.email > 0 || selectedCounts.telegram > 0);
   const showResult = sendResult !== null;
 
@@ -354,27 +408,104 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
                   <div className="rounded-lg border bg-muted/40 p-4 space-y-2">
                     <p className="text-sm font-medium">Summary</p>
                     <ul className="text-sm text-muted-foreground space-y-1">
-                      <li className="flex items-center gap-2">
-                        <Mail className="size-4" />
-                        {selectedCounts.email} reminder
-                        {selectedCounts.email !== 1 ? "s" : ""} via email
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <MessageCircle className="size-4" />
-                        {selectedCounts.telegram} reminder
-                        {selectedCounts.telegram !== 1 ? "s" : ""} via Telegram
-                      </li>
-                      <li>
-                        {selectedCounts.total} payment
-                        {selectedCounts.total !== 1 ? "s" : ""} selected
-                      </li>
+                      {preview.aggregateReminders && selectedCounts.userCount > 0 ? (
+                        <>
+                          <li className="flex items-center gap-2">
+                            <Mail className="size-4" />
+                            {selectedCounts.email} user
+                            {selectedCounts.email !== 1 ? "s" : ""} will receive 1
+                            email each
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <MessageCircle className="size-4" />
+                            {selectedCounts.telegram} user
+                            {selectedCounts.telegram !== 1 ? "s" : ""} will
+                            receive 1 Telegram each
+                          </li>
+                          <li>
+                            {selectedCounts.userCount} user
+                            {selectedCounts.userCount !== 1 ? "s" : ""} selected
+                            (aggregated)
+                          </li>
+                        </>
+                      ) : (
+                        <>
+                          <li className="flex items-center gap-2">
+                            <Mail className="size-4" />
+                            {selectedCounts.email} reminder
+                            {selectedCounts.email !== 1 ? "s" : ""} via email
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <MessageCircle className="size-4" />
+                            {selectedCounts.telegram} reminder
+                            {selectedCounts.telegram !== 1 ? "s" : ""} via
+                            Telegram
+                          </li>
+                          <li>
+                            {selectedCounts.total} payment
+                            {selectedCounts.total !== 1 ? "s" : ""} selected
+                          </li>
+                        </>
+                      )}
                     </ul>
-                    {selectedCounts.total === 0 && (
+                    {selectedCounts.total === 0 && !preview.aggregateReminders && (
                       <p className="text-xs text-amber-600 dark:text-amber-400">
                         Select at least one group and one member to send.
                       </p>
                     )}
+                    {selectedCounts.userCount === 0 &&
+                      preview.aggregateReminders && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                          Select at least one group and one member to send.
+                        </p>
+                      )}
                   </div>
+
+                  {/* By user (when aggregation is on) */}
+                  {preview.aggregateReminders && preview.byUser && preview.byUser.length > 0 && (
+                    <div className="rounded-lg border p-4 space-y-3">
+                      <p className="text-sm font-medium">
+                        By user (one notification per user)
+                      </p>
+                      <ul className="text-sm space-y-2 max-h-40 overflow-y-auto">
+                        {preview.byUser.map((u) => {
+                          const selected = u.payments.some(
+                            (p) =>
+                              selectedPaymentIds.has(p.paymentId) &&
+                              selectedGroupIds.has(p.groupId)
+                          );
+                          return (
+                            <li
+                              key={u.memberEmail}
+                              className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${
+                                !selected ? "opacity-50" : ""
+                              }`}
+                            >
+                              <span className="font-medium">
+                                {u.memberNickname || u.memberEmail}
+                              </span>
+                              <span className="text-muted-foreground">
+                                {u.payments.length} group
+                                {u.payments.length !== 1 ? "s" : ""} · total{" "}
+                                {u.totalAmount.toFixed(2)}
+                                {u.payments[0]?.currency ?? ""}
+                              </span>
+                              {u.sendEmail && (
+                                <span className="text-muted-foreground">
+                                  email
+                                </span>
+                              )}
+                              {u.sendTelegram && (
+                                <span className="text-muted-foreground">
+                                  Telegram
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
 
                   {Object.entries(preview.summary.skipReasonCounts).some(
                     ([, n]) => n > 0

@@ -1,4 +1,8 @@
 import {
+  buildPriceAdjustmentEmailHtml,
+  buildPriceAdjustmentTelegramText,
+} from "@/lib/email/templates/price-adjustment";
+import {
   buildPriceChangeEmailHtml,
   buildPriceChangeTelegramText,
 } from "@/lib/email/templates/price-change";
@@ -273,6 +277,179 @@ export async function sendPriceChangeAnnouncements(
     } catch (error) {
       console.error(
         `price-change notification failed for ${target.email}:`,
+        error
+      );
+    }
+  }
+}
+
+export interface MemberAddedCreditEntry {
+  memberId: string;
+  memberNickname: string;
+  memberEmail: string;
+  totalCredit: number;
+  periods: Array<{
+    periodId: string;
+    periodLabel: string;
+    oldAmount: number;
+    newAmount: number;
+    credit: number;
+  }>;
+}
+
+// notify existing members when a new member is added (new share amount, optional credit)
+export async function sendMemberAddedNotifications(
+  group: IGroup,
+  params: {
+    newMemberId: string;
+    newMemberNickname: string;
+    newShareAmount: number;
+    currency: string;
+    creditSummary: MemberAddedCreditEntry[];
+  }
+): Promise<void> {
+  await dbConnect();
+
+  const {
+    newMemberId,
+    newMemberNickname,
+    newShareAmount,
+    currency,
+    creditSummary,
+  } = params;
+  const groupName = group.name;
+  const groupIdStr = group._id.toString();
+  const creditByMemberId = new Map(
+    creditSummary.map((c) => [c.memberId, c])
+  );
+
+  const targets = new Map<string, PriceChangeTarget & { memberNickname: string }>();
+
+  const admin = await User.findById(group.admin);
+  if (admin) {
+    const adminMember = group.members.find(
+      (m) => m.user?.toString() === admin._id.toString()
+    );
+    const nickname = adminMember?.nickname ?? admin.name ?? "Admin";
+    targets.set(admin.email.toLowerCase(), {
+      email: admin.email,
+      telegramChatId: admin.telegram?.chatId ?? null,
+      userId: admin._id.toString(),
+      preferences: {
+        email: admin.notificationPreferences?.email ?? true,
+        telegram: admin.notificationPreferences?.telegram ?? false,
+      },
+      memberId: adminMember?._id?.toString(),
+      memberNickname: nickname,
+    });
+  }
+
+  for (const member of group.members) {
+    if (!member.isActive || member.leftAt) continue;
+    if (member._id.toString() === newMemberId) continue;
+    const key = member.email.toLowerCase();
+    if (targets.has(key)) continue;
+
+    const sendEmail = !member.unsubscribedFromEmail;
+    if (member.user) {
+      const user = await User.findById(member.user);
+      if (user) {
+        targets.set(key, {
+          email: user.email,
+          telegramChatId: user.telegram?.chatId ?? null,
+          userId: user._id.toString(),
+          preferences: {
+            email: sendEmail && (user.notificationPreferences?.email ?? true),
+            telegram: user.notificationPreferences?.telegram ?? false,
+          },
+          memberId: member._id.toString(),
+          unsubscribedFromEmail: member.unsubscribedFromEmail,
+          memberNickname: member.nickname,
+        });
+        continue;
+      }
+    }
+
+    targets.set(key, {
+      email: member.email,
+      telegramChatId: null,
+      userId: null,
+      preferences: { email: sendEmail, telegram: false },
+      memberId: member._id.toString(),
+      unsubscribedFromEmail: member.unsubscribedFromEmail,
+      memberNickname: member.nickname,
+    });
+  }
+
+  const subject = `New member added: ${groupName}`;
+  const periodLabel = "your next payment";
+
+  for (const target of targets.values()) {
+    try {
+      const memberId = target.memberId ?? target.userId;
+      const creditEntry = memberId ? creditByMemberId.get(memberId) : null;
+      const originalAmount = creditEntry
+        ? newShareAmount + creditEntry.totalCredit
+        : newShareAmount;
+      const difference = creditEntry ? creditEntry.totalCredit : 0;
+      const reason =
+        creditEntry != null
+          ? `${newMemberNickname} joined the subscription. You overpaid on past periods; this credit will be applied to your next payment.`
+          : `A new member (${newMemberNickname}) was added to the subscription. Your new share is ${newShareAmount.toFixed(2)} ${currency}.`;
+
+      const unsubscribeUrl =
+        target.memberId && !target.unsubscribedFromEmail
+          ? await getUnsubscribeUrl(
+              await createUnsubscribeToken(target.memberId, groupIdStr)
+            )
+          : null;
+
+      const emailHtml = buildPriceAdjustmentEmailHtml({
+        memberName: target.memberNickname,
+        groupName,
+        periodLabel,
+        originalAmount,
+        newAmount: newShareAmount,
+        difference,
+        currency,
+        reason,
+        paymentLink: null,
+        confirmUrl: null,
+        isCredit: difference > 0,
+        unsubscribeUrl,
+        accentColor: group.service?.accentColor ?? null,
+      });
+      const telegramText = buildPriceAdjustmentTelegramText({
+        memberName: target.memberNickname,
+        groupName,
+        periodLabel,
+        originalAmount,
+        newAmount: newShareAmount,
+        difference,
+        currency,
+        reason,
+        paymentLink: null,
+        isCredit: difference > 0,
+      });
+
+      await sendNotification(
+        {
+          email: target.email,
+          telegramChatId: target.telegramChatId ?? null,
+          userId: target.userId ?? null,
+          preferences: target.preferences,
+        },
+        {
+          type: "price_adjustment",
+          subject,
+          emailHtml,
+          telegramText,
+          groupId: groupIdStr,
+        }
+      );
+    } catch (error) {
+      console.error(
+        `member-added notification failed for ${target.email}:`,
         error
       );
     }

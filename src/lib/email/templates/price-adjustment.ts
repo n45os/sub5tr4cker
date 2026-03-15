@@ -12,6 +12,8 @@ export interface PriceAdjustmentTemplateParams {
   reason: string;
   paymentLink: string | null;
   confirmUrl: string | null;
+  /** when true, difference is a credit (reduces next payment) rather than amount due */
+  isCredit?: boolean;
   unsubscribeUrl?: string | null;
   accentColor?: string | null;
 }
@@ -51,7 +53,7 @@ export function buildPriceAdjustmentEmailHtml(
           <p>Hi ${params.memberName},</p>
           <p>The price for <strong>${params.groupName}</strong> has been adjusted for ${params.periodLabel}.</p>
           <div class="amount-box">
-            <div class="amount">Difference: ${params.difference.toFixed(2)}${params.currency}</div>
+            <div class="amount">${params.isCredit ? "Credit: " : "Difference: "}${params.difference.toFixed(2)}${params.currency}</div>
             <div class="diff">
               Previous: ${params.originalAmount.toFixed(2)}${params.currency} →
               New: ${params.newAmount.toFixed(2)}${params.currency}
@@ -60,7 +62,11 @@ export function buildPriceAdjustmentEmailHtml(
           <div class="reason">
             <strong>Reason:</strong> ${params.reason}
           </div>
-          <p>Please pay the difference of <strong>${params.difference.toFixed(2)}${params.currency}</strong>.</p>
+          <p>${params.difference === 0
+            ? `Your share for the next period is <strong>${params.newAmount.toFixed(2)}${params.currency}</strong>.`
+            : params.isCredit
+              ? `This amount will be credited to your next payment. Your next payment is <strong>${params.newAmount.toFixed(2)}${params.currency}</strong> or less.`
+              : `Please pay the difference of <strong>${params.difference.toFixed(2)}${params.currency}</strong>.`}</p>
           ${params.paymentLink ? `
             <div class="cta">
               <a href="${params.paymentLink}" class="btn">Pay difference</a>
@@ -85,17 +91,26 @@ export function buildPriceAdjustmentEmailHtml(
 export function buildPriceAdjustmentTelegramText(
   params: Pick<
     PriceAdjustmentTemplateParams,
-    "memberName" | "groupName" | "periodLabel" | "originalAmount" | "newAmount" | "difference" | "currency" | "reason" | "paymentLink"
+    "memberName" | "groupName" | "periodLabel" | "originalAmount" | "newAmount" | "difference" | "currency" | "reason" | "paymentLink" | "isCredit"
   >,
 ): string {
+  const creditNote =
+    params.difference === 0
+      ? `Your share for the next period is ${params.newAmount.toFixed(2)}${params.currency}.`
+      : params.isCredit
+        ? `This amount will be credited to your next payment.`
+        : `Please pay the difference and confirm.`;
+  const diffLine =
+    params.difference === 0
+      ? ""
+      : `\n${params.isCredit ? "Credit: " : "Difference: "}<b>${params.difference.toFixed(2)}${params.currency}</b>\n\n`;
   return (
     `⚠️ <b>Price Adjustment</b>\n\n` +
     `${params.memberName}, the price for <b>${params.groupName}</b> — ${params.periodLabel} has changed.\n\n` +
     `Previous: <s>${params.originalAmount.toFixed(2)}${params.currency}</s>\n` +
-    `New: <b>${params.newAmount.toFixed(2)}${params.currency}</b>\n` +
-    `Difference: <b>${params.difference.toFixed(2)}${params.currency}</b>\n\n` +
+    `New: <b>${params.newAmount.toFixed(2)}${params.currency}</b>${diffLine}` +
     `<i>${params.reason}</i>\n\n` +
     (params.paymentLink ? `Pay: ${params.paymentLink}\n\n` : "") +
-    `Please pay the difference and confirm.`
+    creditNote
   );
 }

@@ -1,6 +1,6 @@
 import { User } from "@/models";
 import type { IGroup } from "@/models";
-import type { IBillingPeriod } from "@/models/billing-period";
+import type { IBillingPeriod, IMemberPayment } from "@/models/billing-period";
 import { sendNotification } from "@/lib/notifications/service";
 import { getReminderEligibility, type PaymentLike } from "@/lib/notifications/reminder-targeting";
 import { paymentConfirmationKeyboard } from "@/lib/telegram/keyboards";
@@ -45,6 +45,10 @@ export async function sendReminderForPayment(
 
   const paymentLink = group.payment?.link ?? null;
   const currency = period.currency || "€";
+  const effectiveAmount =
+    (payment as IMemberPayment).adjustedAmount ?? payment.amount;
+  const adjustmentReason = (payment as IMemberPayment).adjustmentReason ?? null;
+  const priceNote = (period as IBillingPeriod).priceNote ?? null;
 
   const unsubscribeUrl =
     eligibility.sendEmail && member
@@ -60,13 +64,15 @@ export async function sendReminderForPayment(
     memberName: payment.memberNickname,
     groupName: group.name,
     periodLabel: period.periodLabel,
-    amount: payment.amount,
+    amount: effectiveAmount,
     currency,
     paymentPlatform: group.payment?.platform ?? "custom",
     paymentLink,
     confirmUrl,
     ownerName: "the admin",
     extraText: group.announcements?.extraText ?? null,
+    adjustmentReason,
+    priceNote,
     unsubscribeUrl,
     accentColor: group.service?.accentColor ?? null,
   });
@@ -94,9 +100,11 @@ export async function sendReminderForPayment(
         memberName: payment.memberNickname,
         groupName: group.name,
         periodLabel: period.periodLabel,
-        amount: payment.amount,
+        amount: effectiveAmount,
         currency,
         paymentLink,
+        adjustmentReason,
+        priceNote,
       }),
       telegramKeyboard: keyboard,
       groupId: (group._id as { toString: () => string }).toString(),

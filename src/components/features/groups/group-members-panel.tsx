@@ -56,6 +56,7 @@ export interface PeriodPaymentRow {
     memberId: string;
     memberNickname: string;
     amount: number;
+    adjustedAmount?: number | null;
     status: string;
     memberConfirmedAt: string | null;
     adminConfirmedAt: string | null;
@@ -87,6 +88,7 @@ export function GroupMembersPanel({
   const [email, setEmail] = useState("");
   const [nickname, setNickname] = useState("");
   const [customAmount, setCustomAmount] = useState("");
+  const [billingStartsAt, setBillingStartsAt] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
@@ -95,6 +97,33 @@ export function GroupMembersPanel({
     memberId: string;
     email: string;
   } | null>(null);
+  // when set (with creditSummary or not), show post-add modal: credit summary → apply credits → notify + invite
+  const [postAddModal, setPostAddModal] = useState<{
+    memberId: string;
+    email: string;
+    nickname: string;
+    creditSummary: Array<{
+      memberId: string;
+      memberNickname: string;
+      memberEmail: string;
+      totalCredit: number;
+      periods: Array<{
+        periodId: string;
+        periodLabel: string;
+        oldAmount: number;
+        newAmount: number;
+        credit: number;
+      }>;
+    }>;
+    newShareAmount: number;
+    currency: string;
+  } | null>(null);
+  const [postAddStep, setPostAddStep] = useState<1 | 2 | 3>(1);
+  const [creditApplications, setCreditApplications] = useState<
+    Record<string, { periodId: string; periodLabel: string } | null>
+  >({});
+  const [applyCreditsLoading, setApplyCreditsLoading] = useState(false);
+  const [notifyMembersLoading, setNotifyMembersLoading] = useState(false);
   const [inviteSending, setInviteSending] = useState(false);
   const [resendingMemberId, setResendingMemberId] = useState<string | null>(null);
   const [editMember, setEditMember] = useState<{
@@ -148,14 +177,25 @@ export function GroupMembersPanel({
 
     setLoading(true);
     try {
+      const body: {
+        email: string;
+        nickname: string;
+        customAmount: number | null;
+        billingStartsAt?: string | null;
+      } = {
+        email: trimmedEmail,
+        nickname: trimmedNickname,
+        customAmount: amount,
+      };
+      if (billingStartsAt.trim()) {
+        body.billingStartsAt = billingStartsAt.trim();
+      } else {
+        body.billingStartsAt = null;
+      }
       const res = await fetch(`/api/groups/${groupId}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: trimmedEmail,
-          nickname: trimmedNickname,
-          customAmount: amount,
-        }),
+        body: JSON.stringify(body),
       });
       const json = await res.json();
 
@@ -168,9 +208,31 @@ export function GroupMembersPanel({
       setEmail("");
       setNickname("");
       setCustomAmount("");
-      setInviteDialog({
+      setBillingStartsAt("");
+      const summary = json.data.creditSummary ?? [];
+      const defaults: Record<string, { periodId: string; periodLabel: string } | null> = {};
+      for (const entry of summary) {
+        const unpaidPeriod = periods.find((p) => {
+          const pay = p.payments.find((x) => x.memberId === entry.memberId);
+          return (
+            pay &&
+            pay.status !== "confirmed" &&
+            pay.status !== "waived"
+          );
+        });
+        defaults[entry.memberId] = unpaidPeriod
+          ? { periodId: unpaidPeriod._id, periodLabel: unpaidPeriod.periodLabel }
+          : null;
+      }
+      setCreditApplications(defaults);
+      setPostAddStep(1);
+      setPostAddModal({
         memberId: json.data._id,
         email: json.data.email,
+        nickname: json.data.nickname,
+        creditSummary: summary,
+        newShareAmount: json.data.newShareAmount ?? 0,
+        currency: json.data.currency ?? currency,
       });
       router.refresh();
     } catch {
@@ -199,6 +261,110 @@ export function GroupMembersPanel({
       setError("Failed to send invite. Try again.");
     } finally {
       setInviteSending(false);
+    }
+  }
+
+  async function handleApplyCredits() {
+    if (!postAddModal) return;
+    const toApply = postAddModal.creditSummary.filter(
+      (c) => creditApplications[c.memberId] != null
+    );
+    if (toApply.length === 0) {
+      setPostAddStep(3);
+      return;
+    }
+    setApplyCreditsLoading(true);
+    try {
+      for (const entry of toApply) {
+        const target = creditApplications[entry.memberId];
+        if (!target) continue;
+        const period = periods.find((p) => p._id === target.periodId);
+        if (!period) continue;
+        const payment = period.payments.find(
+          (p) => p.memberId === entry.memberId
+        );
+        if (!payment) continue;
+        const currentAmount = payment.adjustedAmount ?? payment.amount;
+        const newAmount = Math.round((currentAmount - entry.totalCredit) * 100) / 100;
+        const reason = `Credit from ${postAddModal.nickname} joining — overpaid ${entry.totalCredit.toFixed(2)} ${postAddModal.currency} on past periods`;
+        const res = await fetch(
+          `/api/groups/${groupId}/billing/${target.periodId}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              payments: [
+                {
+                  memberId: entry.memberId,
+                  adjustedAmount: newAmount,
+                  adjustmentReason: reason,
+                },
+              ],
+            }),
+          }
+        );
+        if (!res.ok) {
+          const json = await res.json();
+          setError(json?.error?.message ?? "Failed to apply credit.");
+          return;
+        }
+      }
+      setPostAddStep(3);
+      router.refresh();
+    } catch {
+      setError("Failed to apply credits. Try again.");
+    } finally {
+      setApplyCreditsLoading(false);
+    }
+  }
+
+  async function handlePostAddNotifyAndInvite(options: {
+    sendInvite: boolean;
+    notify: boolean;
+  }) {
+    if (!postAddModal) return;
+    setNotifyMembersLoading(true);
+    try {
+      if (options.notify) {
+        const res = await fetch(
+          `/api/groups/${groupId}/notify-member-added`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              newMemberId: postAddModal.memberId,
+              newMemberNickname: postAddModal.nickname,
+              newShareAmount: postAddModal.newShareAmount,
+              currency: postAddModal.currency,
+              creditSummary: postAddModal.creditSummary,
+            }),
+          }
+        );
+        if (!res.ok) {
+          const json = await res.json();
+          setError(json?.error?.message ?? "Failed to notify members.");
+          return;
+        }
+      }
+      if (options.sendInvite) {
+        const res = await fetch(
+          `/api/groups/${groupId}/members/${postAddModal.memberId}/send-invite`,
+          { method: "POST" }
+        );
+        if (!res.ok) {
+          const json = await res.json();
+          setError(json?.error?.message ?? "Failed to send invite.");
+          return;
+        }
+      }
+      setPostAddModal(null);
+      setPostAddStep(1);
+      setCreditApplications({});
+      router.refresh();
+    } catch {
+      setError("Failed to send. Try again.");
+    } finally {
+      setNotifyMembersLoading(false);
     }
   }
 
@@ -282,6 +448,207 @@ export function GroupMembersPanel({
 
   return (
     <>
+      <Dialog
+        open={!!postAddModal}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPostAddModal(null);
+            setPostAddStep(1);
+            setCreditApplications({});
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Member added</DialogTitle>
+            <DialogDescription>
+              {postAddModal && postAddStep === 1 && postAddModal.creditSummary.length > 0 && (
+                <>
+                  {postAddModal.nickname} was added with billing from a past period.
+                  Existing members who already paid now have credits. Review below, then choose where to apply them.
+                </>
+              )}
+              {postAddModal && postAddStep === 1 && postAddModal.creditSummary.length === 0 && (
+                <> {postAddModal.nickname} was added. You can send an invite below. </>
+              )}
+              {postAddModal && postAddStep === 2 && (
+                <> Choose which period to apply each member&apos;s credit to. </>
+              )}
+              {postAddModal && postAddStep === 3 && (
+                <> Notify existing members about the new price and optionally send an invite to {postAddModal.nickname}. </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {postAddModal && postAddStep === 1 && (
+            <div className="space-y-4 py-2">
+              {postAddModal.creditSummary.length > 0 ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    New share amount: <strong>{postAddModal.newShareAmount.toFixed(2)} {postAddModal.currency}</strong> per person
+                  </p>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Member</TableHead>
+                        <TableHead className="text-right">Total credit</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {postAddModal.creditSummary.map((c) => (
+                        <TableRow key={c.memberId}>
+                          <TableCell>{c.memberNickname}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            {c.totalCredit.toFixed(2)} {postAddModal.currency}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <DialogFooter className="gap-2 sm:gap-0">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setPostAddStep(3);
+                      }}
+                    >
+                      Skip credits
+                    </Button>
+                    <Button onClick={() => setPostAddStep(2)}>
+                      Next — Apply credits
+                    </Button>
+                  </DialogFooter>
+                </>
+              ) : (
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setPostAddModal(null);
+                      setPostAddStep(1);
+                    }}
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setPostAddStep(3);
+                    }}
+                  >
+                    Send invite
+                  </Button>
+                </DialogFooter>
+              )}
+            </div>
+          )}
+          {postAddModal && postAddStep === 2 && (
+            <div className="space-y-4 py-2">
+              {postAddModal.creditSummary.map((c) => {
+                const unpaidPeriods = periods.filter((p) => {
+                  const pay = p.payments.find((x) => x.memberId === c.memberId);
+                  return pay && pay.status !== "confirmed" && pay.status !== "waived";
+                });
+                const selected = creditApplications[c.memberId];
+                return (
+                  <div key={c.memberId} className="flex flex-col gap-2 rounded-lg border p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{c.memberNickname}</span>
+                      <span className="text-sm text-muted-foreground font-mono">
+                        {c.totalCredit.toFixed(2)} {postAddModal.currency} credit
+                      </span>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label className="text-xs">Apply to period</Label>
+                      <select
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                        value={selected?.periodId ?? ""}
+                        onChange={(e) => {
+                          const periodId = e.target.value;
+                          if (!periodId) {
+                            setCreditApplications((prev) => ({ ...prev, [c.memberId]: null }));
+                            return;
+                          }
+                          const period = unpaidPeriods.find((p) => p._id === periodId);
+                          setCreditApplications((prev) => ({
+                            ...prev,
+                            [c.memberId]: period
+                              ? { periodId: period._id, periodLabel: period.periodLabel }
+                              : null,
+                          }));
+                        }}
+                      >
+                        <option value="">Don&apos;t apply</option>
+                        {unpaidPeriods.map((p) => (
+                          <option key={p._id} value={p._id}>
+                            {p.periodLabel}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  variant="outline"
+                  onClick={() => setPostAddStep(1)}
+                  disabled={applyCreditsLoading}
+                >
+                  Back
+                </Button>
+                <Button onClick={handleApplyCredits} disabled={applyCreditsLoading}>
+                  {applyCreditsLoading ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    "Apply credits"
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+          {postAddModal && postAddStep === 3 && (
+            <div className="space-y-4 py-2">
+              <DialogFooter className="gap-2 sm:gap-0 flex-col sm:flex-row">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setPostAddModal(null);
+                    setPostAddStep(1);
+                    setCreditApplications({});
+                  }}
+                  disabled={notifyMembersLoading}
+                >
+                  Skip
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => handlePostAddNotifyAndInvite({ sendInvite: true, notify: false })}
+                  disabled={notifyMembersLoading}
+                >
+                  {notifyMembersLoading ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Mail className="size-4 mr-2" />
+                      Send invite to {postAddModal.nickname}
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={() => handlePostAddNotifyAndInvite({ sendInvite: true, notify: true })}
+                  disabled={notifyMembersLoading}
+                >
+                  {notifyMembersLoading ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    "Notify members & send invite"
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog
         open={!!inviteDialog}
         onOpenChange={(open) => !open && setInviteDialog(null)}
@@ -490,7 +857,7 @@ export function GroupMembersPanel({
                 {error}
               </p>
             ) : null}
-            <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end">
+            <div className="grid gap-4 sm:grid-cols-[1fr_1fr_1fr_auto_auto] sm:items-end">
               <div className="grid gap-2">
                 <Label htmlFor="member-email">Email</Label>
                 <Input
@@ -512,6 +879,23 @@ export function GroupMembersPanel({
                   onChange={(e) => setNickname(e.target.value)}
                   disabled={loading}
                 />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="member-billing-starts">Billing starts from</Label>
+                <select
+                  id="member-billing-starts"
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  value={billingStartsAt}
+                  onChange={(e) => setBillingStartsAt(e.target.value)}
+                  disabled={loading}
+                >
+                  <option value="">From join date</option>
+                  {periods.map((p) => (
+                    <option key={p._id} value={p.periodStart}>
+                      {p.periodLabel}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="member-custom-amount">

@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
 import { backfillMemberIntoPeriods } from "@/lib/billing/backfill";
+import { calculateShares, getNextPeriodStart } from "@/lib/billing/calculator";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group } from "@/models";
 import type { IGroupMember } from "@/models";
@@ -103,9 +104,31 @@ export async function POST(
 
   // backfill into existing periods when billing starts in the past
   let backfilledPeriods = 0;
+  let creditSummary: Array<{
+    memberId: string;
+    memberNickname: string;
+    memberEmail: string;
+    totalCredit: number;
+    periods: Array<{
+      periodId: string;
+      periodLabel: string;
+      oldAmount: number;
+      newAmount: number;
+      credit: number;
+    }>;
+  }> = [];
   if (added.billingStartsAt && added.billingStartsAt < new Date()) {
-    backfilledPeriods = await backfillMemberIntoPeriods(group, added);
+    const result = await backfillMemberIntoPeriods(group, added);
+    backfilledPeriods = result.backfilledCount;
+    creditSummary = result.creditSummary;
   }
+
+  // new per-member share for next period (for UI display)
+  const nextPeriodStart = getNextPeriodStart(group.billing.cycleDay);
+  const nextShares = calculateShares(group, undefined, nextPeriodStart);
+  const newShareAmount =
+    nextShares.length > 0 ? nextShares[0].amount : group.billing.currentPrice;
+  const currency = group.billing.currency;
 
   const actorName =
     (session.user.name as string) ||
@@ -117,7 +140,12 @@ export async function POST(
     action: "member_added",
     groupId,
     targetMemberId: added._id.toString(),
-    metadata: { email: added.email, nickname: added.nickname, backfilledPeriods },
+    metadata: {
+      email: added.email,
+      nickname: added.nickname,
+      backfilledPeriods,
+      creditSummaryCount: creditSummary.length,
+    },
   });
 
   return NextResponse.json({
@@ -128,6 +156,9 @@ export async function POST(
       role: added.role,
       isActive: added.isActive,
       backfilledPeriods,
+      creditSummary,
+      newShareAmount,
+      currency,
     },
   });
 }

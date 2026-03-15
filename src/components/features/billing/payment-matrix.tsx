@@ -906,17 +906,20 @@ export function PaymentMatrix({
         <>
           <div className="flex justify-end border-t px-4 py-3">
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  Create periods
-                  <ChevronDown className="ml-2 size-4 opacity-50" />
-                </Button>
+              <DropdownMenuTrigger
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                  "gap-2"
+                )}
+              >
+                Create periods
+                <ChevronDown className="size-4 opacity-50" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => setAdvanceOpen(true)}>
+                <DropdownMenuItem onClick={() => setAdvanceOpen(true)}>
                   Upcoming periods…
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setBackfillOpen(true)}>
+                <DropdownMenuItem onClick={() => setBackfillOpen(true)}>
                   Previous periods…
                 </DropdownMenuItem>
               </DropdownMenuContent>

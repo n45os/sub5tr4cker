@@ -37,6 +37,13 @@ export function NoPeriodsCard({ groupId, cycleDay, isAdmin = true }: NoPeriodsCa
         setError(json?.error?.message ?? "Failed to create period");
         return;
       }
+      const created = json?.data?.created ?? 0;
+      if (created === 0) {
+        setError(
+          "Could not create a period. Make sure the group has at least one active member."
+        );
+        return;
+      }
       router.refresh();
     } catch {
       setError("Something went wrong");

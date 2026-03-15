@@ -78,11 +78,24 @@ export async function POST(
     paymentsCount: number;
   }> = [];
 
-  // start from next upcoming period
+  const existingCount = await BillingPeriod.countDocuments({ group: groupId });
   let year = now.getFullYear();
   let month = now.getMonth();
-  if (now.getDate() >= cycleDay) {
-    month += 1;
+
+  if (existingCount === 0) {
+    // when no periods exist, create the current period first (the one that includes today)
+    if (now.getDate() < cycleDay) {
+      month -= 1;
+      if (month < 0) {
+        month += 12;
+        year -= 1;
+      }
+    }
+  } else {
+    // when periods exist, start from next upcoming period
+    if (now.getDate() >= cycleDay) {
+      month += 1;
+    }
   }
 
   for (let i = 0; i < monthsAhead; i++) {

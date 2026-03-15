@@ -16,7 +16,7 @@ const updatePeriodSchema = z
         z.object({
           memberId: z.string(),
           status: z.enum(["pending", "waived"]).optional(),
-          adjustedAmount: z.number().positive().optional().nullable(),
+          adjustedAmount: z.number().nonnegative().optional().nullable(),
           adjustmentReason: z.string().max(500).optional().nullable(),
           notes: z.string().max(500).optional().nullable(),
         })

@@ -305,6 +305,7 @@ export async function sendMemberAddedNotifications(
     newMemberNickname: string;
     newShareAmount: number;
     currency: string;
+    changeType?: "added" | "removed";
     creditSummary: MemberAddedCreditEntry[];
   }
 ): Promise<void> {
@@ -315,10 +316,12 @@ export async function sendMemberAddedNotifications(
     newMemberNickname,
     newShareAmount,
     currency,
+    changeType = "added",
     creditSummary,
   } = params;
   const groupName = group.name;
   const groupIdStr = group._id.toString();
+  const isRemoval = changeType === "removed";
   const creditByMemberId = new Map(
     creditSummary.map((c) => [c.memberId, c])
   );
@@ -381,7 +384,9 @@ export async function sendMemberAddedNotifications(
     });
   }
 
-  const subject = `New member added: ${groupName}`;
+  const subject = isRemoval
+    ? `Member left: ${groupName}`
+    : `New member added: ${groupName}`;
   const periodLabel = "your next payment";
 
   for (const target of targets.values()) {
@@ -392,10 +397,15 @@ export async function sendMemberAddedNotifications(
         ? newShareAmount + creditEntry.totalCredit
         : newShareAmount;
       const difference = creditEntry ? creditEntry.totalCredit : 0;
-      const reason =
-        creditEntry != null
-          ? `${newMemberNickname} joined the subscription. You overpaid on past periods; this credit will be applied to your next payment.`
-          : `A new member (${newMemberNickname}) was added to the subscription. Your new share is ${newShareAmount.toFixed(2)} ${currency}.`;
+
+      let reason: string;
+      if (isRemoval) {
+        reason = `${newMemberNickname} has left the subscription. Your new share is ${newShareAmount.toFixed(2)} ${currency}.`;
+      } else if (creditEntry != null) {
+        reason = `${newMemberNickname} joined the subscription. You overpaid on past periods; this credit will be applied to your next payment.`;
+      } else {
+        reason = `A new member (${newMemberNickname}) was added to the subscription. Your new share is ${newShareAmount.toFixed(2)} ${currency}.`;
+      }
 
       const unsubscribeUrl =
         target.memberId && !target.unsubscribedFromEmail

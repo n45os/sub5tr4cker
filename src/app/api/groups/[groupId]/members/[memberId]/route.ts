@@ -3,7 +3,8 @@ import { z } from "zod";
 import mongoose from "mongoose";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
-import { backfillMemberIntoPeriods } from "@/lib/billing/backfill";
+import { backfillMemberIntoPeriods, recalculatePeriodsOnMemberRemoval } from "@/lib/billing/backfill";
+import { calculateShares, getNextPeriodStart } from "@/lib/billing/calculator";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group } from "@/models";
 
@@ -184,6 +185,17 @@ export async function DELETE(
   member.isActive = false;
   await group.save();
 
+  // recalculate pending period amounts now that this member is inactive
+  const recalcResult = await recalculatePeriodsOnMemberRemoval(group, member);
+
+  // compute the new share for the next upcoming period
+  let newShareAmount = recalcResult.newShareAmount;
+  if (!newShareAmount) {
+    const nextStart = getNextPeriodStart(group.billing.cycleDay ?? 1);
+    const shares = calculateShares(group, group.price, nextStart);
+    newShareAmount = shares.length > 0 ? shares[0].amount : 0;
+  }
+
   const actorName =
     (session.user.name as string) ||
     (session.user.email as string) ||
@@ -197,5 +209,13 @@ export async function DELETE(
     metadata: { nickname: member.nickname, email: member.email },
   });
 
-  return NextResponse.json({ data: { success: true } });
+  return NextResponse.json({
+    data: {
+      success: true,
+      newShareAmount,
+      currency: group.currency,
+      recalculatedCount: recalcResult.recalculatedCount,
+      removedMemberPendingPeriods: recalcResult.removedMemberPendingPeriods,
+    },
+  });
 }

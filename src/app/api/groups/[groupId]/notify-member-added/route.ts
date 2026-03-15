@@ -11,6 +11,7 @@ const notifyMemberAddedSchema = z.object({
   newMemberNickname: z.string().min(1),
   newShareAmount: z.number().nonnegative(),
   currency: z.string().length(3),
+  changeType: z.enum(["added", "removed"]).optional(),
   creditSummary: z.array(
     z.object({
       memberId: z.string(),
@@ -86,6 +87,7 @@ export async function POST(
     newMemberNickname,
     newShareAmount,
     currency,
+    changeType,
     creditSummary,
   } = parsed.data;
 
@@ -101,6 +103,7 @@ export async function POST(
       newMemberNickname,
       newShareAmount,
       currency,
+      changeType: changeType ?? "added",
       creditSummary,
     });
   } catch (error) {

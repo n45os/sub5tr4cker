@@ -24,6 +24,17 @@ export interface BackfillResult {
   creditSummary: MemberCredit[];
 }
 
+export interface RemovalRecalcResult {
+  recalculatedCount: number;
+  newShareAmount: number;
+  removedMemberPendingPeriods: Array<{
+    periodId: string;
+    periodLabel: string;
+    amount: number;
+    status: string;
+  }>;
+}
+
 function shouldRecalculateExistingPayments(group: IGroup): boolean {
   return group.billing.mode === "equal_split" || group.billing.mode === "variable";
 }
@@ -167,4 +178,73 @@ export async function backfillMemberIntoPeriods(
   );
 
   return { backfilledCount, creditSummary };
+}
+
+// recalculate pending/future period amounts after a member is removed.
+// the member must already be soft-deleted (isActive: false) on the group
+// so calculateShares excludes them. leaves the removed member's own
+// payment entries untouched for manual admin handling.
+export async function recalculatePeriodsOnMemberRemoval(
+  group: IGroup,
+  removedMember: IGroupMember,
+): Promise<RemovalRecalcResult> {
+  const memberId = removedMember._id.toString();
+
+  const periods = await BillingPeriod.find({
+    group: group._id,
+    "payments.memberId": removedMember._id,
+  }).sort({ periodStart: 1 });
+
+  let recalculatedCount = 0;
+  let latestNewShare = 0;
+  const removedMemberPendingPeriods: RemovalRecalcResult["removedMemberPendingPeriods"] = [];
+
+  for (const period of periods) {
+    const removedPayment = period.payments.find(
+      (p: IMemberPayment) => p.memberId.toString() === memberId,
+    ) as IMemberPayment | undefined;
+
+    // collect the removed member's pending/overdue payments for the admin summary
+    if (
+      removedPayment &&
+      (removedPayment.status === "pending" || removedPayment.status === "overdue")
+    ) {
+      removedMemberPendingPeriods.push({
+        periodId: period._id.toString(),
+        periodLabel: period.periodLabel,
+        amount: removedPayment.adjustedAmount ?? removedPayment.amount,
+        status: removedPayment.status,
+      });
+    }
+
+    // only recalculate periods that have at least one pending/overdue remaining member
+    const hasPendingRemaining = period.payments.some(
+      (p: IMemberPayment) =>
+        p.memberId.toString() !== memberId &&
+        (p.status === "pending" || p.status === "overdue"),
+    );
+    if (!hasPendingRemaining) continue;
+
+    if (!shouldRecalculateExistingPayments(group)) continue;
+
+    recalculatePeriodPayments(period, group, period.totalPrice, period.periodStart);
+
+    // track the latest new share amount for the response
+    const anyRemainingPayment = period.payments.find(
+      (p: IMemberPayment) =>
+        p.memberId.toString() !== memberId && p.adjustedAmount == null,
+    ) as IMemberPayment | undefined;
+    if (anyRemainingPayment) {
+      latestNewShare = anyRemainingPayment.amount;
+    }
+
+    await period.save();
+    recalculatedCount++;
+  }
+
+  return {
+    recalculatedCount,
+    newShareAmount: latestNewShare,
+    removedMemberPendingPeriods,
+  };
 }

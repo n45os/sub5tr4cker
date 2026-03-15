@@ -139,6 +139,19 @@ export function GroupMembersPanel({
     email: string;
   } | null>(null);
   const [removeLoading, setRemoveLoading] = useState(false);
+  const [postRemoveModal, setPostRemoveModal] = useState<{
+    nickname: string;
+    newShareAmount: number;
+    currency: string;
+    recalculatedCount: number;
+    removedMemberPendingPeriods: Array<{
+      periodId: string;
+      periodLabel: string;
+      amount: number;
+      status: string;
+    }>;
+  } | null>(null);
+  const [notifyRemovalLoading, setNotifyRemovalLoading] = useState(false);
 
   async function handleResendInvite(memberId: string) {
     setResendingMemberId(memberId);
@@ -286,6 +299,12 @@ export function GroupMembersPanel({
         if (!payment) continue;
         const currentAmount = payment.adjustedAmount ?? payment.amount;
         const newAmount = Math.round((currentAmount - entry.totalCredit) * 100) / 100;
+        if (newAmount < 0) {
+          setError(
+            `Credit for ${entry.memberNickname} is larger than the amount due in ${target.periodLabel}. Choose a different period.`
+          );
+          return;
+        }
         const reason = `Credit from ${postAddModal.nickname} joining — overpaid ${entry.totalCredit.toFixed(2)} ${postAddModal.currency} on past periods`;
         const res = await fetch(
           `/api/groups/${groupId}/billing/${target.periodId}`,
@@ -297,6 +316,7 @@ export function GroupMembersPanel({
                 {
                   memberId: entry.memberId,
                   adjustedAmount: newAmount,
+                  status: newAmount === 0 ? "waived" : "pending",
                   adjustmentReason: reason,
                 },
               ],
@@ -437,12 +457,53 @@ export function GroupMembersPanel({
         setRemoveLoading(false);
         return;
       }
+      const nickname = removeMember.nickname;
       setRemoveMember(null);
-      router.refresh();
+      const data = json.data ?? {};
+      setPostRemoveModal({
+        nickname,
+        newShareAmount: data.newShareAmount ?? 0,
+        currency: data.currency ?? currency,
+        recalculatedCount: data.recalculatedCount ?? 0,
+        removedMemberPendingPeriods: data.removedMemberPendingPeriods ?? [],
+      });
     } catch {
       setError("Something went wrong. Try again.");
     } finally {
       setRemoveLoading(false);
+    }
+  }
+
+  async function handlePostRemoveNotify() {
+    if (!postRemoveModal) return;
+    setNotifyRemovalLoading(true);
+    try {
+      const res = await fetch(
+        `/api/groups/${groupId}/notify-member-added`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            newMemberId: "",
+            newMemberNickname: postRemoveModal.nickname,
+            newShareAmount: postRemoveModal.newShareAmount,
+            currency: postRemoveModal.currency,
+            changeType: "removed",
+            creditSummary: [],
+          }),
+        }
+      );
+      if (!res.ok) {
+        const json = await res.json();
+        setError(json?.error?.message ?? "Failed to notify members.");
+        return;
+      }
+      setPostRemoveModal(null);
+      router.refresh();
+    } catch {
+      setError("Failed to notify members. Try again.");
+    } finally {
+      setNotifyRemovalLoading(false);
     }
   }
 
@@ -728,6 +789,98 @@ export function GroupMembersPanel({
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!postRemoveModal}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPostRemoveModal(null);
+            router.refresh();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Member removed</DialogTitle>
+            <DialogDescription>
+              {postRemoveModal && (
+                <>
+                  {postRemoveModal.nickname} has been removed from the group.
+                  {postRemoveModal.recalculatedCount > 0
+                    ? ` ${postRemoveModal.recalculatedCount} pending period${postRemoveModal.recalculatedCount !== 1 ? "s" : ""} ${postRemoveModal.recalculatedCount !== 1 ? "were" : "was"} recalculated.`
+                    : ""}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {postRemoveModal && (
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-muted-foreground">
+                New share amount: <strong>{postRemoveModal.newShareAmount.toFixed(2)} {postRemoveModal.currency}</strong> per person
+              </p>
+              {postRemoveModal.removedMemberPendingPeriods.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">
+                    {postRemoveModal.nickname}&apos;s unpaid periods
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    These payments were left as-is for you to handle manually (waive, mark paid, etc.).
+                  </p>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Period</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {postRemoveModal.removedMemberPendingPeriods.map((p) => (
+                        <TableRow key={p.periodId}>
+                          <TableCell>{p.periodLabel}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            {p.amount.toFixed(2)} {postRemoveModal.currency}
+                          </TableCell>
+                          <TableCell className="text-right capitalize">
+                            {p.status}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              {error ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              ) : null}
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setPostRemoveModal(null);
+                    router.refresh();
+                  }}
+                  disabled={notifyRemovalLoading}
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={handlePostRemoveNotify}
+                  disabled={notifyRemovalLoading}
+                >
+                  {notifyRemovalLoading ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    "Notify members about new price"
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

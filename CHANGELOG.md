@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.22.1] - 2026-03-19
+
+### Added
+
+- **Remove member from group** — Admins can remove a member from the group from the Members panel. A confirmation dialog explains that the member will stop receiving reminders and lose access; removal is soft (sets `leftAt` and `isActive: false`). DELETE `/api/groups/[groupId]/members/[memberId]` was already implemented and is now exposed via a remove (user-minus) button next to each member.
+
 ## [0.22.0] - 2026-03-18
 
 ### Added

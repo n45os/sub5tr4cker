@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, Loader2, Mail, Pencil, UserPlus } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, Mail, Pencil, UserMinus, UserPlus } from "lucide-react";
 import { PaymentStatusBadge } from "@/components/features/billing/payment-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -104,6 +104,12 @@ export function GroupMembersPanel({
     billingStartsAt: string;
   } | null>(null);
   const [editSaving, setEditSaving] = useState(false);
+  const [removeMember, setRemoveMember] = useState<{
+    _id: string;
+    nickname: string;
+    email: string;
+  } | null>(null);
+  const [removeLoading, setRemoveLoading] = useState(false);
 
   async function handleResendInvite(memberId: string) {
     setResendingMemberId(memberId);
@@ -250,6 +256,30 @@ export function GroupMembersPanel({
     }
   }
 
+  async function handleRemoveMember() {
+    if (!removeMember) return;
+    setRemoveLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/groups/${groupId}/members/${removeMember._id}`,
+        { method: "DELETE" }
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error?.message ?? "Failed to remove member.");
+        setRemoveLoading(false);
+        return;
+      }
+      setRemoveMember(null);
+      router.refresh();
+    } catch {
+      setError("Something went wrong. Try again.");
+    } finally {
+      setRemoveLoading(false);
+    }
+  }
+
   return (
     <>
       <Dialog
@@ -283,6 +313,50 @@ export function GroupMembersPanel({
                 <>
                   <Mail className="size-4 mr-2" />
                   Send invite
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!removeMember}
+        onOpenChange={(open) => !open && setRemoveMember(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove member</DialogTitle>
+            <DialogDescription>
+              {removeMember
+                ? `Remove ${removeMember.nickname} (${removeMember.email}) from this group? They will no longer receive reminders or see this group. You can add them again later if needed.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setRemoveMember(null)}
+              disabled={removeLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRemoveMember}
+              disabled={removeLoading}
+            >
+              {removeLoading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <>
+                  <UserMinus className="size-4 mr-2" />
+                  Remove
                 </>
               )}
             </Button>
@@ -606,15 +680,33 @@ export function GroupMembersPanel({
                       ) : null}
                       {isAdmin ? (
                         <TableCell className="w-10">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8"
-                            onClick={() => openEditMember(member)}
-                            aria-label="Edit member"
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8"
+                              onClick={() => openEditMember(member)}
+                              aria-label="Edit member"
+                            >
+                              <Pencil className="size-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8 text-muted-foreground hover:text-destructive"
+                              onClick={() => {
+                                setError(null);
+                                setRemoveMember({
+                                  _id: member._id,
+                                  nickname: member.nickname,
+                                  email: member.email,
+                                });
+                              }}
+                              aria-label="Remove member"
+                            >
+                              <UserMinus className="size-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       ) : null}
                     </TableRow>

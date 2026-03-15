@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.23.2] - 2026-03-19
+
+### Fixed
+
+- **Login: session persists across tabs; autofill improved** — Session and session-token cookie now use an explicit 30-day `maxAge` so the cookie is persistent and shared across browser tabs. Login form email field uses `autocomplete="username"` for better password manager recognition and a stable form `id` for tools.
+
 ## [0.23.1] - 2026-03-19
 
 ### Fixed

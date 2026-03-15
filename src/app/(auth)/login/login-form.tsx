@@ -58,7 +58,7 @@ export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
           </p>
         </div>
 
-        <form onSubmit={handleCredentialsSubmit} className="space-y-4">
+        <form id="login-form" onSubmit={handleCredentialsSubmit} className="space-y-4">
           {error && (
             <div
               role="alert"
@@ -78,7 +78,7 @@ export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
               id="email"
               name="email"
               type="email"
-              autoComplete="email"
+              autoComplete="username"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}

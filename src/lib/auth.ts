@@ -18,11 +18,21 @@ function getMongoClientPromise(): Promise<MongoClient> {
   return clientPromise;
 }
 
+// 30 days in seconds — persistent session so cookie is shared across tabs
+const SESSION_MAX_AGE = 30 * 24 * 60 * 60;
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || (process.env.NODE_ENV === "development" ? "dev-secret-change-in-production" : undefined),
   adapter: MongoDBAdapter(getMongoClientPromise),
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE },
+  cookies: {
+    sessionToken: {
+      options: {
+        maxAge: SESSION_MAX_AGE,
+      },
+    },
+  },
   pages: {
     signIn: "/login",
     error: "/login",

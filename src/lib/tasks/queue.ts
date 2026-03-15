@@ -96,7 +96,7 @@ export async function claimTasks(
           lockedBy: workerId,
         },
       },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (updated) tasks.push(updated);
   }
@@ -121,7 +121,7 @@ export async function completeTask(
         lockedBy: null,
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   );
 }
 
@@ -151,7 +151,7 @@ export async function failTask(
           lockedBy: null,
         },
       },
-      { new: true }
+      { returnDocument: "after" }
     );
   }
 
@@ -174,7 +174,7 @@ export async function failTask(
         lockedBy: null,
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   );
 }
 
@@ -194,7 +194,7 @@ export async function releaseTask(
         lockedBy: null,
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   );
 }
 

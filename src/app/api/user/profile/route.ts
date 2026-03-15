@@ -135,7 +135,7 @@ export async function PATCH(request: NextRequest) {
   const user = await User.findByIdAndUpdate(
     session.user.id,
     { $set: update },
-    { new: true }
+    { returnDocument: "after" }
   ).lean();
 
   if (!user) {

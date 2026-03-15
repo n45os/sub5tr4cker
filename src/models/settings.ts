@@ -28,7 +28,7 @@ const settingsSchema = new Schema<ISettings>(
   { timestamps: true }
 );
 
-settingsSchema.index({ key: 1 }, { unique: true });
+// key is already unique via schema option; avoid duplicate index
 settingsSchema.index({ category: 1 });
 
 export const Settings =

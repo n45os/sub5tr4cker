@@ -19,6 +19,7 @@ export async function getBot(): Promise<Bot> {
   botToken = token;
   bot = new Bot(token);
   registerHandlers(bot);
+  await bot.init();
   return bot;
 }
 

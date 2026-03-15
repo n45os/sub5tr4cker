@@ -187,7 +187,7 @@ export async function setSetting(key: string, value: string | null) {
       label: effectiveDef.label,
       description: effectiveDef.description,
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
 
   clearSettingsCache(key);

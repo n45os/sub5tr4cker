@@ -98,7 +98,11 @@ export async function POST(
     }
   }
 
-  for (let i = 0; i < monthsAhead; i++) {
+  // when no periods exist, try more months (up to 12) until we create at least one
+  // — members who joined mid-cycle are excluded from the current period, so we may need the next
+  const maxIterations = existingCount === 0 ? Math.max(monthsAhead, 12) : monthsAhead;
+
+  for (let i = 0; i < maxIterations && createdPeriods.length < monthsAhead; i++) {
     const currentMonth = month + i;
     const adjustedYear = year + Math.floor(currentMonth / 12);
     const adjustedMonth = currentMonth % 12;

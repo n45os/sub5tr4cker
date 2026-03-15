@@ -130,7 +130,7 @@ export async function GET(
   };
   const allPeriods = periods as PeriodDoc[];
   const list = access === "member"
-    ? filterBillingForMember(allPeriods, memberEntry._id.toString())
+    ? filterBillingForMember(allPeriods, effectiveMemberId!)
     : allPeriods.map((p) => {
     const payments = p.payments.map((pay) => ({
       memberId: pay.memberId.toString(),

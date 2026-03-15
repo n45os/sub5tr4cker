@@ -48,7 +48,11 @@ export function orderPeriodsForDisplay<T extends PeriodWithDates>(
 }
 
 /** Classify a period for row highlighting (current month vs past). */
-export function getPeriodDisplayState(period: PeriodWithDates): {
+export function getPeriodDisplayState(period: {
+  _id: string;
+  periodStart?: string;
+  periodEnd?: string;
+}): {
   isCurrent: boolean;
   isPast: boolean;
 } {

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.24.0] - 2026-03-19
+
+### Added
+
+- **Password change flow** — Authenticated users can change or set their password from the Profile page. New "Password" card with form: current password (when already set) plus new password and confirmation. New `POST /api/user/change-password` endpoint. Users who sign in only with Google or magic link can set a password to enable email/password sign-in.
+
 ## [0.23.3] - 2026-03-19
 
 ### Fixed

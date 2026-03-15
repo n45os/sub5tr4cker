@@ -415,6 +415,22 @@ Update profile and notification preferences.
 }
 ```
 
+### `POST /api/user/change-password`
+
+Change or set the authenticated user's password (for credentials sign-in). If the user already has a password, `currentPassword` is required. If they sign in only via Google or magic link, only `newPassword` is needed.
+
+**Body:**
+```json
+{
+  "currentPassword": "optional when user has no password set",
+  "newPassword": "8–128 characters"
+}
+```
+
+**Success:** `200` with `{ "data": { "message": "Password updated." } }`.
+
+**Errors:** `400` with code `INVALID_PASSWORD` when current password is missing (for password users) or incorrect; `400` with `VALIDATION_ERROR` for invalid or short/long new password.
+
 ## App Settings
 
 Settings are key-value; keys include `general.appUrl`, `email.apiKey`, `email.fromAddress` (sender address for outgoing emails), optional `email.replyToAddress` (reply-to header), Telegram and security keys, etc. See the Settings UI or `src/lib/settings/definitions.ts` for the full list.

@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ProfileEmailForm } from "@/components/features/profile/profile-email-form";
+import { ProfilePasswordForm } from "@/components/features/profile/profile-password-form";
 import { TelegramLinkCard } from "@/components/features/profile/telegram-link-card";
 import { NotificationPreferencesCard } from "@/components/features/profile/notification-preferences-card";
 import { User } from "@/models";
@@ -21,9 +22,10 @@ export default async function ProfilePage() {
 
   await dbConnect();
   const user = await User.findById(session.user.id)
-    .select("email telegram notificationPreferences")
+    .select("email telegram notificationPreferences hashedPassword")
     .lean();
 
+  const hasPassword = Boolean(user?.hashedPassword);
   const email = user?.email ?? session.user.email ?? "";
   const telegram = user?.telegram;
   const notificationPreferences = user?.notificationPreferences;
@@ -49,6 +51,20 @@ export default async function ProfilePage() {
         </CardHeader>
         <CardContent>
           <ProfileEmailForm currentEmail={email} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Password</CardTitle>
+          <CardDescription>
+            {hasPassword
+              ? "Change your password. You will use the new password to sign in with email."
+              : "Set a password to sign in with your email address. You currently sign in with Google or a magic link."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ProfilePasswordForm hasPassword={hasPassword} />
         </CardContent>
       </Card>
 

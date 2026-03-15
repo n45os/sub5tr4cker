@@ -174,7 +174,9 @@ export function AppSidebar({ user, groups }: AppSidebarProps) {
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-56">
-                <DropdownMenuLabel>{user.name || user.email || "Account"}</DropdownMenuLabel>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>{user.name || user.email || "Account"}</DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                   <DropdownMenuItem render={<Link href="/dashboard/profile" />}>

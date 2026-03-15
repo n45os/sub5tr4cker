@@ -71,9 +71,9 @@ export const settingsDefinitions: SettingsDefinition[] = [
   {
     key: "notifications.aggregateReminders",
     category: "notifications",
-    label: "Aggregate reminders by user",
+    label: "Aggregate automated reminders by user",
     description:
-      "When enabled, members with the same email across groups receive a single combined notification instead of one per group.",
+      "When enabled, cron reminders group members by email (one notification per user). Dashboard 'Notify all unpaid' always sends one combined reminder per member email.",
     isSecret: false,
     envVar: "AGGREGATE_REMINDERS",
     defaultValue: "false",

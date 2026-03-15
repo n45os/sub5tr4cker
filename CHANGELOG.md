@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.26.1] - 2026-03-19
+
+### Fixed
+
+- **Notify all unpaid always aggregates** — Dashboard "Notify all unpaid" now always sends one combined email/Telegram per member email (matching address across groups, case-insensitive), independent of the app setting. The setting controls **cron** automated reminders only.
+
+### Changed
+
+- **Notify unpaid dialog & button** — Wider modal (`max-w-4xl`), clearer layout with scroll + pinned footer; primary action button is larger with stronger shadow. Copy explains one message per member.
+
 ## [0.26.0] - 2026-03-19
 
 ### Added

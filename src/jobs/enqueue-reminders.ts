@@ -1,6 +1,7 @@
 import { dbConnect } from "@/lib/db/mongoose";
 import { BillingPeriod, Group } from "@/models";
 import { getSetting } from "@/lib/settings/service";
+import { normalizeMemberEmailForAggregation } from "@/lib/notifications/member-email";
 import { enqueueTask } from "@/lib/tasks/queue";
 
 type PaymentRef = {
@@ -8,6 +9,7 @@ type PaymentRef = {
   billingPeriodId: string;
   memberId: string;
   paymentId: string;
+  memberEmail: string;
 };
 
 /**
@@ -48,19 +50,28 @@ export async function enqueueReminders(): Promise<number> {
 
       for (const payment of period.payments) {
         if (payment.status !== "pending" && payment.status !== "overdue") continue;
-        const memberEmail = payment.memberEmail;
+        const bucketKey = normalizeMemberEmailForAggregation(payment.memberEmail);
         const ref: PaymentRef = {
           groupId,
           billingPeriodId,
           memberId: (payment.memberId as { toString: () => string }).toString(),
           paymentId: (payment._id as { toString: () => string }).toString(),
+          memberEmail: payment.memberEmail,
         };
-        const list = byEmail.get(memberEmail) ?? [];
+        const list = byEmail.get(bucketKey) ?? [];
         list.push(ref);
-        byEmail.set(memberEmail, list);
+        byEmail.set(bucketKey, list);
       }
     }
-    for (const [memberEmail, payments] of byEmail) {
+    for (const [, refs] of byEmail) {
+      if (refs.length === 0) continue;
+      const memberEmail = refs[0].memberEmail;
+      const payments = refs.map((r) => ({
+        groupId: r.groupId,
+        billingPeriodId: r.billingPeriodId,
+        memberId: r.memberId,
+        paymentId: r.paymentId,
+      }));
       const task = await enqueueTask({
         type: "aggregated_payment_reminder",
         runAt: now,

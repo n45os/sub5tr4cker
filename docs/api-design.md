@@ -365,7 +365,7 @@ Aggregate unpaid and overdue counts across all groups where the user is admin.
 
 ### `GET /api/dashboard/notify-unpaid`
 
-Preview unpaid reminder candidates: by group, period, and payment, with per-payment eligibility (sendEmail, sendTelegram) and skip reasons. No body. When the app setting `notifications.aggregateReminders` is enabled, the response also includes `byUser` (payments grouped by member email) and `aggregateReminders: true`.
+Preview unpaid reminder candidates: by group, period, and payment, with per-payment eligibility (sendEmail, sendTelegram) and skip reasons. No body. Always includes `byUser` (payments grouped by member email, case-insensitive) and `aggregateReminders: true` for the dialog UI. The app setting `notifications.aggregateReminders` applies to **cron** reminders only, not this preview.
 
 ### `POST /api/dashboard/notify-unpaid`
 
@@ -384,7 +384,7 @@ Send payment reminders to unpaid (pending/overdue) members. Optional body to nar
 - `paymentIds` — only send to these payment IDs. Omit for all eligible payments.
 - `channelPreference` — `"email"` | `"telegram"` | `"both"` (default). For this batch, restrict to one channel or use both per member preferences.
 
-When `notifications.aggregateReminders` is enabled, reminders are grouped by member email: each unique email receives at most one email and one Telegram with all their unpaid amounts across groups. Counts in the response are then per user, not per payment.
+Reminders are grouped by member email (case-insensitive): each unique email receives at most one email and one Telegram with all their unpaid amounts across groups. Response counts are per user, not per payment. Cron reminder grouping still follows the `notifications.aggregateReminders` setting.
 
 **Response:** `{ "data": { "emailSent", "telegramSent", "skipped", "failed" } }`.
 

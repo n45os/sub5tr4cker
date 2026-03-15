@@ -321,25 +321,30 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
       <Button
         type="button"
         variant="default"
+        size="lg"
         disabled={disabled}
         onClick={() => {
           loadPreview();
           setOpen(true);
         }}
+        className="w-full gap-2 rounded-xl bg-primary px-5 py-3 text-base font-semibold shadow-md ring-1 ring-primary/20 transition-shadow hover:shadow-lg disabled:opacity-60 sm:w-auto"
       >
-        <Bell className="size-4" />
+        <Bell className="size-5 shrink-0" />
         Notify all unpaid
       </Button>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Notify all unpaid</DialogTitle>
-            <DialogDescription>
-              Send payment reminders to members with pending or overdue payments.
-              Choose groups, members, and channel below. Unsubscribed members
-              will not receive email.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="flex max-h-[min(92vh,56rem)] w-[calc(100vw-1.5rem)] max-w-4xl flex-col gap-0 overflow-hidden p-0 shadow-xl ring-foreground/15 sm:w-full">
+          <div className="max-h-[min(92vh,56rem)] overflow-y-auto p-6 pb-4">
+            <DialogHeader className="space-y-2 text-left">
+              <DialogTitle className="text-xl font-semibold tracking-tight">
+                Notify all unpaid
+              </DialogTitle>
+              <DialogDescription className="text-base">
+                One combined email or Telegram per member (same address across
+                groups). Choose groups, members, and channel below. Unsubscribed
+                members will not receive email.
+              </DialogDescription>
+            </DialogHeader>
 
           {preview && !previewLoading && preview.summary.totalPayments > 0 && (
             <p className="text-sm font-medium text-foreground">
@@ -705,9 +710,10 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
               {sendError}
             </p>
           ) : null}
+          </div>
 
           {preview && !previewLoading && (
-            <DialogFooter showCloseButton>
+            <DialogFooter showCloseButton className="mx-0 mt-0 shrink-0 border-t">
               <Button variant="outline" onClick={() => setOpen(false)} disabled={sending}>
                 {showResult ? "Close" : "Cancel"}
               </Button>

@@ -93,11 +93,11 @@ Aggregate unpaid/overdue counts across admin’s groups.
 
 ### `GET /api/dashboard/notify-unpaid`
 
-Preview unpaid reminder candidates (by group, period, payment) with eligibility and skip reasons. No body. When `notifications.aggregateReminders` is enabled, response includes `byUser` (grouped by member email) and `aggregateReminders: true`.
+Preview unpaid reminder candidates (by group, period, payment) with eligibility and skip reasons. No body. Always includes `byUser` (grouped by member email, case-insensitive) and `aggregateReminders: true`.
 
 ### `POST /api/dashboard/notify-unpaid`
 
-Send payment reminders. Optional body: `groupIds` (string[]), `paymentIds` (string[]), `channelPreference` (`"email"` | `"telegram"` | `"both"`). Omitted fields mean all. When aggregation is on, each member email receives at most one email and one Telegram with all unpaid amounts. Response: `{ "data": { "emailSent", "telegramSent", "skipped", "failed" } }`.
+Send payment reminders. Optional body: `groupIds` (string[]), `paymentIds` (string[]), `channelPreference` (`"email"` | `"telegram"` | `"both"`). Always groups by member email (one combined message per user). Response: `{ "data": { "emailSent", "telegramSent", "skipped", "failed" } }`.
 
 ## Cron
 

@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, CheckCircle, Clock, CreditCard, AlertTriangle, ExternalLink, Users } from "lucide-react";
+import { CalendarDays, Clock, CreditCard, AlertTriangle, ExternalLink, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { MemberPaymentList } from "@/components/features/billing/member-payment-list";
 import { PaymentMatrix } from "@/components/features/billing/payment-matrix";
 import { ContactAdminForm } from "@/components/features/groups/contact-admin-form";
 
@@ -66,6 +67,7 @@ interface MemberGroupViewProps {
 }
 
 const MEMBER_PERIOD_PREVIEW_COUNT = 6;
+const MAX_FUTURE_PREVIEW = 2;
 
 /** Member-safe group content: no members list, no notifications, no edit/invite. Reused by dashboard and standalone member page. */
 export function MemberGroupView({
@@ -76,27 +78,39 @@ export function MemberGroupView({
 }: MemberGroupViewProps) {
   const [showAllPeriods, setShowAllPeriods] = useState(false);
   const paymentBoardRef = useRef<HTMLDivElement | null>(null);
-  const currentPeriod = periods[0];
   const myMembership = group.myMembership;
   const membersForMatrix = myMembership
     ? [{ _id: myMembership._id, nickname: myMembership.nickname, email: "" }]
     : [];
+
+  // same logic as admin: cap future periods to 2 nearest, newest first
+  const now = new Date();
+  const nearest2Future = periods
+    .filter((p) => p.periodStart && new Date(p.periodStart) > now)
+    .slice(-MAX_FUTURE_PREVIEW);
+  const nonFuturePeriods = periods.filter(
+    (p) => !p.periodStart || new Date(p.periodStart) <= now
+  );
+  const hiddenFutureCount = periods.filter(
+    (p) => p.periodStart && new Date(p.periodStart) > now
+  ).length - nearest2Future.length;
+  const cappedPeriods = [...nearest2Future, ...nonFuturePeriods];
+
   const visiblePeriods = useMemo(() => {
-    if (!memberToken || showAllPeriods) return periods;
-    return periods.slice(0, MEMBER_PERIOD_PREVIEW_COUNT);
-  }, [memberToken, periods, showAllPeriods]);
+    if (!memberToken) return cappedPeriods;
+    if (showAllPeriods) return periods;
+    return cappedPeriods.slice(0, MEMBER_PERIOD_PREVIEW_COUNT);
+  }, [memberToken, cappedPeriods, periods, showAllPeriods]);
   const hasHiddenPeriods =
     !!memberToken && periods.length > MEMBER_PERIOD_PREVIEW_COUNT && !showAllPeriods;
+  const currentPeriod = cappedPeriods[0];
 
-  // compute financial summary for the current member
+  // financial summary based only on current + past periods (not future)
   const myPayments = currentMemberId
-    ? periods.flatMap((p) =>
+    ? nonFuturePeriods.flatMap((p) =>
         p.payments.filter((pay) => pay.memberId === currentMemberId),
       )
     : [];
-  const totalPaid = myPayments
-    .filter((p) => p.status === "confirmed")
-    .reduce((s, p) => s + p.amount, 0);
   const totalPending = myPayments
     .filter((p) => p.status === "pending" || p.status === "member_confirmed")
     .reduce((s, p) => s + p.amount, 0);
@@ -132,19 +146,7 @@ export function MemberGroupView({
       </div>
 
       {/* financial summary */}
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total paid</CardDescription>
-            <CardTitle className="font-mono text-3xl tabular-nums">
-              {totalPaid.toFixed(2)} {group.billing.currency}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle className="size-4 text-green-600" />
-            Confirmed by admin
-          </CardContent>
-        </Card>
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Pending</CardDescription>
@@ -203,9 +205,7 @@ export function MemberGroupView({
                 <CardDescription>
                   Your amount and status per period.
                   {!memberToken && " Open the full list to see all."}
-                  {memberToken &&
-                    periods.length > MEMBER_PERIOD_PREVIEW_COUNT &&
-                    " Showing the latest periods first."}
+                  {hiddenFutureCount > 0 && ` ${hiddenFutureCount} more future period${hiddenFutureCount !== 1 ? "s" : ""} available.`}
                 </CardDescription>
               </div>
               {!memberToken && (
@@ -219,43 +219,54 @@ export function MemberGroupView({
               )}
             </CardHeader>
             <CardContent>
-              <PaymentMatrix
-                groupId={group._id}
-                currency={group.billing.currency}
-                periods={visiblePeriods}
-                members={membersForMatrix}
-                isAdmin={false}
-                currentMemberId={currentMemberId}
-                memberToken={memberToken}
-              />
-              {memberToken && periods.length > MEMBER_PERIOD_PREVIEW_COUNT && (
-                <div className="mt-4 flex justify-end">
-                  {hasHiddenPeriods ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setShowAllPeriods(true);
-                        requestAnimationFrame(() => {
-                          paymentBoardRef.current?.scrollIntoView({
-                            behavior: "smooth",
-                            block: "start",
-                          });
-                        });
-                      }}
-                    >
-                      Load all periods
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowAllPeriods(false)}
-                    >
-                      Show less
-                    </Button>
+              {memberToken ? (
+                <>
+                  <MemberPaymentList
+                    groupId={group._id}
+                    currency={group.billing.currency}
+                    periods={visiblePeriods}
+                    currentMemberId={currentMemberId}
+                    memberToken={memberToken}
+                  />
+                  {periods.length > MEMBER_PERIOD_PREVIEW_COUNT && (
+                    <div className="mt-4 flex justify-end">
+                      {hasHiddenPeriods ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setShowAllPeriods(true);
+                            requestAnimationFrame(() => {
+                              paymentBoardRef.current?.scrollIntoView({
+                                behavior: "smooth",
+                                block: "start",
+                              });
+                            });
+                          }}
+                        >
+                          Load all periods
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowAllPeriods(false)}
+                        >
+                          Show less
+                        </Button>
+                      )}
+                    </div>
                   )}
-                </div>
+                </>
+              ) : (
+                <PaymentMatrix
+                  groupId={group._id}
+                  currency={group.billing.currency}
+                  periods={visiblePeriods}
+                  members={membersForMatrix}
+                  isAdmin={false}
+                  currentMemberId={currentMemberId}
+                />
               )}
             </CardContent>
           </Card>

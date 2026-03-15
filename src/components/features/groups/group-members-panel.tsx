@@ -569,10 +569,14 @@ export function GroupMembersPanel({
               </TableRow>
             ) : (
               members.map((member) => {
-                const memberPayments = periods.flatMap((p) => {
-                  const pay = p.payments.find((x) => x.memberId === member._id);
-                  return pay ? [{ period: p, payment: pay }] : [];
-                });
+                // only include periods that have started (not future)
+                const now = new Date();
+                const memberPayments = periods
+                  .filter((p) => !p.periodStart || new Date(p.periodStart) <= now)
+                  .flatMap((p) => {
+                    const pay = p.payments.find((x) => x.memberId === member._id);
+                    return pay ? [{ period: p, payment: pay }] : [];
+                  });
                 const paidCount = memberPayments.filter(
                   (x) =>
                     x.payment.status === "confirmed" ||

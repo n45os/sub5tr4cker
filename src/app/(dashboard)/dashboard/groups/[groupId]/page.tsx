@@ -166,19 +166,18 @@ export default async function GroupDetailPage({
     getBillingPeriods(groupId, cookieHeader, 12),
     getNotifications(groupId, cookieHeader, isAdmin),
   ]);
-  // split into future vs current+past, cap future to 2 on the preview
-  const MAX_FUTURE_PREVIEW = 2;
+  // newest first, but only keep the 2 nearest future periods
   const now = new Date();
-  const futurePeriods = periodsRaw.filter(
-    (p) => p.periodStart && new Date(p.periodStart) > now
-  );
+  const nearest2Future = periodsRaw
+    .filter((p) => p.periodStart && new Date(p.periodStart) > now)
+    .slice(-2);
   const nonFuturePeriods = periodsRaw.filter(
     (p) => !p.periodStart || new Date(p.periodStart) <= now
   );
-  const futurePreview = futurePeriods.slice(0, MAX_FUTURE_PREVIEW);
-  const hiddenFutureCount = futurePeriods.length - futurePreview.length;
-  const pastSlots = Math.max(0, 6 - futurePreview.length);
-  const periods = [...futurePreview, ...nonFuturePeriods.slice(0, pastSlots)];
+  const hiddenFutureCount = periodsRaw.filter(
+    (p) => p.periodStart && new Date(p.periodStart) > now
+  ).length - nearest2Future.length;
+  const periods = [...nearest2Future, ...nonFuturePeriods].slice(0, 6);
   const currentPeriod = periods[0];
   const acceptedCount = isAdmin
     ? members.filter((m) => !!m.acceptedAt).length

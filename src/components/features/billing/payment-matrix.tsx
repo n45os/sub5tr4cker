@@ -128,6 +128,8 @@ function CellIcon({ status }: { status: string }) {
       );
     case "waived":
       return <Minus className="size-4 shrink-0 text-muted-foreground" />;
+    case "pending":
+      return <span className="size-3 rounded-full border-2 border-current opacity-40" />;
     default:
       return null;
   }
@@ -624,9 +626,6 @@ export function PaymentMatrix({
                       <Check className="size-4 text-primary" strokeWidth={2.5} />
                     ) : (
                       <CellIcon status={payment.status} />
-                    )}
-                    {!loading && !isSelected && !payment.status && (
-                      <span className="text-xs">○</span>
                     )}
                   </button>
                 );

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
+import { generateUniqueInviteCode } from "@/lib/invite-code";
 import { Group, BillingPeriod } from "@/models";
 import { getNextPeriodStart } from "@/lib/billing/calculator";
 import type { IGroup, IGroupMember } from "@/models";
@@ -145,6 +146,12 @@ export async function POST(request: NextRequest) {
     leftAt: null,
   }));
 
+  // assign a unique invite code on create to avoid duplicate null in unique index
+  const inviteCode = await generateUniqueInviteCode(async (c) => {
+    const existing = await Group.findOne({ inviteCode: c }).lean();
+    return !!existing;
+  });
+
   const group = await Group.create({
     name: body.name,
     admin: session.user.id,
@@ -177,6 +184,8 @@ export async function POST(request: NextRequest) {
     },
     members,
     isActive: true,
+    inviteCode,
+    inviteLinkEnabled: false,
   });
 
   const actorName =

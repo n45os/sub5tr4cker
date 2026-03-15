@@ -23,6 +23,14 @@ Usually skip changelog and version bumps for:
 - refactors with no behavior change
 - tiny internal cleanup that would not matter in release notes
 
+## Semver for `0.y.z`
+
+This project is pre-1.0. The three digits mean:
+
+- `z` (patch): bug fix, safe polish, no new capability — e.g. `0.24.0` → `0.24.1`
+- `y` (minor): new feature, endpoint, job, or workflow (non-breaking) — e.g. `0.24.*` → `0.25.0`
+- major (`1.0.0`+): breaking API/schema change, required migration, removed behavior
+
 ## Bump rules
 
 Choose exactly one:
@@ -60,6 +68,7 @@ Use these decision rules:
 5. Create or update `CHANGELOG.md`
 6. Add a dated section for the new version with concise bullets under the right headings
 7. Mention the bump reason in the final response
+8. Sync docs — apply the `release-docs-sync` skill (`.cursor/skills/release-docs-sync/SKILL.md`) so the CHANGELOG deltas are reflected in `docs/`, `content/docs/`, and `_context/`
 
 ## Changelog format
 

@@ -21,11 +21,21 @@ After every substantial change, decide whether the work needs a changelog entry 
 - the change is refactoring or tests only with no behavior change
 - the change is a tiny internal adjustment that would not matter in release notes
 
+## Semver for `0.y.z`
+
+This project is pre-1.0. The three digits mean:
+
+- `z` (patch): bug fix, safe polish, no new capability — e.g. `0.24.0` → `0.24.1`
+- `y` (minor): new feature, endpoint, job, or workflow (non-breaking) — e.g. `0.24.*` → `0.25.0`
+- major (`1.0.0`+): breaking API/schema change, required migration, removed behavior
+
 ## Version bump rules
 
 - major: breaking change, incompatible API/schema change, required manual migration, or removed behavior
 - minor: new non-breaking capability, workflow, endpoint, integration, or automation
 - patch: bug fix, safe dependency update, non-breaking polish, or internal improvement with user impact
+
+Quick decision: new endpoint or feature → minor; fix-only with no new capability → patch; breaking or removal → major.
 
 ## When a bump is needed
 
@@ -33,5 +43,6 @@ After every substantial change, decide whether the work needs a changelog entry 
 2. Update matching root version fields in lockfiles
 3. Add or update `CHANGELOG.md` with a dated version section
 4. Explain the bump decision briefly in the final response
+5. After the bump, apply the `release-docs-sync` skill (`.cursor/skills/release-docs-sync/SKILL.md`) so CHANGELOG deltas are reflected in `docs/`, `content/docs/`, and `_context/`
 
 If no bump is needed, say that explicitly in the final response.

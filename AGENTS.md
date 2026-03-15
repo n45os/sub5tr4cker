@@ -107,6 +107,10 @@ See `docs/data-models.md`. Quick summary:
 1. For **reconciliation** (e.g. billing periods): create job in `src/jobs/<job-name>.ts`, register in `src/jobs/runner.ts`, optionally add `src/app/api/cron/<job-name>/route.ts`.
 2. For **notification delivery**: add a task type in `src/models/scheduled-task.ts`, implement producer (enqueue in `src/jobs/enqueue-*.ts` or similar), add handler in `src/lib/tasks/worker.ts`, and enqueue from cron or from API (e.g. confirm flow).
 
+### After shipping a version
+
+After a version bump in `package.json` and a new section in `CHANGELOG.md`, sync documentation using `.cursor/skills/release-docs-sync/SKILL.md`. This ensures `docs/`, `content/docs/`, and `_context/` stay aligned with the changelog.
+
 ## References
 
 - Architecture plan: `docs/PLAN.md`

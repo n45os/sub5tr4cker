@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.24.1] - 2026-03-19
+
+### Added
+
+- **Release docs sync skill** — New `.cursor/skills/release-docs-sync/SKILL.md` that runs after any version bump to systematically update `docs/`, `content/docs/`, and `_context/` from the latest CHANGELOG section.
+
+### Changed
+
+- **Explicit semver rules** — Release management rule and changelog skill now document the `0.y.z` scheme (patch = `z`, minor = `y`, major = `1.0.0`+) with a quick-decision guide and examples.
+- **Post-bump doc sync step** — Version bump checklist in both the always-applied rule and the changelog skill now includes a final step to run the docs sync.
+- **CHANGELOG backfill** — Retroactive entries added for undocumented work across 0.15.0, 0.19.0, 0.23.0–0.23.3 (invite resend, billing backfill API, member notifications, bot singleton fix, portal Telegram, and more).
+
 ## [0.24.0] - 2026-03-19
 
 ### Added
@@ -15,17 +27,27 @@ All notable changes to this project will be documented in this file.
 - **Delivery log: no more bogus Telegram "failed" for members without Telegram** — When a member has no Telegram linked or has Telegram notifications off, the channel is now treated as skipped instead of attempted; the notification service no longer logs a "failed" Telegram row for those cases. The recent delivery log only shows real send attempts per channel.
 - **Member list: email/Telegram connection status** — Admin group payload now includes per-member `emailConnected`, `telegramConnected`, and `unsubscribedFromEmail` (from the same eligibility rules used for reminders). The member table shows "Email connected" / "Email unsubscribed" and "Telegram connected" / "Telegram not linked" under each member's status so admins can see which channels are reachable.
 
+### Changed
+
+- **Member portal Telegram** — Connect-Telegram card and `member-telegram-link` UX polished on the token-based portal page.
+
 ## [0.23.2] - 2026-03-19
 
 ### Fixed
 
 - **Login: session persists across tabs; autofill improved** — Session and session-token cookie now use an explicit 30-day `maxAge` so the cookie is persistent and shared across browser tabs. Login form email field uses `autocomplete="username"` for better password manager recognition and a stable form `id` for tools.
+- **Telegram bot startup** — Avoids initializing multiple concurrent grammy bot instances when modules reload or under overlapping requests.
+- **Billing period creation** — Clearer due-date handling and error paths when creating periods.
+- **MongoDB updates** — Profile, settings, and notification task queue use `returnDocument: "after"` instead of deprecated `new` on `findOneAndUpdate`-style calls.
+- **PaymentMatrix** — More reliable dropdown/menu behavior for payment actions opened from the matrix.
+- **Member payment history** — `MemberPaymentList` component for per-member period rows with updated styling.
 
 ## [0.23.1] - 2026-03-19
 
 ### Fixed
 
 - **Backfilled period share recalculation** — When a member is added into existing billing periods, equal-split and variable periods now recalculate unadjusted payment amounts for all included members instead of only appending the new member. This keeps backfilled periods aligned with the updated group split.
+- **Member removal and splits** — Soft-removing a member recalculates billing period shares for remaining members where needed (pairs with retroactive add backfill).
 
 ## [0.23.0] - 2026-03-19
 
@@ -40,6 +62,9 @@ All notable changes to this project will be documented in this file.
 - **Member portal Telegram linking** — Token-based member portal now includes a "Connect Telegram" card. New `POST /api/member/[token]/telegram-link` endpoint.
 - **Price adjustment notification templates** — New `price_adjustment` and `member_message` notification types with email and Telegram templates.
 - **PriceHistory tracking** — Group price changes now create `PriceHistory` records (model was defined but unused; now wired up).
+- **Generate past billing periods** — From the Payment Matrix, admins can create 1–12 historical monthly periods in one step. New `POST /api/groups/[groupId]/billing/backfill`.
+- **Invite code on group create** — New groups receive a unique `inviteCode` as soon as they are created; the public invite link stays disabled until the admin turns it on.
+- **Member add/remove notifications** — Optional notify step after adding or removing a member: email/Telegram summary of share changes and credits across affected periods. New `POST /api/groups/[groupId]/notify-member-added`.
 
 ### Changed
 
@@ -98,8 +123,12 @@ All notable changes to this project will be documented in this file.
 - **Webhook diagnostics endpoint** — Added `GET /api/telegram/webhook-info` (auth-protected) to fetch Telegram `getWebhookInfo` details, including pending update count and Telegram's last delivery error data.
 - **Webhook status in settings UI** — Notifications settings now include a **Check webhook status** action and a webhook status panel (URL, pending updates, last error message/date) so admins can verify bot delivery health directly in the dashboard.
 - **Telegram welcome magic-link email** — Added `buildTelegramWelcomeEmailHtml` so members who join via Telegram invite link receive a styled onboarding email with a secure magic sign-in link to the group dashboard.
+- **SVG app icon** — Application branding icon in the dashboard shell.
 
 ### Changed
+- **NextAuth behind reverse proxies** — `trustHost` is enabled so OAuth and magic-link callbacks work when the app sits behind a TLS-terminating reverse proxy.
+- **Portainer / GHCR stack** — Compose no longer embeds a local `build` for the cron service; cron is built and pushed as its own image for registry-based deploys.
+- **GitHub Actions deploy** — Workflow `if` conditions avoid `secrets.*` in job-level expressions so conditional deploy steps evaluate reliably.
 - **Telegram invite deep-link onboarding** — `handleInviteLink` now auto-creates or links the member user, binds Telegram chat details, sets member acceptance, and sends a one-time welcome email with a magic login callback link.
 - **Webhook handler resilience** — `POST /api/telegram/webhook` now validates malformed JSON payloads and adds explicit error handling around settings reads for clearer operational failures.
 - **Invite acceptance resilience** — `GET /api/invite/accept/[token]` is now wrapped in guarded error handling to return a user-facing HTML failure page instead of an uncaught 500.
@@ -146,6 +175,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - **Member-specific Telegram invite link** — Invite emails (and Telegram invite messages) now include a clickable deep link (`t.me/Bot?start=invite_<token>`) that identifies the invited member. When the recipient opens the link and starts the bot, the bot links their Telegram to the correct account if they are already registered, or instructs them to register with the invited email and link from Settings.
+- **Members list: account status and invite resend** — Group payloads include `hasAccount` per member; admins can resend invites from the members panel (works alongside per-member send-invite from 0.13.0).
 
 ## [0.14.0] - 2026-03-18
 

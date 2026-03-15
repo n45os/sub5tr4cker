@@ -4,7 +4,7 @@ import { MemberGroupView } from "@/components/features/groups/member-group-view"
 import { MemberTelegramLink } from "@/components/features/groups/member-telegram-link";
 import { verifyMemberPortalToken } from "@/lib/tokens";
 import { dbConnect } from "@/lib/db/mongoose";
-import { Group, BillingPeriod } from "@/models";
+import { Group, BillingPeriod, User } from "@/models";
 import type { IGroupMember, IMemberPayment, IBillingPeriod } from "@/models";
 
 function TokenError({ message }: { message: string }) {
@@ -91,6 +91,19 @@ export default async function MemberPortalPage({
 
   const confirmed = query.confirmed === "true";
   const joined = query.joined === "true";
+
+  // load user's telegram link state when member has an account (for "Connect Telegram" card)
+  let telegramLinked = false;
+  let telegramUsername: string | null = null;
+  let telegramLinkedAt: string | null = null;
+  if (member.user) {
+    const user = await User.findById(member.user).select("telegram").lean();
+    telegramLinked = Boolean(user?.telegram?.chatId);
+    telegramUsername = user?.telegram?.username ?? null;
+    telegramLinkedAt =
+      user?.telegram?.linkedAt != null ? String(user.telegram.linkedAt) : null;
+  }
+
   const memberViewGroup = {
     _id: group._id.toString(),
     name: group.name,
@@ -163,7 +176,12 @@ export default async function MemberPortalPage({
 
         {member.user && (
           <div className="mt-6">
-            <MemberTelegramLink portalToken={token} />
+            <MemberTelegramLink
+              portalToken={token}
+              telegramLinked={telegramLinked}
+              telegramUsername={telegramUsername}
+              telegramLinkedAt={telegramLinkedAt}
+            />
           </div>
         )}
       </main>

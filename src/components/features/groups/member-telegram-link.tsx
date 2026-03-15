@@ -13,15 +13,29 @@ import {
 
 interface MemberTelegramLinkProps {
   portalToken: string;
+  telegramLinked?: boolean;
+  telegramUsername?: string | null;
+  telegramLinkedAt?: string | null;
 }
 
-export function MemberTelegramLink({ portalToken }: MemberTelegramLinkProps) {
+export function MemberTelegramLink({
+  portalToken,
+  telegramLinked = false,
+  telegramUsername = null,
+  telegramLinkedAt = null,
+}: MemberTelegramLinkProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingLink, setPendingLink] = useState<{
     deepLink: string;
     botUsername: string;
   } | null>(null);
+
+  const linkedDate =
+    telegramLinkedAt &&
+    new Date(telegramLinkedAt).toLocaleDateString(undefined, {
+      dateStyle: "medium",
+    });
 
   async function handleConnect() {
     setError(null);
@@ -46,6 +60,32 @@ export function MemberTelegramLink({ portalToken }: MemberTelegramLinkProps) {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (telegramLinked) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Telegram</CardTitle>
+          <CardDescription>
+            Payment reminders and confirmations can be sent to your linked Telegram.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-1 text-sm">
+            <p className="font-medium">
+              {telegramUsername ? `Connected as @${telegramUsername}` : "Telegram connected"}
+            </p>
+            {linkedDate ? (
+              <p className="text-muted-foreground">Linked on {linkedDate}</p>
+            ) : null}
+          </div>
+          <p className="mt-3 text-sm text-muted-foreground">
+            To disconnect, use your Profile when signed in.
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (

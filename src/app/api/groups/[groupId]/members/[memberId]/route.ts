@@ -105,7 +105,8 @@ export async function PATCH(
     (!previousBillingStart || newBillingStart < previousBillingStart) &&
     newBillingStart < new Date()
   ) {
-    backfilledPeriods = await backfillMemberIntoPeriods(group, member);
+    const result = await backfillMemberIntoPeriods(group, member);
+    backfilledPeriods = result.backfilledCount;
   }
 
   const actorName =

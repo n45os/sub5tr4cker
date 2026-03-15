@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import {
   AlertTriangle,
   Check,
+  ChevronDown,
   Info,
   Loader2,
   Minus,
@@ -462,6 +463,30 @@ export function PaymentMatrix({
     }
   }, [groupId, advanceMonths]);
 
+  // backfill (previous) periods state
+  const [backfillOpen, setBackfillOpen] = useState(false);
+  const [backfillMonths, setBackfillMonths] = useState("3");
+  const [backfillLoading, setBackfillLoading] = useState(false);
+
+  const generateBackfillPeriods = useCallback(async () => {
+    const months = parseInt(backfillMonths, 10);
+    if (!months || months < 1 || months > 12) return;
+    setBackfillLoading(true);
+    try {
+      const res = await fetch(`/api/groups/${groupId}/billing/backfill`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ monthsBack: months }),
+      });
+      if (res.ok) {
+        setBackfillOpen(false);
+        window.location.reload();
+      }
+    } finally {
+      setBackfillLoading(false);
+    }
+  }, [groupId, backfillMonths]);
+
   if (periods.length === 0) return null;
 
   const columnOrder = members.length
@@ -876,13 +901,26 @@ export function PaymentMatrix({
         </DialogContent>
       </Dialog>
 
-      {/* advance periods */}
+      {/* create periods: dropdown + advance + backfill dialogs */}
       {isAdmin && (
         <>
           <div className="flex justify-end border-t px-4 py-3">
-            <Button variant="outline" size="sm" onClick={() => setAdvanceOpen(true)}>
-              Generate upcoming periods
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Create periods
+                  <ChevronDown className="ml-2 size-4 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setAdvanceOpen(true)}>
+                  Upcoming periods…
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setBackfillOpen(true)}>
+                  Previous periods…
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           <Dialog open={advanceOpen} onOpenChange={setAdvanceOpen}>
             <DialogContent className="sm:max-w-sm">
@@ -913,6 +951,39 @@ export function PaymentMatrix({
                 <Button onClick={generateAdvancePeriods} disabled={advanceLoading}>
                   {advanceLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
                   Generate
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={backfillOpen} onOpenChange={setBackfillOpen}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Create past periods</DialogTitle>
+                <DialogDescription>
+                  Create billing periods for past months so you can record or import
+                  history. Periods are added backward from your earliest existing period.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="backfillMonths">How many months back? (1–12)</Label>
+                  <Input
+                    id="backfillMonths"
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={backfillMonths}
+                    onChange={(e) => setBackfillMonths(e.target.value)}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setBackfillOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={generateBackfillPeriods} disabled={backfillLoading}>
+                  {backfillLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
+                  Create
                 </Button>
               </DialogFooter>
             </DialogContent>

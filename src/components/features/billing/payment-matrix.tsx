@@ -668,7 +668,7 @@ export function PaymentMatrix({
                     </DropdownMenu>
                   ) : (
                     <Tooltip>
-                      <TooltipTrigger>{cellButton}</TooltipTrigger>
+                      <TooltipTrigger asChild>{cellButton}</TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
                         {tooltipContent}
                       </TooltipContent>

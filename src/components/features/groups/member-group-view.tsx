@@ -180,28 +180,35 @@ export function MemberGroupView({
           </CardHeader>
         </Card>
       ) : (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle>Your payment status</CardTitle>
-            <Link
-              href={`/dashboard/groups/${group._id}/billing`}
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              <ExternalLink className="mr-2 size-4" />
-              View all periods
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <PaymentMatrix
-              groupId={group._id}
-              currency={group.billing.currency}
-              periods={periods}
-              members={membersForMatrix}
-              isAdmin={false}
-              currentMemberId={currentMemberId}
-            />
-          </CardContent>
-        </Card>
+        <div className="w-fit max-w-full">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div>
+                <CardTitle>Your payment status</CardTitle>
+                <CardDescription>
+                  Your amount and status per period. Open the full list to see all.
+                </CardDescription>
+              </div>
+              <Link
+                href={`/dashboard/groups/${group._id}/billing`}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                <ExternalLink className="mr-2 size-4" />
+                View all periods
+              </Link>
+            </CardHeader>
+            <CardContent>
+              <PaymentMatrix
+                groupId={group._id}
+                currency={group.billing.currency}
+                periods={periods}
+                members={membersForMatrix}
+                isAdmin={false}
+                currentMemberId={currentMemberId}
+              />
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       <section className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">

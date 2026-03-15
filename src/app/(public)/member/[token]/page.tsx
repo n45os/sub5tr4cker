@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MemberGroupView } from "@/components/features/groups/member-group-view";
+import { MemberTelegramLink } from "@/components/features/groups/member-telegram-link";
 import { verifyMemberPortalToken } from "@/lib/tokens";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group, BillingPeriod } from "@/models";
@@ -137,7 +138,14 @@ export default async function MemberPortalPage({
           }}
           periods={memberPeriods}
           currentMemberId={member._id.toString()}
+          memberToken={token}
         />
+
+        {member.user && (
+          <div className="mt-6">
+            <MemberTelegramLink portalToken={token} />
+          </div>
+        )}
       </main>
     </div>
   );

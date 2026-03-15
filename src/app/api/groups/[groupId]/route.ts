@@ -3,15 +3,17 @@ import { z } from "zod";
 import mongoose from "mongoose";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
+import { calculateShares } from "@/lib/billing/calculator";
 import { dbConnect } from "@/lib/db/mongoose";
-import { Group } from "@/models";
-import type { IGroupMember } from "@/models";
+import { Group, BillingPeriod, PriceHistory } from "@/models";
+import type { IGroupMember, IMemberPayment } from "@/models";
 import {
   filterGroupForMember,
   getGroupAccess,
   getMemberEntry,
 } from "@/lib/authorization";
 import { sendPriceChangeAnnouncements } from "@/lib/notifications/service";
+import { createConfirmationToken } from "@/lib/tokens";
 
 const updateGroupSchema = z
   .object({
@@ -212,6 +214,23 @@ export async function PATCH(
   const priceChanged =
     body.billing?.currentPrice !== undefined &&
     previousPrice !== group.billing.currentPrice;
+
+  // record price history
+  if (priceChanged) {
+    try {
+      await PriceHistory.create({
+        group: groupId,
+        price: group.billing.currentPrice,
+        previousPrice,
+        currency: group.billing.currency,
+        effectiveFrom: new Date(),
+        createdBy: session.user.id,
+      });
+    } catch (error) {
+      console.error("failed to record price history:", error);
+    }
+  }
+
   if (
     priceChanged &&
     (group.notifications?.priceChangeEnabled ??
@@ -226,6 +245,61 @@ export async function PATCH(
       });
     } catch (error) {
       console.error("price-change announcements failed:", error);
+    }
+  }
+
+  // adjust future pre-paid periods when price increases
+  if (priceChanged) {
+    try {
+      const futurePeriods = await BillingPeriod.find({
+        group: groupId,
+        periodStart: { $gt: new Date() },
+      });
+
+      for (const period of futurePeriods) {
+        const newShares = calculateShares(group, group.billing.currentPrice, period.periodStart);
+
+        for (const payment of period.payments) {
+          const typedPayment = payment as IMemberPayment;
+          const newShare = newShares.find(
+            (s) => s.memberId === typedPayment.memberId.toString(),
+          );
+          if (!newShare) continue;
+
+          const currentEffective = typedPayment.adjustedAmount ?? typedPayment.amount;
+          if (newShare.amount === currentEffective) continue;
+
+          if (typedPayment.status === "confirmed") {
+            // pre-paid: add a supplementary payment entry for the diff
+            const diff = newShare.amount - currentEffective;
+            if (diff > 0) {
+              const token = await createConfirmationToken(
+                typedPayment.memberId.toString(),
+                period._id.toString(),
+                groupId,
+              );
+              period.payments.push({
+                memberId: typedPayment.memberId,
+                memberEmail: typedPayment.memberEmail,
+                memberNickname: typedPayment.memberNickname,
+                amount: diff,
+                adjustmentReason: `price updated from ${previousPrice} to ${group.billing.currentPrice} ${group.billing.currency}`,
+                status: "pending",
+                confirmationToken: token,
+              } as never);
+              period.isFullyPaid = false;
+            }
+          } else {
+            // not yet paid: update the amount directly
+            typedPayment.adjustedAmount = newShare.amount;
+            typedPayment.adjustmentReason = `price updated from ${previousPrice} to ${group.billing.currentPrice} ${group.billing.currency}`;
+          }
+        }
+
+        await period.save();
+      }
+    } catch (error) {
+      console.error("future period price adjustment failed:", error);
     }
   }
 

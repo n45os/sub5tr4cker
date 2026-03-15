@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { CalendarDays, CreditCard, Pencil, Users } from "lucide-react";
+import { AlertTriangle, CalendarDays, CreditCard, Pencil, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import {
@@ -11,12 +11,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ImportHistoryDialog } from "@/components/features/billing/import-history-dialog";
 import { PaymentMatrix } from "@/components/features/billing/payment-matrix";
 import { GroupMembersPanel } from "@/components/features/groups/group-members-panel";
 import { InitializeNotifyButton } from "@/components/features/groups/initialize-notify-button";
 import { InviteLinkCard } from "@/components/features/groups/invite-link-card";
 import { MemberGroupView } from "@/components/features/groups/member-group-view";
-import { GroupNotificationsPanel } from "@/components/features/notifications/group-notifications-panel";
+import { CollapsibleNotificationsPanel } from "@/components/features/notifications/collapsible-notifications-panel";
 import { auth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { getServerBaseUrl } from "@/lib/server-url";
@@ -172,6 +173,13 @@ export default async function GroupDetailPage({
     (session?.user?.email && members.find((m) => m.email === session.user.email)?._id) ??
     null;
 
+  // total outstanding across all open periods
+  const totalOutstanding = periods.reduce((sum, period) => {
+    return sum + period.payments
+      .filter((p: { status: string }) => p.status === "pending" || p.status === "overdue")
+      .reduce((pSum: number, p: { amount: number }) => pSum + p.amount, 0);
+  }, 0);
+
   // member view: show limited info within the dashboard shell
   if (!isAdmin) {
     return (
@@ -219,6 +227,11 @@ export default async function GroupDetailPage({
             memberCount={memberCount}
             initializedAt={group.initializedAt}
           />
+          <ImportHistoryDialog
+            groupId={groupId}
+            memberEmails={members.map((m) => m.email)}
+            currency={group.billing.currency}
+          />
           <Link
             href={`/dashboard/groups/${groupId}/edit`}
             className={cn(buttonVariants({ variant: "outline" }))}
@@ -229,7 +242,7 @@ export default async function GroupDetailPage({
         </div>
       </div>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Current price</CardDescription>
@@ -266,18 +279,60 @@ export default async function GroupDetailPage({
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Open billing periods</CardDescription>
+            <CardDescription>Open periods</CardDescription>
             <CardTitle className="font-mono text-3xl tabular-nums">
               {periods.filter((period) => !period.isFullyPaid).length}
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
             {currentPeriod
-              ? `Latest period: ${currentPeriod.periodLabel}`
+              ? `Latest: ${currentPeriod.periodLabel}`
               : "No billing periods yet"}
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Total outstanding</CardDescription>
+            <CardTitle className="font-mono text-3xl tabular-nums">
+              {totalOutstanding.toFixed(2)} {group.billing.currency}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
+            <AlertTriangle className="size-4" />
+            Pending + overdue
+          </CardContent>
+        </Card>
       </section>
+
+      {/* payment board — the primary view */}
+      {!currentPeriod ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>No billing periods yet</CardTitle>
+            <CardDescription>
+              Periods are created automatically on the configured cycle day, or
+              manually for variable billing.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      ) : (
+        <PaymentMatrix
+          groupId={groupId}
+          currency={group.billing.currency}
+          periods={periods}
+          members={members.map((m) => ({ _id: m._id, nickname: m.nickname, email: m.email }))}
+          isAdmin
+          currentMemberId={currentMemberId}
+        />
+      )}
+
+      <GroupMembersPanel
+        groupId={groupId}
+        members={members}
+        currency={group.billing.currency}
+        isAdmin
+        periods={periods}
+      />
 
       {/* billing & workflow */}
       <section className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
@@ -343,36 +398,7 @@ export default async function GroupDetailPage({
         <InviteLinkCard groupId={groupId} />
       </section>
 
-      <GroupMembersPanel
-        groupId={groupId}
-        members={members}
-        currency={group.billing.currency}
-        isAdmin
-        periods={periods}
-      />
-
-      {!currentPeriod ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No billing periods yet</CardTitle>
-            <CardDescription>
-              Periods are created automatically on the configured cycle day, or
-              manually for variable billing.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ) : (
-        <PaymentMatrix
-          groupId={groupId}
-          currency={group.billing.currency}
-          periods={periods}
-          members={members.map((m) => ({ _id: m._id, nickname: m.nickname, email: m.email }))}
-          isAdmin
-          currentMemberId={currentMemberId}
-        />
-      )}
-
-      <GroupNotificationsPanel
+      <CollapsibleNotificationsPanel
         groupId={groupId}
         isAdmin
         initialPreferences={group.notifications}

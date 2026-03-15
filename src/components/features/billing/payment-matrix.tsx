@@ -4,16 +4,31 @@ import { useState, useCallback } from "react";
 import {
   AlertTriangle,
   Check,
+  Info,
   Loader2,
   Minus,
+  Pencil,
   UserCheck,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
   TooltipContent,
@@ -25,6 +40,8 @@ export interface PaymentCell {
   memberId: string;
   memberNickname: string;
   amount: number;
+  adjustedAmount?: number | null;
+  adjustmentReason?: string | null;
   status: string;
   memberConfirmedAt: string | null;
   adminConfirmedAt: string | null;
@@ -34,6 +51,7 @@ export interface PeriodRow {
   _id: string;
   periodLabel: string;
   totalPrice: number;
+  priceNote?: string | null;
   payments: PaymentCell[];
   isFullyPaid: boolean;
 }
@@ -42,6 +60,10 @@ export interface MemberColumn {
   _id: string;
   nickname: string;
   email: string;
+}
+
+function effectiveAmount(payment: PaymentCell): number {
+  return payment.adjustedAmount ?? payment.amount;
 }
 
 interface PaymentMatrixProps {
@@ -207,6 +229,90 @@ export function PaymentMatrix({
     [groupId, currentMemberId, updateCell]
   );
 
+  // adjustment dialog state
+  const [adjustDialog, setAdjustDialog] = useState<{
+    periodId: string;
+    memberId: string;
+    memberNickname: string;
+    currentAmount: number;
+    adjustedAmount: string;
+    reason: string;
+  } | null>(null);
+  const [adjustSaving, setAdjustSaving] = useState(false);
+
+  const openAdjustDialog = useCallback(
+    (periodId: string, payment: PaymentCell) => {
+      setAdjustDialog({
+        periodId,
+        memberId: payment.memberId,
+        memberNickname: payment.memberNickname,
+        currentAmount: payment.amount,
+        adjustedAmount: payment.adjustedAmount ? String(payment.adjustedAmount) : "",
+        reason: payment.adjustmentReason || "",
+      });
+    },
+    [],
+  );
+
+  const saveAdjustment = useCallback(async () => {
+    if (!adjustDialog) return;
+    setAdjustSaving(true);
+    try {
+      const adjustedAmount = adjustDialog.adjustedAmount
+        ? parseFloat(adjustDialog.adjustedAmount)
+        : null;
+      const res = await fetch(
+        `/api/groups/${groupId}/billing/${adjustDialog.periodId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            payments: [
+              {
+                memberId: adjustDialog.memberId,
+                adjustedAmount,
+                adjustmentReason: adjustDialog.reason || null,
+              },
+            ],
+          }),
+        },
+      );
+      if (res.ok) {
+        updateCell(adjustDialog.periodId, adjustDialog.memberId, {
+          adjustedAmount,
+          adjustmentReason: adjustDialog.reason || null,
+        });
+        setAdjustDialog(null);
+      }
+    } finally {
+      setAdjustSaving(false);
+    }
+  }, [adjustDialog, groupId, updateCell]);
+
+  // advance periods state
+  const [advanceOpen, setAdvanceOpen] = useState(false);
+  const [advanceMonths, setAdvanceMonths] = useState("3");
+  const [advanceLoading, setAdvanceLoading] = useState(false);
+
+  const generateAdvancePeriods = useCallback(async () => {
+    const months = parseInt(advanceMonths, 10);
+    if (!months || months < 1 || months > 12) return;
+    setAdvanceLoading(true);
+    try {
+      const res = await fetch(`/api/groups/${groupId}/billing/advance`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ monthsAhead: months }),
+      });
+      if (res.ok) {
+        setAdvanceOpen(false);
+        window.location.reload();
+      }
+    } finally {
+      setAdvanceLoading(false);
+    }
+  }, [groupId, advanceMonths]);
+
   if (periods.length === 0) return null;
 
   const columnOrder = members.length
@@ -242,7 +348,7 @@ export function PaymentMatrix({
                       periods[0]?.payments ?? [],
                       mem._id
                     );
-                    return pay ? `${pay.amount} ${currency}` : "—";
+                    return pay ? `${effectiveAmount(pay)} ${currency}` : "—";
                   })()}
                 </div>
               </th>
@@ -256,7 +362,19 @@ export function PaymentMatrix({
               className="border-b last:border-b-0 hover:bg-muted/20"
             >
               <td className="sticky left-0 z-10 border-r bg-card px-4 py-2">
-                <div className="font-medium">{period.periodLabel}</div>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-medium">{period.periodLabel}</span>
+                  {period.priceNote && (
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="size-3.5 text-amber-500" />
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs text-xs">
+                        {period.priceNote}
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
                 <div className="font-mono text-xs tabular-nums text-muted-foreground">
                   {period.totalPrice} {currency}
                 </div>
@@ -329,8 +447,14 @@ export function PaymentMatrix({
                 const tooltipContent = (
                   <div className="space-y-1 text-left">
                     <p className="font-medium">
-                      {payment.memberNickname} · {payment.amount} {currency}
+                      {payment.memberNickname} · {effectiveAmount(payment)} {currency}
                     </p>
+                    {payment.adjustedAmount != null && (
+                      <p className="text-xs text-amber-600">
+                        Adjusted from {payment.amount} {currency}
+                        {payment.adjustmentReason && ` — ${payment.adjustmentReason}`}
+                      </p>
+                    )}
                     <p className="text-muted-foreground capitalize">
                       {payment.status.replace("_", " ")}
                     </p>
@@ -410,6 +534,13 @@ export function PaymentMatrix({
                           <Minus className="size-4" />
                           Waive
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => openAdjustDialog(period._id, payment)}
+                        >
+                          <Pencil className="size-4" />
+                          Adjust amount
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   ) : (
@@ -423,7 +554,12 @@ export function PaymentMatrix({
 
                 return (
                   <td key={mem._id} className="px-3 py-2">
-                    {interactiveCell}
+                    <div className="relative inline-flex">
+                      {interactiveCell}
+                      {payment.adjustedAmount != null && (
+                        <span className="absolute -right-1 -top-1 size-2.5 rounded-full bg-amber-500" title="Amount adjusted" />
+                      )}
+                    </div>
                   </td>
                 );
               })}
@@ -431,6 +567,105 @@ export function PaymentMatrix({
           ))}
         </tbody>
       </table>
+
+      {/* advance periods */}
+      {isAdmin && (
+        <>
+          <div className="flex justify-end border-t px-4 py-3">
+            <Button variant="outline" size="sm" onClick={() => setAdvanceOpen(true)}>
+              Generate upcoming periods
+            </Button>
+          </div>
+          <Dialog open={advanceOpen} onOpenChange={setAdvanceOpen}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Generate future periods</DialogTitle>
+                <DialogDescription>
+                  Create billing periods ahead of time so members can pay in advance.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="advanceMonths">Months ahead (1–12)</Label>
+                  <Input
+                    id="advanceMonths"
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={advanceMonths}
+                    onChange={(e) => setAdvanceMonths(e.target.value)}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setAdvanceOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={generateAdvancePeriods} disabled={advanceLoading}>
+                  {advanceLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
+                  Generate
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
+
+      {/* adjustment dialog */}
+      <Dialog open={!!adjustDialog} onOpenChange={(open) => !open && setAdjustDialog(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Adjust payment amount</DialogTitle>
+            <DialogDescription>
+              Override the share for {adjustDialog?.memberNickname}. Original
+              amount: {adjustDialog?.currentAmount} {currency}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="adjustedAmount">Adjusted amount ({currency})</Label>
+              <Input
+                id="adjustedAmount"
+                type="number"
+                step="0.01"
+                placeholder={String(adjustDialog?.currentAmount ?? "")}
+                value={adjustDialog?.adjustedAmount ?? ""}
+                onChange={(e) =>
+                  setAdjustDialog((prev) =>
+                    prev ? { ...prev, adjustedAmount: e.target.value } : null,
+                  )
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave empty to reset to the original calculated amount.
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="adjustmentReason">Reason</Label>
+              <Textarea
+                id="adjustmentReason"
+                placeholder="e.g. price increase for this month"
+                rows={2}
+                value={adjustDialog?.reason ?? ""}
+                onChange={(e) =>
+                  setAdjustDialog((prev) =>
+                    prev ? { ...prev, reason: e.target.value } : null,
+                  )
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdjustDialog(null)}>
+              Cancel
+            </Button>
+            <Button onClick={saveAdjustment} disabled={adjustSaving}>
+              {adjustSaving && <Loader2 className="mr-2 size-4 animate-spin" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

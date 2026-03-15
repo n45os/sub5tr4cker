@@ -36,10 +36,16 @@ export async function sendPaymentReminder(
   amount: number,
   currency: string,
   paymentLink: string | null,
-  keyboard: InlineKeyboard
+  keyboard: InlineKeyboard,
+  adjustmentReason?: string | null,
+  priceNote?: string | null,
 ): Promise<number | null> {
   const payLine = paymentLink
     ? `\n\n<b>Pay via:</b> <a href="${paymentLink}">${paymentLink}</a>`
+    : "";
+
+  const noteLine = adjustmentReason || priceNote
+    ? `\n\n⚠️ <i>${adjustmentReason || priceNote}</i>`
     : "";
 
   const text =
@@ -47,6 +53,7 @@ export async function sendPaymentReminder(
     `Hi ${memberName},\n\n` +
     `<b>${groupName}</b> — ${periodLabel}\n` +
     `Your share: <b>${amount.toFixed(2)}${currency}</b>` +
+    noteLine +
     payLine +
     `\n\nPlease pay and confirm below.`;
 
@@ -87,6 +94,33 @@ export async function sendPriceChange(
     `Previous: <s>${oldPrice.toFixed(2)}${currency}</s>\n` +
     `New: <b>${newPrice.toFixed(2)}${currency}</b>\n\n` +
     `Your next billing cycle will use the new amount.`;
+
+  return sendTelegramMessage({ chatId, text });
+}
+
+// send price adjustment notification to a member via Telegram
+export async function sendPriceAdjustment(
+  chatId: number,
+  memberName: string,
+  groupName: string,
+  periodLabel: string,
+  originalAmount: number,
+  newAmount: number,
+  difference: number,
+  currency: string,
+  reason: string,
+  paymentLink: string | null,
+): Promise<number | null> {
+  const text =
+    `⚠️ <b>Price Adjustment</b>\n\n` +
+    `Hi ${memberName},\n\n` +
+    `<b>${groupName}</b> — ${periodLabel}\n` +
+    `Previous: <s>${originalAmount.toFixed(2)}${currency}</s>\n` +
+    `New: <b>${newAmount.toFixed(2)}${currency}</b>\n` +
+    `Difference: <b>${difference.toFixed(2)}${currency}</b>\n\n` +
+    `<i>${reason}</i>\n\n` +
+    (paymentLink ? `Pay: ${paymentLink}\n\n` : "") +
+    `Please pay the difference and confirm.`;
 
   return sendTelegramMessage({ chatId, text });
 }

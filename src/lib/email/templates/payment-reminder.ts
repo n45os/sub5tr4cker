@@ -12,6 +12,10 @@ export interface PaymentReminderTemplateParams {
   confirmUrl: string | null;
   ownerName: string;
   extraText: string | null;
+  /** admin note explaining a price adjustment for this payment */
+  adjustmentReason?: string | null;
+  /** blanket admin note for the whole period */
+  priceNote?: string | null;
   /** optional; when set, footer includes repo link and unsubscribe link */
   unsubscribeUrl?: string | null;
   /** optional; hex accent for header and primary buttons */
@@ -63,6 +67,11 @@ export function buildPaymentReminderEmailHtml(
           <p>Hi ${params.memberName},</p>
           <p>You owe for <strong>${params.groupName}</strong> — ${params.periodLabel}:</p>
           <div class="amount">${params.amount.toFixed(2)}${params.currency}</div>
+          ${(params.adjustmentReason || params.priceNote) ? `
+            <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin: 16px 0; font-size: 13px; color: #78350f;">
+              <strong>Note:</strong> ${params.adjustmentReason || params.priceNote}
+            </div>
+          ` : ""}
           ${params.paymentLink ? `
             <div class="cta">
               <a href="${params.paymentLink}" class="btn">Pay via ${params.paymentPlatform}</a>
@@ -88,13 +97,17 @@ export function buildPaymentReminderEmailHtml(
 export function buildPaymentReminderTelegramText(
   params: Pick<
     PaymentReminderTemplateParams,
-    "memberName" | "groupName" | "periodLabel" | "amount" | "currency" | "paymentLink"
+    "memberName" | "groupName" | "periodLabel" | "amount" | "currency" | "paymentLink" | "adjustmentReason" | "priceNote"
   >
 ): string {
+  const noteLine = params.adjustmentReason || params.priceNote
+    ? `\n⚠️ <i>${params.adjustmentReason || params.priceNote}</i>\n`
+    : "";
   return (
     `💳 <b>Payment Reminder</b>\n\n` +
     `${params.memberName}, you owe <b>${params.amount.toFixed(2)}${params.currency}</b>\n` +
-    `for <b>${params.groupName}</b> — ${params.periodLabel}\n\n` +
+    `for <b>${params.groupName}</b> — ${params.periodLabel}\n` +
+    noteLine + `\n` +
     (params.paymentLink ? `Pay: ${params.paymentLink}\n\n` : "") +
     `Tap below to confirm once paid.`
   );

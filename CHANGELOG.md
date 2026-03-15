@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.23.0] - 2026-03-19
+
+### Added
+
+- **Advance billing** — Admins can generate up to 12 future billing periods so members can pay ahead. New `POST /api/groups/[groupId]/billing/advance` endpoint and "Generate upcoming periods" button on PaymentMatrix.
+- **Retroactive period backfill** — When a member is added (or their billing start date is moved earlier), they are automatically added to all existing billing periods from that date forward with pending payment entries.
+- **Per-payment price adjustments** — Admins can override individual member amounts per period with a reason (e.g. "price increase"). New `adjustedAmount`, `adjustmentReason` fields on member payments and `priceNote` on billing periods. Reasons appear in reminder emails and Telegram messages.
+- **Price-change diff for pre-paid periods** — When the group price changes, future periods with confirmed (pre-paid) payments get a supplementary diff entry; unpaid future periods get their amounts adjusted. Members are notified about the difference.
+- **Billing history import** — Admins can bulk-import past billing periods with per-member payment records. New `POST /api/groups/[groupId]/billing/import` and Import History dialog on the group page.
+- **Member-to-admin messaging** — Members can send messages to the group admin from their dashboard or portal page. Admin receives notification via their preferred channel. New `POST /api/groups/[groupId]/messages` endpoint.
+- **Member portal Telegram linking** — Token-based member portal now includes a "Connect Telegram" card. New `POST /api/member/[token]/telegram-link` endpoint.
+- **Price adjustment notification templates** — New `price_adjustment` and `member_message` notification types with email and Telegram templates.
+- **PriceHistory tracking** — Group price changes now create `PriceHistory` records (model was defined but unused; now wired up).
+
+### Changed
+
+- **Sidebar navigation** — Removed Profile and Settings from the main nav; they are now in a dropdown menu triggered by clicking the user avatar in the sidebar footer.
+- **Group detail page layout** — PaymentMatrix promoted to the top (below stats). Delivery log collapsed by default behind an expand toggle. New "Total outstanding" stat card showing pending + overdue amounts.
+- **Member view** — Financial summary cards (total paid, pending, overdue, next due) shown at the top of the member group view instead of generic group stats.
+- **Billing GET API** — Responses now include `adjustedAmount`, `adjustmentReason`, and `priceNote` fields.
+- **Add member API** — Accepts optional `billingStartsAt` on POST and triggers retroactive backfill.
+
 ## [0.22.1] - 2026-03-19
 
 ### Added

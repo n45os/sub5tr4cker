@@ -1,4 +1,4 @@
-import { CalendarDays, CreditCard, Users } from "lucide-react";
+import { CalendarDays, CheckCircle, Clock, CreditCard, AlertTriangle, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { PaymentMatrix } from "@/components/features/billing/payment-matrix";
+import { ContactAdminForm } from "@/components/features/groups/contact-admin-form";
 
 export interface MemberGroupViewGroup {
   _id: string;
@@ -53,6 +54,8 @@ interface MemberGroupViewProps {
   group: MemberGroupViewGroup;
   periods: MemberGroupViewPeriod[];
   currentMemberId: string | null;
+  /** portal token for unauthenticated member actions */
+  memberToken?: string;
 }
 
 /** Member-safe group content: no members list, no notifications, no edit/invite. Reused by dashboard and standalone member page. */
@@ -60,12 +63,36 @@ export function MemberGroupView({
   group,
   periods,
   currentMemberId,
+  memberToken,
 }: MemberGroupViewProps) {
   const currentPeriod = periods[0];
   const myMembership = group.myMembership;
   const membersForMatrix = myMembership
     ? [{ _id: myMembership._id, nickname: myMembership.nickname, email: "" }]
     : [];
+
+  // compute financial summary for the current member
+  const myPayments = currentMemberId
+    ? periods.flatMap((p) =>
+        p.payments.filter((pay) => pay.memberId === currentMemberId),
+      )
+    : [];
+  const totalPaid = myPayments
+    .filter((p) => p.status === "confirmed")
+    .reduce((s, p) => s + p.amount, 0);
+  const totalPending = myPayments
+    .filter((p) => p.status === "pending" || p.status === "member_confirmed")
+    .reduce((s, p) => s + p.amount, 0);
+  const totalOverdue = myPayments
+    .filter((p) => p.status === "overdue")
+    .reduce((s, p) => s + p.amount, 0);
+  const nextDuePeriod = periods.find((p) =>
+    p.payments.some(
+      (pay) =>
+        pay.memberId === currentMemberId &&
+        (pay.status === "pending" || pay.status === "overdue"),
+    ),
+  );
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -87,57 +114,79 @@ export function MemberGroupView({
         </div>
       </div>
 
+      {/* financial summary */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Current price</CardDescription>
+            <CardDescription>Total paid</CardDescription>
             <CardTitle className="font-mono text-3xl tabular-nums">
-              {group.billing.currentPrice} {group.billing.currency}
+              {totalPaid.toFixed(2)} {group.billing.currency}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CreditCard className="size-4" />
-            {group.billing.mode.replace("_", " ")}
+            <CheckCircle className="size-4 text-green-600" />
+            Confirmed by admin
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Members</CardDescription>
+            <CardDescription>Pending</CardDescription>
             <CardTitle className="font-mono text-3xl tabular-nums">
-              {group.memberCount}
+              {totalPending.toFixed(2)} {group.billing.currency}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Users className="size-4" />
-            On this plan
+            <Clock className="size-4" />
+            Awaiting confirmation
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Cycle cadence</CardDescription>
-            <CardTitle className="font-mono text-3xl capitalize">
-              {group.billing.cycleType}
+            <CardDescription>Overdue</CardDescription>
+            <CardTitle className="font-mono text-3xl tabular-nums">
+              {totalOverdue.toFixed(2)} {group.billing.currency}
             </CardTitle>
           </CardHeader>
-          <CardContent className="font-mono flex items-center gap-2 text-sm tabular-nums text-muted-foreground">
+          <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
+            <AlertTriangle className="size-4 text-destructive" />
+            Past grace period
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Next due</CardDescription>
+            <CardTitle className="font-mono text-2xl tabular-nums">
+              {nextDuePeriod ? nextDuePeriod.periodLabel : "—"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
             <CalendarDays className="size-4" />
-            Day {group.billing.cycleDay} of each cycle
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Open billing periods</CardDescription>
-            <CardTitle className="font-mono text-3xl tabular-nums">
-              {periods.filter((p) => !p.isFullyPaid).length}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {currentPeriod
-              ? `Latest period: ${currentPeriod.periodLabel}`
-              : "No billing periods yet"}
+            {nextDuePeriod ? "Upcoming cycle" : "All clear"}
           </CardContent>
         </Card>
       </section>
+
+      {/* payment board first */}
+      {!currentPeriod ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Your payment status</CardTitle>
+            <CardDescription>
+              No billing periods have been created for this group yet. Your
+              status will appear here.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      ) : (
+        <PaymentMatrix
+          groupId={group._id}
+          currency={group.billing.currency}
+          periods={periods}
+          members={membersForMatrix}
+          isAdmin={false}
+          currentMemberId={currentMemberId}
+        />
+      )}
 
       <section className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
         <Card>
@@ -201,26 +250,7 @@ export function MemberGroupView({
         </Card>
       </section>
 
-      {!currentPeriod ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Your payment status</CardTitle>
-            <CardDescription>
-              No billing periods have been created for this group yet. Your
-              status will appear here.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ) : (
-        <PaymentMatrix
-          groupId={group._id}
-          currency={group.billing.currency}
-          periods={periods}
-          members={membersForMatrix}
-          isAdmin={false}
-          currentMemberId={currentMemberId}
-        />
-      )}
+      <ContactAdminForm groupId={group._id} memberToken={memberToken} />
     </div>
   );
 }

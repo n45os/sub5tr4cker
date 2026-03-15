@@ -71,6 +71,13 @@ function getHeaderMeta(pathname: string) {
     };
   }
 
+  if (pathname.startsWith("/dashboard/profile")) {
+    return {
+      title: "Profile",
+      description: "Manage your account, notification preferences, and Telegram link.",
+    };
+  }
+
   if (pathname.startsWith("/dashboard/settings")) {
     return {
       title: "Workspace settings",
@@ -105,6 +112,10 @@ function getBreadcrumbs(pathname: string) {
       label: "Notifications",
       href: "/dashboard/notifications",
     });
+  }
+
+  if (parts[1] === "profile") {
+    breadcrumbs.push({ label: "Profile", href: "/dashboard/profile" });
   }
 
   if (parts[1] === "settings") {

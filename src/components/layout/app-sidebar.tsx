@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react";
 import {
   Activity,
   Bell,
+  ChevronsUpDown,
   CreditCard,
   LayoutDashboard,
   LogOut,
@@ -16,7 +17,15 @@ import {
   Wallet,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -37,8 +46,6 @@ const NAV_ITEMS = [
   { title: "Activity", href: "/dashboard/activity", icon: Activity },
   { title: "Payments", href: "/dashboard/payments", icon: Wallet },
   { title: "Notifications", href: "/dashboard/notifications", icon: Bell },
-  { title: "Profile", href: "/dashboard/profile", icon: User },
-  { title: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -144,31 +151,52 @@ export function AppSidebar({ user, groups }: AppSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="rounded-xl border border-sidebar-border bg-sidebar-accent/35 p-3 text-sidebar-foreground">
-          <div className="flex items-center gap-3">
-            <Avatar className="size-9">
-              <AvatarImage src={user.image ?? undefined} alt={user.name ?? "User"} />
-              <AvatarFallback>{getInitials(user.name, user.email)}</AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-              <p className="truncate text-sm font-medium">
-                {user.name || "sub5tr4cker user"}
-              </p>
-              <p className="truncate text-xs text-muted-foreground">
-                {user.email || "No email"}
-              </p>
-            </div>
-          </div>
-
-          <Button
-            variant="outline"
-            className="mt-3 w-full justify-start group-data-[collapsible=icon]:hidden"
-            onClick={() => signOut({ callbackUrl: "/" })}
-          >
-            <LogOut className="size-4" />
-            Sign out
-          </Button>
-        </div>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="w-full rounded-xl border border-sidebar-border bg-sidebar-accent/35 p-3 text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-accent/50"
+              >
+                <div className="flex items-center gap-3">
+                  <Avatar className="size-9">
+                    <AvatarImage src={user.image ?? undefined} alt={user.name ?? "User"} />
+                    <AvatarFallback>{getInitials(user.name, user.email)}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1 text-left group-data-[collapsible=icon]:hidden">
+                    <p className="truncate text-sm font-medium">
+                      {user.name || "sub5tr4cker user"}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {user.email || "No email"}
+                    </p>
+                  </div>
+                  <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground group-data-[collapsible=icon]:hidden" />
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-56">
+                <DropdownMenuLabel>{user.name || user.email || "Account"}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem render={<Link href="/dashboard/profile" />}>
+                    <User className="size-4" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
+                    <Settings className="size-4" />
+                    Settings
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => signOut({ callbackUrl: "/" })}
+                >
+                  <LogOut className="size-4" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
 
       <SidebarRail />

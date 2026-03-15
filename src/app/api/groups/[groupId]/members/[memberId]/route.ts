@@ -3,6 +3,7 @@ import { z } from "zod";
 import mongoose from "mongoose";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
+import { backfillMemberIntoPeriods } from "@/lib/billing/backfill";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group } from "@/models";
 
@@ -79,6 +80,8 @@ export async function PATCH(
   }
 
   const body = parsed.data;
+  const previousBillingStart = member.billingStartsAt as Date | null;
+
   if (body.nickname !== undefined) member.nickname = body.nickname;
   if ("customAmount" in (body || {})) member.customAmount = body.customAmount ?? null;
   if (body.isActive !== undefined) member.isActive = body.isActive;
@@ -94,6 +97,17 @@ export async function PATCH(
 
   await group.save();
 
+  // backfill into past periods when billingStartsAt moved earlier
+  let backfilledPeriods = 0;
+  const newBillingStart = member.billingStartsAt as Date | null;
+  if (
+    newBillingStart &&
+    (!previousBillingStart || newBillingStart < previousBillingStart) &&
+    newBillingStart < new Date()
+  ) {
+    backfilledPeriods = await backfillMemberIntoPeriods(group, member);
+  }
+
   const actorName =
     (session.user.name as string) ||
     (session.user.email as string) ||
@@ -104,7 +118,7 @@ export async function PATCH(
     action: "member_updated",
     groupId,
     targetMemberId: memberId,
-    metadata: { nickname: member.nickname },
+    metadata: { nickname: member.nickname, backfilledPeriods },
   });
 
   return NextResponse.json({
@@ -116,6 +130,7 @@ export async function PATCH(
       isActive: member.isActive,
       customAmount: member.customAmount,
       billingStartsAt: member.billingStartsAt ? (member.billingStartsAt as Date).toISOString().slice(0, 10) : null,
+      backfilledPeriods,
     },
   });
 }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import mongoose from "mongoose";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
+import { backfillMemberIntoPeriods } from "@/lib/billing/backfill";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group } from "@/models";
 import type { IGroupMember } from "@/models";
@@ -11,6 +12,7 @@ const addMemberSchema = z.object({
   email: z.string().email(),
   nickname: z.string().min(1).max(100),
   customAmount: z.number().positive().optional().nullable(),
+  billingStartsAt: z.string().optional().nullable(),
 });
 
 export async function POST(
@@ -63,7 +65,7 @@ export async function POST(
     );
   }
 
-  const { email, nickname, customAmount } = parsed.data;
+  const { email, nickname, customAmount, billingStartsAt } = parsed.data;
   const existing = group.members.find(
     (m: IGroupMember) =>
       m.email.toLowerCase() === email.toLowerCase() && m.isActive && !m.leftAt
@@ -80,7 +82,7 @@ export async function POST(
     );
   }
 
-  group.members.push({
+  const memberData: Record<string, unknown> = {
     email,
     nickname,
     customAmount: customAmount ?? null,
@@ -88,10 +90,23 @@ export async function POST(
     isActive: true,
     leftAt: null,
     user: null,
-  } as never);
+  };
+  if (billingStartsAt) {
+    const d = new Date(billingStartsAt);
+    if (!Number.isNaN(d.getTime())) memberData.billingStartsAt = d;
+  }
+
+  group.members.push(memberData as never);
   await group.save();
 
   const added = group.members[group.members.length - 1];
+
+  // backfill into existing periods when billing starts in the past
+  let backfilledPeriods = 0;
+  if (added.billingStartsAt && added.billingStartsAt < new Date()) {
+    backfilledPeriods = await backfillMemberIntoPeriods(group, added);
+  }
+
   const actorName =
     (session.user.name as string) ||
     (session.user.email as string) ||
@@ -102,7 +117,7 @@ export async function POST(
     action: "member_added",
     groupId,
     targetMemberId: added._id.toString(),
-    metadata: { email: added.email, nickname: added.nickname },
+    metadata: { email: added.email, nickname: added.nickname, backfilledPeriods },
   });
 
   return NextResponse.json({
@@ -112,6 +127,7 @@ export async function POST(
       nickname: added.nickname,
       role: added.role,
       isActive: added.isActive,
+      backfilledPeriods,
     },
   });
 }

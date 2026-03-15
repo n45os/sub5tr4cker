@@ -111,10 +111,13 @@ export async function GET(
     periodStart: Date;
     periodLabel: string;
     totalPrice: number;
+    priceNote?: string | null;
     payments: Array<{
       memberId: { toString: () => string };
       memberNickname: string;
       amount: number;
+      adjustedAmount?: number | null;
+      adjustmentReason?: string | null;
       status: string;
       memberConfirmedAt: Date | null;
       adminConfirmedAt: Date | null;
@@ -129,6 +132,8 @@ export async function GET(
       memberId: pay.memberId.toString(),
       memberNickname: pay.memberNickname,
       amount: pay.amount,
+      adjustedAmount: pay.adjustedAmount ?? null,
+      adjustmentReason: pay.adjustmentReason ?? null,
       status: pay.status,
       memberConfirmedAt: pay.memberConfirmedAt
         ? (pay.memberConfirmedAt as Date).toISOString()
@@ -145,6 +150,7 @@ export async function GET(
       periodStart: (p.periodStart as Date).toISOString().slice(0, 10),
       periodLabel: p.periodLabel,
       totalPrice: p.totalPrice,
+      priceNote: p.priceNote ?? null,
       payments: filteredPayments,
       isFullyPaid: p.isFullyPaid,
     };

@@ -10,11 +10,14 @@ const updatePeriodSchema = z
   .object({
     totalPrice: z.number().positive().optional(),
     currency: z.string().length(3).optional(),
+    priceNote: z.string().max(500).optional().nullable(),
     payments: z
       .array(
         z.object({
           memberId: z.string(),
           status: z.enum(["pending", "waived"]).optional(),
+          adjustedAmount: z.number().positive().optional().nullable(),
+          adjustmentReason: z.string().max(500).optional().nullable(),
           notes: z.string().max(500).optional().nullable(),
         })
       )
@@ -87,6 +90,7 @@ export async function PATCH(
   const body = parsed.data;
   if (body.totalPrice !== undefined) period.totalPrice = body.totalPrice;
   if (body.currency !== undefined) period.currency = body.currency;
+  if ("priceNote" in body) period.priceNote = body.priceNote ?? null;
 
   if (body.payments?.length) {
     for (const update of body.payments) {
@@ -95,6 +99,8 @@ export async function PATCH(
       );
       if (payment) {
         if (update.status === "waived") payment.status = "waived";
+        if ("adjustedAmount" in update) payment.adjustedAmount = update.adjustedAmount ?? null;
+        if ("adjustmentReason" in update) payment.adjustmentReason = update.adjustmentReason ?? null;
         if ("notes" in update) payment.notes = update.notes ?? null;
       }
     }
@@ -111,10 +117,13 @@ export async function PATCH(
       periodLabel: period.periodLabel,
       totalPrice: period.totalPrice,
       currency: period.currency,
+      priceNote: period.priceNote,
       payments: period.payments.map((p: IMemberPayment) => ({
         memberId: p.memberId.toString(),
         memberNickname: p.memberNickname,
         amount: p.amount,
+        adjustedAmount: p.adjustedAmount,
+        adjustmentReason: p.adjustmentReason,
         status: p.status,
         notes: p.notes,
       })),

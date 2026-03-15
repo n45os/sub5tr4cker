@@ -6,6 +6,10 @@ export interface IMemberPayment {
   memberEmail: string;
   memberNickname: string;
   amount: number;
+  /** admin override of the calculated share for this specific period+member */
+  adjustedAmount: number | null;
+  /** free-text explanation for the adjustment */
+  adjustmentReason: string | null;
   status: "pending" | "member_confirmed" | "confirmed" | "overdue" | "waived";
   memberConfirmedAt: Date | null;
   adminConfirmedAt: Date | null;
@@ -27,6 +31,8 @@ export interface IBillingPeriod extends Document {
   periodLabel: string;
   totalPrice: number;
   currency: string;
+  /** blanket admin note for the whole period (e.g. "annual price hike") */
+  priceNote: string | null;
   payments: IMemberPayment[];
   reminders: IReminderEntry[];
   isFullyPaid: boolean;
@@ -39,6 +45,8 @@ const memberPaymentSchema = new Schema<IMemberPayment>({
   memberEmail: { type: String, required: true },
   memberNickname: { type: String, required: true },
   amount: { type: Number, required: true },
+  adjustedAmount: { type: Number, default: null },
+  adjustmentReason: { type: String, default: null },
   status: {
     type: String,
     enum: ["pending", "member_confirmed", "confirmed", "overdue", "waived"],
@@ -65,6 +73,7 @@ const billingPeriodSchema = new Schema<IBillingPeriod>(
     periodLabel: { type: String, required: true },
     totalPrice: { type: Number, required: true },
     currency: { type: String, default: "EUR" },
+    priceNote: { type: String, default: null },
     payments: [memberPaymentSchema],
     reminders: [reminderEntrySchema],
     isFullyPaid: { type: Boolean, default: false },

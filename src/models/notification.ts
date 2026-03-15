@@ -5,9 +5,11 @@ export type NotificationType =
   | "payment_confirmed"
   | "admin_confirmation_request"
   | "price_change"
+  | "price_adjustment"
   | "announcement"
   | "invite"
-  | "follow_up";
+  | "follow_up"
+  | "member_message";
 
 export interface INotification extends Document {
   recipient: Types.ObjectId | null;
@@ -46,9 +48,11 @@ const notificationSchema = new Schema<INotification>(
         "payment_confirmed",
         "admin_confirmation_request",
         "price_change",
+        "price_adjustment",
         "announcement",
         "invite",
         "follow_up",
+        "member_message",
       ],
       required: true,
     },

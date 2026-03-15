@@ -227,6 +227,9 @@ export function MemberGroupView({
                     periods={visiblePeriods}
                     currentMemberId={currentMemberId}
                     memberToken={memberToken}
+                    paymentPlatform={group.payment.platform}
+                    paymentLink={group.payment.link}
+                    paymentInstructions={group.payment.instructions}
                   />
                   {periods.length > MEMBER_PERIOD_PREVIEW_COUNT && (
                     <div className="mt-4 flex justify-end">
@@ -266,6 +269,9 @@ export function MemberGroupView({
                   members={membersForMatrix}
                   isAdmin={false}
                   currentMemberId={currentMemberId}
+                  paymentPlatform={group.payment.platform}
+                  paymentLink={group.payment.link}
+                  paymentInstructions={group.payment.instructions}
                 />
               )}
             </CardContent>

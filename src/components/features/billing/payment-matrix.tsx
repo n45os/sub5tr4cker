@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -80,6 +81,9 @@ interface PaymentMatrixProps {
   isAdmin: boolean;
   currentMemberId: string | null;
   memberToken?: string;
+  paymentPlatform?: string | null;
+  paymentLink?: string | null;
+  paymentInstructions?: string | null;
   onPeriodsChange?: (periods: PeriodRow[]) => void;
 }
 
@@ -104,6 +108,11 @@ function formatDateRange(startIso: string | undefined, endIso: string | undefine
   const start = new Date(startIso);
   const end = new Date(endIso);
   return `${start.toLocaleDateString(undefined, { day: "numeric", month: "short" })} – ${end.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`;
+}
+
+function formatPaymentPlatform(platform?: string | null) {
+  if (!platform) return "payment link";
+  return platform.replace(/_/g, " ");
 }
 
 function getPaymentByMemberId(
@@ -161,6 +170,9 @@ export function PaymentMatrix({
   isAdmin,
   currentMemberId,
   memberToken,
+  paymentPlatform,
+  paymentLink,
+  paymentInstructions,
   onPeriodsChange,
 }: PaymentMatrixProps) {
   const [periods, setPeriods] = useState<PeriodRow[]>(initialPeriods);
@@ -701,7 +713,7 @@ export function PaymentMatrix({
                       <p className="text-xs text-primary">
                         {isSelected
                           ? "Selected — click again to deselect"
-                          : "Click to select, then confirm payment"}
+                          : "Click to select, then start payment"}
                       </p>
                     )}
                     {isAdmin && (canAdminConfirm || isConfirmedOrWaived) && (
@@ -846,7 +858,7 @@ export function PaymentMatrix({
               }}
             >
               <Check className="mr-2 size-4" />
-              Confirm payment
+              Pay selected
             </Button>
           </div>
         </div>
@@ -862,14 +874,14 @@ export function PaymentMatrix({
       >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Confirm payment?</DialogTitle>
+            <DialogTitle>Pay for selected periods</DialogTitle>
             <DialogDescription>
-              You&apos;re marking {selectedPeriods.size} period{selectedPeriods.size !== 1 ? "s" : ""} as
-              paid for a total of{" "}
+              You&apos;re about to pay for {selectedPeriods.size} period{selectedPeriods.size !== 1 ? "s" : ""} totaling{" "}
               <span className="font-mono font-semibold text-foreground">
                 {selectedTotal.toFixed(2)} {currency}
               </span>.
-              The admin will verify your payment.
+              Complete the payment using the details below, then come back and press
+              &quot;I&apos;ve paid&quot; so the admin can verify it.
             </DialogDescription>
           </DialogHeader>
           {confirmError && (
@@ -896,6 +908,28 @@ export function PaymentMatrix({
               );
             })}
           </div>
+          {(paymentLink || paymentInstructions || paymentPlatform) && (
+            <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+              <div className="space-y-1">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Payment method
+                </p>
+                <p className="text-sm font-medium capitalize">
+                  {formatPaymentPlatform(paymentPlatform)}
+                </p>
+              </div>
+              {paymentInstructions && (
+                <p className="text-sm text-muted-foreground">{paymentInstructions}</p>
+              )}
+              {paymentLink && (
+                <Button asChild variant="outline" className="w-full">
+                  <Link href={paymentLink} target="_blank" rel="noreferrer">
+                    Open payment link
+                  </Link>
+                </Button>
+              )}
+            </div>
+          )}
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               variant="outline"

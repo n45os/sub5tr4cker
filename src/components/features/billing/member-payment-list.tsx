@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangle,
@@ -46,6 +47,9 @@ interface MemberPaymentListProps {
   periods: Period[];
   currentMemberId: string | null;
   memberToken?: string;
+  paymentPlatform?: string | null;
+  paymentLink?: string | null;
+  paymentInstructions?: string | null;
 }
 
 function statusIcon(status: string) {
@@ -107,12 +111,20 @@ function formatDateShort(iso: string) {
   });
 }
 
+function formatPaymentPlatform(platform?: string | null) {
+  if (!platform) return "payment link";
+  return platform.replace(/_/g, " ");
+}
+
 export function MemberPaymentList({
   groupId,
   currency,
   periods: initialPeriods,
   currentMemberId,
   memberToken,
+  paymentPlatform,
+  paymentLink,
+  paymentInstructions,
 }: MemberPaymentListProps) {
   const [periods, setPeriods] = useState(initialPeriods);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -320,7 +332,7 @@ export function MemberPaymentList({
               }}
             >
               <Check className="mr-2 size-4" />
-              I&apos;ve paid
+              Pay selected
             </Button>
           </div>
         </div>
@@ -336,14 +348,14 @@ export function MemberPaymentList({
       >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Confirm payment?</DialogTitle>
+            <DialogTitle>Pay for selected periods</DialogTitle>
             <DialogDescription>
-              You&apos;re marking {selectedIds.size} period{selectedIds.size !== 1 ? "s" : ""} as
-              paid for a total of{" "}
+              You&apos;re about to pay for {selectedIds.size} period{selectedIds.size !== 1 ? "s" : ""} totaling{" "}
               <span className="font-mono font-semibold text-foreground">
                 {selectedTotal.toFixed(2)} {currency}
               </span>.
-              The admin will verify your payment.
+              Complete the payment using the details below, then come back and press
+              &quot;I&apos;ve paid&quot; so the admin can verify it.
             </DialogDescription>
           </DialogHeader>
           {confirmError && (
@@ -369,6 +381,28 @@ export function MemberPaymentList({
               );
             })}
           </div>
+          {(paymentLink || paymentInstructions || paymentPlatform) && (
+            <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+              <div className="space-y-1">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Payment method
+                </p>
+                <p className="text-sm font-medium capitalize">
+                  {formatPaymentPlatform(paymentPlatform)}
+                </p>
+              </div>
+              {paymentInstructions && (
+                <p className="text-sm text-muted-foreground">{paymentInstructions}</p>
+              )}
+              {paymentLink && (
+                <Button asChild variant="outline" className="w-full">
+                  <Link href={paymentLink} target="_blank" rel="noreferrer">
+                    Open payment link
+                  </Link>
+                </Button>
+              )}
+            </div>
+          )}
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               variant="outline"

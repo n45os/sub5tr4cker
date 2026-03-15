@@ -97,7 +97,7 @@ Preview unpaid reminder candidates (by group, period, payment) with eligibility 
 
 ### `POST /api/dashboard/notify-unpaid`
 
-Send payment reminders. Optional body: `groupIds` (string[]), `paymentIds` (string[]), `channelPreference` (`"email"` | `"telegram"` | `"both"`). Omitted fields mean “all”. Response: `{ "data": { "emailSent", "telegramSent", "skipped", "failed" } }`.
+Send payment reminders. Optional body: `groupIds` (string[]), `paymentIds` (string[]), `channelPreference` (`"email"` | `"telegram"` | `"both"`). Omitted fields mean all. When aggregation is on, each member email receives at most one email and one Telegram with all unpaid amounts. Response: `{ "data": { "emailSent", "telegramSent", "skipped", "failed" } }`.
 
 ## Cron
 

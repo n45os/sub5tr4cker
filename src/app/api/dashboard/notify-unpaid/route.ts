@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { isInstanceAdmin } from "@/lib/authorization";
 import { dbConnect } from "@/lib/db/mongoose";
 import { BillingPeriod, Group } from "@/models";
 import { getReminderEligibility } from "@/lib/notifications/reminder-targeting";
@@ -154,12 +153,6 @@ export async function POST() {
     return NextResponse.json(
       { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
       { status: 401 }
-    );
-  }
-  if (!isInstanceAdmin(session)) {
-    return NextResponse.json(
-      { error: { code: "FORBIDDEN", message: "Only admins can send reminders" } },
-      { status: 403 }
     );
   }
 

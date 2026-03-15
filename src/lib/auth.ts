@@ -5,7 +5,6 @@ import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import { MongoClient } from "mongodb";
 import { compare } from "bcryptjs";
 import { dbConnect } from "@/lib/db/mongoose";
-import { ensureInstanceAdmin } from "@/lib/db/ensure-admin";
 import { User } from "@/models";
 import { verifyMagicLoginToken } from "@/lib/tokens";
 
@@ -115,16 +114,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (token.id && session.user) {
         session.user.id = token.id as string;
         await dbConnect();
-        await ensureInstanceAdmin();
         // load fresh user from DB so profile changes (e.g. email) are reflected
         const u = await User.findById(token.id).lean();
         if (u) {
           session.user.email = u.email;
           session.user.name = u.name;
           session.user.image = u.image ?? null;
-          session.user.role = u.role ?? "user";
-        } else {
-          session.user.role = (token.role as "admin" | "user" | undefined) ?? "user";
         }
       }
       return session;

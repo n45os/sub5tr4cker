@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { isInstanceAdmin } from "@/lib/authorization";
 import { dbConnect } from "@/lib/db/mongoose";
 import { User } from "@/models";
 import { sendTelegramMessage } from "@/lib/telegram/send";
@@ -11,12 +10,6 @@ export async function POST() {
     return NextResponse.json(
       { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
       { status: 401 }
-    );
-  }
-  if (!isInstanceAdmin(session)) {
-    return NextResponse.json(
-      { error: { code: "FORBIDDEN", message: "Only admins can send Telegram test messages" } },
-      { status: 403 }
     );
   }
 

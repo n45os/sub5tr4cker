@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
-import { isInstanceAdmin } from "@/lib/authorization";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group, BillingPeriod } from "@/models";
 import { getNextPeriodStart } from "@/lib/billing/calculator";
@@ -117,12 +116,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
       { status: 401 }
-    );
-  }
-  if (!isInstanceAdmin(session)) {
-    return NextResponse.json(
-      { error: { code: "FORBIDDEN", message: "Only admins can create groups" } },
-      { status: 403 }
     );
   }
 

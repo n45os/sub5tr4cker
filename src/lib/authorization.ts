@@ -107,7 +107,7 @@ export function getMemberEntry(
 
 export function filterGroupForMember(
   group: GroupLike,
-  memberEntry: IGroupMember,
+  memberEntry: IGroupMember | null,
   access: "member" | "admin"
 ) {
   if (access === "admin") {
@@ -148,6 +148,8 @@ export function filterGroupForMember(
     };
   }
 
+  // member branch: memberEntry is guaranteed non-null (caller checks before calling with access "member")
+  const me = memberEntry!;
   const activeMembers = group.members.filter((m) => m.isActive && !m.leftAt);
   return {
     _id: group._id.toString(),
@@ -171,16 +173,16 @@ export function filterGroupForMember(
     role: access,
     memberCount: activeMembers.length,
     myMembership: {
-      _id: memberEntry._id.toString(),
-      nickname: memberEntry.nickname,
-      role: memberEntry.role,
-      customAmount: memberEntry.customAmount ?? null,
-      hasAccount: !!memberEntry.user,
-      acceptedAt: memberEntry.acceptedAt
-        ? (memberEntry.acceptedAt as Date).toISOString()
+      _id: me._id.toString(),
+      nickname: me.nickname,
+      role: me.role,
+      customAmount: me.customAmount ?? null,
+      hasAccount: !!me.user,
+      acceptedAt: me.acceptedAt
+        ? (me.acceptedAt as Date).toISOString()
         : null,
-      billingStartsAt: memberEntry.billingStartsAt
-        ? (memberEntry.billingStartsAt as Date).toISOString().slice(0, 10)
+      billingStartsAt: me.billingStartsAt
+        ? (me.billingStartsAt as Date).toISOString().slice(0, 10)
         : null,
     },
   };

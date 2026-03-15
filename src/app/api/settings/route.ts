@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
-import { isInstanceAdmin } from "@/lib/authorization";
 import { getAllSettings, setSetting } from "@/lib/settings/service";
 import { getSettingsDefinition } from "@/lib/settings/definitions";
 
@@ -22,12 +21,6 @@ export async function GET() {
       { status: 401 }
     );
   }
-  if (!isInstanceAdmin(session)) {
-    return NextResponse.json(
-      { error: { code: "FORBIDDEN", message: "Only admins can access settings" } },
-      { status: 403 }
-    );
-  }
 
   const settings = await getAllSettings();
 
@@ -44,12 +37,6 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json(
       { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
       { status: 401 }
-    );
-  }
-  if (!isInstanceAdmin(session)) {
-    return NextResponse.json(
-      { error: { code: "FORBIDDEN", message: "Only admins can update settings" } },
-      { status: 403 }
     );
   }
 

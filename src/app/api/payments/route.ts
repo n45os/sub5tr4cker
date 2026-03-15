@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { isInstanceAdmin } from "@/lib/authorization";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group, BillingPeriod } from "@/models";
 import type { IMemberPayment } from "@/models";
@@ -43,12 +42,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
       { status: 401 }
-    );
-  }
-  if (!isInstanceAdmin(session)) {
-    return NextResponse.json(
-      { error: { code: "FORBIDDEN", message: "Only admins can view payments" } },
-      { status: 403 }
     );
   }
 

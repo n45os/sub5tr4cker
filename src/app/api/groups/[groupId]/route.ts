@@ -95,7 +95,9 @@ export async function GET(
     session.user.id,
     (session.user.email as string) || ""
   );
-  if (!memberEntry) {
+
+  // group admins may not be in the members array (they're the owner)
+  if (!memberEntry && access !== "admin") {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Not authorized to view this group" } },
       { status: 403 }

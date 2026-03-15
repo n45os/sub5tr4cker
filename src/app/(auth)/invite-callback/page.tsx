@@ -14,8 +14,7 @@ function InviteCallbackContent() {
 
   const token = searchParams.get("token");
   const groupId = searchParams.get("groupId");
-  const groupUrl =
-    groupId ? `/dashboard/groups/${groupId}` : "/dashboard";
+  const groupUrl = groupId ? `/dashboard/groups/${groupId}` : "/dashboard";
   const loginUrl = `/login${groupId ? `?callbackUrl=${encodeURIComponent(groupUrl)}` : ""}`;
 
   useEffect(() => {

@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyConfirmationToken } from "@/lib/tokens";
+import {
+  verifyConfirmationToken,
+  createMemberPortalToken,
+  getMemberPortalUrl,
+} from "@/lib/tokens";
 import { dbConnect } from "@/lib/db/mongoose";
 import { BillingPeriod, Group } from "@/models";
 import { enqueueTask } from "@/lib/tasks/queue";
@@ -21,12 +25,18 @@ export async function GET(
     );
   }
 
+  const memberPortalToken = await createMemberPortalToken(
+    payload.memberId,
+    payload.groupId
+  );
+  const memberPortalUrl = await getMemberPortalUrl(memberPortalToken);
+
   await dbConnect();
 
   const period = await BillingPeriod.findById(payload.periodId);
   if (!period) {
     return NextResponse.redirect(
-      new URL("/confirmed?error=not_found", appUrl)
+      new URL(memberPortalUrl, appUrl)
     );
   }
 
@@ -35,17 +45,14 @@ export async function GET(
   );
   if (!payment) {
     return NextResponse.redirect(
-      new URL("/confirmed?error=not_found", appUrl)
+      new URL(memberPortalUrl, appUrl)
     );
   }
 
   // already confirmed
   if (payment.status !== "pending" && payment.status !== "overdue") {
     return NextResponse.redirect(
-      new URL(
-        `/confirmed?group=${payload.groupId}&period=${period.periodLabel}&already=true`,
-        appUrl
-      )
+      new URL(`${memberPortalUrl}?confirmed=true&already=true`, appUrl)
     );
   }
 
@@ -68,10 +75,5 @@ export async function GET(
     await runNotificationTasks({ limit: 5 });
   }
 
-  return NextResponse.redirect(
-    new URL(
-      `/confirmed?group=${group?.name || ""}&period=${period.periodLabel}&success=true`,
-      appUrl
-    )
-  );
+  return NextResponse.redirect(new URL(`${memberPortalUrl}?confirmed=true`, appUrl));
 }

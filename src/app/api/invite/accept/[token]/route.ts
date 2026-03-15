@@ -6,6 +6,8 @@ import { getSetting } from "@/lib/settings/service";
 import {
   verifyInviteAcceptToken,
   createMagicLoginToken,
+  createMemberPortalToken,
+  getMemberPortalUrl,
   createInviteLinkToken,
   createUnsubscribeToken,
   getUnsubscribeUrl,
@@ -159,89 +161,91 @@ export async function GET(
       }
     );
 
-    // send welcome email with magic sign-in link + Telegram instructions
-    const baseUrl = appUrl.replace(/\/$/, "");
-    try {
-      const magicToken = await createMagicLoginToken(user._id.toString());
-      const magicLoginUrl = `${baseUrl}/invite-callback?token=${encodeURIComponent(magicToken)}&groupId=${encodeURIComponent(payload.groupId)}`;
-      const groupIdStr = group._id.toString();
-      const sendEmail = !member.unsubscribedFromEmail;
-      const unsubscribeUrl = sendEmail
-        ? await getUnsubscribeUrl(
-            await createUnsubscribeToken(
-              member._id.toString(),
-              groupIdStr
-            )
-          )
-        : null;
-
-      let telegramBotUsername: string | null = null;
-      let telegramInviteLink: string | null = null;
-      if (await isTelegramEnabled()) {
-        try {
-          const bot = await getBot();
-          const me = await bot.api.getMe();
-          telegramBotUsername = me.username ?? null;
-          if (telegramBotUsername) {
-            const inviteToken = await createInviteLinkToken(
-              member._id.toString(),
-              groupIdStr,
-              7
-            );
-            telegramInviteLink = `https://t.me/${telegramBotUsername}?start=invite_${inviteToken}`;
-          }
-        } catch {
-          // telegram not configured, skip
-        }
-      }
-
-      const admin = await User.findById(group.admin);
-      const emailHtml = buildTelegramWelcomeEmailHtml({
-        memberName: member.nickname,
-        groupName: group.name,
-        groupId: groupIdStr,
-        serviceName: group.service.name,
-        adminName: admin?.name ?? "The group admin",
-        billingSummary: buildBillingSummary(group),
-        paymentPlatform: group.payment.platform,
-        paymentLink: group.payment.link ?? null,
-        paymentInstructions: group.payment.instructions ?? null,
-        isPublic: isPublicAppUrl(appUrl),
-        appUrl: appUrl?.trim() || null,
-        telegramBotUsername,
-        telegramInviteLink,
-        unsubscribeUrl,
-        accentColor: group.service?.accentColor ?? null,
-        magicLoginUrl,
-      });
-
-      await sendNotification(
-        {
-          email: user.email,
-          telegramChatId: null,
-          userId: user._id.toString(),
-          preferences: { email: sendEmail, telegram: false },
-        },
-        {
-          type: "invite",
-          subject: `Welcome to ${group.name} — sign in to your dashboard`,
-          emailHtml,
-          telegramText: `Welcome to ${group.name}`,
-          groupId: groupIdStr,
-        }
-      );
-    } catch (emailError) {
-      console.error("invite accept welcome email failed:", emailError);
-    }
-
-    return new NextResponse(
-      buildHtml(
-        "Invite accepted!",
-        "You've joined the group. Check your email for a sign-in link to open the dashboard and manage your subscription.",
-        appUrl
-      ),
-      { status: 200, headers: { "content-type": "text/html; charset=utf-8" } }
+    const groupIdStr = group._id.toString();
+    const memberPortalToken = await createMemberPortalToken(
+      member._id.toString(),
+      groupIdStr
     );
+    const memberPortalUrl = await getMemberPortalUrl(memberPortalToken);
+
+    // send welcome email in background so redirect is instant
+    const baseUrl = appUrl.replace(/\/$/, "");
+    void (async () => {
+      try {
+        const magicToken = await createMagicLoginToken(user._id.toString());
+        const magicLoginUrl = `${baseUrl}/invite-callback?token=${encodeURIComponent(magicToken)}&groupId=${encodeURIComponent(payload.groupId)}`;
+        const sendEmail = !member.unsubscribedFromEmail;
+        const unsubscribeUrl = sendEmail
+          ? await getUnsubscribeUrl(
+              await createUnsubscribeToken(
+                member._id.toString(),
+                groupIdStr
+              )
+            )
+          : null;
+
+        let telegramBotUsername: string | null = null;
+        let telegramInviteLink: string | null = null;
+        if (await isTelegramEnabled()) {
+          try {
+            const bot = await getBot();
+            const me = await bot.api.getMe();
+            telegramBotUsername = me.username ?? null;
+            if (telegramBotUsername) {
+              const inviteToken = await createInviteLinkToken(
+                member._id.toString(),
+                groupIdStr,
+                7
+              );
+              telegramInviteLink = `https://t.me/${telegramBotUsername}?start=invite_${inviteToken}`;
+            }
+          } catch {
+            // telegram not configured, skip
+          }
+        }
+
+        const admin = await User.findById(group.admin);
+        const emailHtml = buildTelegramWelcomeEmailHtml({
+          memberName: member.nickname,
+          groupName: group.name,
+          groupId: groupIdStr,
+          serviceName: group.service.name,
+          adminName: admin?.name ?? "The group admin",
+          billingSummary: buildBillingSummary(group),
+          paymentPlatform: group.payment.platform,
+          paymentLink: group.payment.link ?? null,
+          paymentInstructions: group.payment.instructions ?? null,
+          isPublic: isPublicAppUrl(appUrl),
+          appUrl: appUrl?.trim() || null,
+          telegramBotUsername,
+          telegramInviteLink,
+          unsubscribeUrl,
+          accentColor: group.service?.accentColor ?? null,
+          // template still uses this prop name, but it now points to the member portal
+          magicLoginUrl: memberPortalUrl,
+        });
+
+        await sendNotification(
+          {
+            email: user.email,
+            telegramChatId: null,
+            userId: user._id.toString(),
+            preferences: { email: sendEmail, telegram: false },
+          },
+          {
+            type: "invite",
+            subject: `Welcome to ${group.name} — your member page`,
+            emailHtml,
+            telegramText: `Welcome to ${group.name}`,
+            groupId: groupIdStr,
+          }
+        );
+      } catch (emailError) {
+        console.error("invite accept welcome email failed:", emailError);
+      }
+    })();
+
+    return NextResponse.redirect(new URL(`${memberPortalUrl}?joined=true`), 302);
   } catch (error) {
     console.error("invite accept handler failed:", error);
     return new NextResponse(

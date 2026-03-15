@@ -15,6 +15,7 @@ import { PaymentMatrix } from "@/components/features/billing/payment-matrix";
 import { GroupMembersPanel } from "@/components/features/groups/group-members-panel";
 import { InitializeNotifyButton } from "@/components/features/groups/initialize-notify-button";
 import { InviteLinkCard } from "@/components/features/groups/invite-link-card";
+import { MemberGroupView } from "@/components/features/groups/member-group-view";
 import { GroupNotificationsPanel } from "@/components/features/notifications/group-notifications-panel";
 import { auth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -153,14 +154,15 @@ export default async function GroupDetailPage({
   if (!group) notFound();
 
   const isAdmin = group.role === "admin";
+  const members = group.members ?? [];
+  const memberCount = group.memberCount ?? members.length;
+  const myMembership = group.myMembership;
+
   const [periods, notifications] = await Promise.all([
     getBillingPeriods(groupId, cookieHeader),
     getNotifications(groupId, cookieHeader, isAdmin),
   ]);
 
-  const members = group.members ?? [];
-  const memberCount = group.memberCount ?? members.length;
-  const myMembership = group.myMembership;
   const currentPeriod = periods[0];
   const acceptedCount = isAdmin
     ? members.filter((m) => !!m.acceptedAt).length
@@ -170,6 +172,28 @@ export default async function GroupDetailPage({
     (session?.user?.email && members.find((m) => m.email === session.user.email)?._id) ??
     null;
 
+  // member view: show limited info within the dashboard shell
+  if (!isAdmin) {
+    return (
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <MemberGroupView
+          group={{
+            _id: group._id,
+            name: group.name,
+            description: group.description,
+            service: group.service,
+            billing: group.billing,
+            payment: group.payment,
+            memberCount,
+            myMembership: group.myMembership,
+          }}
+          periods={periods}
+          currentMemberId={currentMemberId}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -178,9 +202,7 @@ export default async function GroupDetailPage({
             <Badge variant="outline">
               {group.service.icon || "ST"} {group.service.name}
             </Badge>
-            <Badge variant={group.role === "admin" ? "default" : "secondary"}>
-              {group.role}
-            </Badge>
+            <Badge variant="default">admin</Badge>
           </div>
           <div>
             <h2 className="font-display text-3xl font-semibold tracking-tight">{group.name}</h2>
@@ -191,22 +213,20 @@ export default async function GroupDetailPage({
           </div>
         </div>
 
-        {isAdmin ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <InitializeNotifyButton
-              groupId={groupId}
-              memberCount={memberCount}
-              initializedAt={group.initializedAt}
-            />
-            <Link
-              href={`/dashboard/groups/${groupId}/edit`}
-              className={cn(buttonVariants({ variant: "outline" }))}
-            >
-              <Pencil className="size-4" />
-              Edit group
-            </Link>
-          </div>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <InitializeNotifyButton
+            groupId={groupId}
+            memberCount={memberCount}
+            initializedAt={group.initializedAt}
+          />
+          <Link
+            href={`/dashboard/groups/${groupId}/edit`}
+            className={cn(buttonVariants({ variant: "outline" }))}
+          >
+            <Pencil className="size-4" />
+            Edit group
+          </Link>
+        </div>
       </div>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -229,7 +249,7 @@ export default async function GroupDetailPage({
           </CardHeader>
           <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
             <Users className="size-4" />
-            {isAdmin ? `${acceptedCount}/${memberCount} accepted invites` : "On this plan"}
+            {acceptedCount}/{memberCount} accepted invites
           </CardContent>
         </Card>
         <Card>
@@ -320,31 +340,24 @@ export default async function GroupDetailPage({
             </div>
           </CardContent>
         </Card>
-        {isAdmin ? (
-          <InviteLinkCard groupId={groupId} />
-        ) : null}
+        <InviteLinkCard groupId={groupId} />
       </section>
 
-      {/* members: admin only */}
-      {isAdmin ? (
-        <GroupMembersPanel
-          groupId={groupId}
-          members={members}
-          currency={group.billing.currency}
-          isAdmin
-          periods={periods}
-        />
-      ) : null}
+      <GroupMembersPanel
+        groupId={groupId}
+        members={members}
+        currency={group.billing.currency}
+        isAdmin
+        periods={periods}
+      />
 
-      {/* billing periods / my payment status */}
       {!currentPeriod ? (
         <Card>
           <CardHeader>
-            <CardTitle>{isAdmin ? "No billing periods yet" : "Your payment status"}</CardTitle>
+            <CardTitle>No billing periods yet</CardTitle>
             <CardDescription>
-              {isAdmin
-                ? "Periods are created automatically on the configured cycle day, or manually for variable billing."
-                : "No billing periods have been created for this group yet. Your status will appear here."}
+              Periods are created automatically on the configured cycle day, or
+              manually for variable billing.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -353,27 +366,18 @@ export default async function GroupDetailPage({
           groupId={groupId}
           currency={group.billing.currency}
           periods={periods}
-          members={
-            isAdmin && members.length > 0
-              ? members.map((m) => ({ _id: m._id, nickname: m.nickname, email: m.email }))
-              : myMembership
-                ? [{ _id: myMembership._id, nickname: myMembership.nickname, email: "" }]
-                : []
-          }
-          isAdmin={isAdmin}
+          members={members.map((m) => ({ _id: m._id, nickname: m.nickname, email: m.email }))}
+          isAdmin
           currentMemberId={currentMemberId}
         />
       )}
 
-      {/* notifications: admin only */}
-      {isAdmin ? (
-        <GroupNotificationsPanel
-          groupId={groupId}
-          isAdmin
-          initialPreferences={group.notifications}
-          recentNotifications={notifications}
-        />
-      ) : null}
+      <GroupNotificationsPanel
+        groupId={groupId}
+        isAdmin
+        initialPreferences={group.notifications}
+        recentNotifications={notifications}
+      />
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { auth } from "@/lib/auth";
-import { isInstanceAdmin } from "@/lib/authorization";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group, Notification } from "@/models";
 import type { IGroupMember } from "@/models";
@@ -29,12 +28,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
       { status: 401 }
-    );
-  }
-  if (!isInstanceAdmin(session)) {
-    return NextResponse.json(
-      { error: { code: "FORBIDDEN", message: "Only admins can view notifications" } },
-      { status: 403 }
     );
   }
 

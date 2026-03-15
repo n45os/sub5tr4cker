@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.22.0] - 2026-03-18
+
+### Added
+
+- **Token-based member portal** — Added signed member portal tokens and a new standalone route at `/member/[token]` that loads member-safe group and billing data directly from the database without requiring a login session.
+
+### Changed
+
+- **Invite acceptance flow** — `GET /api/invite/accept/[token]` now links/accepts the member and immediately redirects to their portal page (`/member/{token}?joined=true`) instead of showing a "check your email" page.
+- **Payment confirmation redirect** — `GET /api/confirm/[token]` now redirects to the member portal (`/member/{token}?confirmed=true`) after marking payment as member-confirmed.
+- **Magic invite callback routing** — `/invite-callback` now routes signed-in users to `/dashboard/groups/[groupId]` (session flow), while non-account member access uses the token portal.
+
 ## [0.21.0] - 2026-03-18
 
 ### Added

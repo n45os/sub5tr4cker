@@ -27,7 +27,7 @@ interface GroupBillingDetail {
   billing: { currency: string; cycleDay: number };
   role: string;
   members?: MemberRow[];
-  myMembership?: { _id: string } | null;
+  myMembership?: { _id: string; nickname: string } | null;
 }
 
 interface BillingPeriodItem {
@@ -106,11 +106,18 @@ export default async function GroupBillingPage({
   });
   const currentPeriod = periods[0];
   const isAdmin = group.role === "admin";
-  const members = group.members ?? [];
+  const adminMembers = group.members ?? [];
   const currentMemberId =
     group.myMembership?._id ??
-    (session?.user?.email && members.find((m) => m.email === session.user.email)?._id) ??
+    (session?.user?.email && adminMembers.find((m) => m.email === session.user.email)?._id) ??
     null;
+
+  // for members, build a single-column matrix from myMembership
+  const membersForMatrix = isAdmin
+    ? adminMembers.map((m) => ({ _id: m._id, nickname: m.nickname, email: m.email }))
+    : group.myMembership
+      ? [{ _id: group.myMembership._id, nickname: group.myMembership.nickname, email: "" }]
+      : [];
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
@@ -125,7 +132,7 @@ export default async function GroupBillingPage({
         {isAdmin && (
           <ImportHistoryDialog
             groupId={groupId}
-            memberEmails={members.map((m) => m.email)}
+            memberEmails={adminMembers.map((m) => m.email)}
             currency={group.billing.currency}
           />
         )}
@@ -133,7 +140,9 @@ export default async function GroupBillingPage({
 
       <div>
         <h1 className="text-xl font-semibold tracking-tight">
-          Billing periods — {group.name}
+          {isAdmin
+            ? `Billing periods — ${group.name}`
+            : `Your payment history — ${group.name}`}
         </h1>
         <p className="text-sm text-muted-foreground">
           {isAdmin
@@ -143,17 +152,13 @@ export default async function GroupBillingPage({
       </div>
 
       {!currentPeriod ? (
-        <NoPeriodsCard groupId={groupId} cycleDay={group.billing.cycleDay} />
+        <NoPeriodsCard groupId={groupId} cycleDay={group.billing.cycleDay} isAdmin={isAdmin} />
       ) : (
         <PaymentMatrix
           groupId={groupId}
           currency={group.billing.currency}
           periods={periods}
-          members={members.map((m) => ({
-            _id: m._id,
-            nickname: m.nickname,
-            email: m.email,
-          }))}
+          members={membersForMatrix}
           isAdmin={isAdmin}
           currentMemberId={currentMemberId}
         />

@@ -221,33 +221,59 @@ export function PaymentMatrix({
     [groupId, updateCell]
   );
 
-  const selfConfirmApi = useCallback(
-    async (periodId: string) => {
-      if (!currentMemberId) return;
+  // member multi-select + confirmation flow
+  const [selectedPeriods, setSelectedPeriods] = useState<Set<string>>(new Set());
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [confirmingPayment, setConfirmingPayment] = useState(false);
+
+  const togglePeriodSelection = useCallback(
+    (periodId: string) => {
+      setSelectedPeriods((prev) => {
+        const next = new Set(prev);
+        if (next.has(periodId)) {
+          next.delete(periodId);
+        } else {
+          next.add(periodId);
+        }
+        return next;
+      });
+    },
+    []
+  );
+
+  const selectedTotal = Array.from(selectedPeriods).reduce((sum, periodId) => {
+    const period = periods.find((p) => p._id === periodId);
+    if (!period || !currentMemberId) return sum;
+    const payment = getPaymentByMemberId(period.payments, currentMemberId);
+    return sum + (payment ? effectiveAmount(payment) : 0);
+  }, 0);
+
+  const confirmSelectedPayments = useCallback(async () => {
+    if (!currentMemberId || selectedPeriods.size === 0) return;
+    setConfirmingPayment(true);
+    const periodIds = Array.from(selectedPeriods);
+    for (const periodId of periodIds) {
       const key = `${periodId}-${currentMemberId}`;
       setLoadingCell(key);
-      setErrorCell(null);
       try {
         const res = await fetch(
           `/api/groups/${groupId}/billing/${periodId}/self-confirm`,
           { method: "POST" }
         );
-        const json = await res.json();
-        if (!res.ok) {
-          setErrorCell(key);
-          setTimeout(() => setErrorCell(null), 2000);
-          return;
+        if (res.ok) {
+          updateCell(periodId, currentMemberId, {
+            status: "member_confirmed",
+            memberConfirmedAt: new Date().toISOString(),
+          });
         }
-        updateCell(periodId, currentMemberId, {
-          status: "member_confirmed",
-          memberConfirmedAt: new Date().toISOString(),
-        });
       } finally {
         setLoadingCell(null);
       }
-    },
-    [groupId, currentMemberId, updateCell]
-  );
+    }
+    setSelectedPeriods(new Set());
+    setConfirmDialogOpen(false);
+    setConfirmingPayment(false);
+  }, [groupId, currentMemberId, selectedPeriods, updateCell]);
 
   // adjustment dialog state
   const [adjustDialog, setAdjustDialog] = useState<{
@@ -533,9 +559,10 @@ export function PaymentMatrix({
                   );
                 }
 
+                const isSelected = canSelfConfirm && selectedPeriods.has(period._id);
                 const handleMemberClick = () => {
                   if (loading) return;
-                  if (canSelfConfirm) selfConfirmApi(period._id);
+                  if (canSelfConfirm) togglePeriodSelection(period._id);
                 };
 
                 const cellButton = (
@@ -549,7 +576,9 @@ export function PaymentMatrix({
                     }
                     className={cn(
                       "mx-auto flex h-7 w-7 items-center justify-center rounded-md border transition-all hover:opacity-90 disabled:cursor-default disabled:opacity-70",
-                      cellStatusClasses(payment.status),
+                      isSelected
+                        ? "bg-primary/20 border-primary ring-2 ring-primary/50"
+                        : cellStatusClasses(payment.status),
                       (canAdminConfirm || canSelfConfirm) &&
                         "cursor-pointer hover:ring-2 hover:ring-primary/50",
                       isAdmin && isConfirmedOrWaived && "cursor-pointer hover:opacity-80",
@@ -558,10 +587,12 @@ export function PaymentMatrix({
                   >
                     {loading ? (
                       <Loader2 className="size-4 animate-spin" />
+                    ) : isSelected ? (
+                      <Check className="size-4 text-primary" strokeWidth={2.5} />
                     ) : (
                       <CellIcon status={payment.status} />
                     )}
-                    {!loading && !payment.status && (
+                    {!loading && !isSelected && !payment.status && (
                       <span className="text-xs">○</span>
                     )}
                   </button>
@@ -595,7 +626,9 @@ export function PaymentMatrix({
                     )}
                     {canSelfConfirm && (
                       <p className="text-xs text-primary">
-                        Click to mark as &quot;I&apos;ve paid&quot;
+                        {isSelected
+                          ? "Selected — click again to deselect"
+                          : "Click to select, then confirm payment"}
                       </p>
                     )}
                     {isAdmin && (canAdminConfirm || isConfirmedOrWaived) && (
@@ -710,6 +743,89 @@ export function PaymentMatrix({
           })}
         </tbody>
       </table>
+
+      {/* member confirm bar */}
+      {!isAdmin && selectedPeriods.size > 0 && (
+        <div className="flex items-center justify-between border-t px-4 py-3">
+          <p className="text-sm text-muted-foreground">
+            {selectedPeriods.size} period{selectedPeriods.size !== 1 ? "s" : ""} selected
+            {" · "}
+            <span className="font-mono font-medium text-foreground">
+              {selectedTotal.toFixed(2)} {currency}
+            </span>
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedPeriods(new Set())}
+            >
+              Clear
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setConfirmDialogOpen(true)}
+            >
+              <Check className="mr-2 size-4" />
+              Confirm payment
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* member confirm dialog */}
+      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Confirm payment?</DialogTitle>
+            <DialogDescription>
+              You&apos;re marking {selectedPeriods.size} period{selectedPeriods.size !== 1 ? "s" : ""} as
+              paid for a total of{" "}
+              <span className="font-mono font-semibold text-foreground">
+                {selectedTotal.toFixed(2)} {currency}
+              </span>.
+              The admin will verify your payment.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            {Array.from(selectedPeriods).map((periodId) => {
+              const period = periods.find((p) => p._id === periodId);
+              if (!period || !currentMemberId) return null;
+              const payment = getPaymentByMemberId(period.payments, currentMemberId);
+              if (!payment) return null;
+              return (
+                <div
+                  key={periodId}
+                  className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
+                >
+                  <span>{period.periodLabel}</span>
+                  <span className="font-mono tabular-nums">
+                    {effectiveAmount(payment)} {currency}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmDialogOpen(false)}
+              disabled={confirmingPayment}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmSelectedPayments}
+              disabled={confirmingPayment}
+            >
+              {confirmingPayment && (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              )}
+              Yes, I&apos;ve paid
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* advance periods */}
       {isAdmin && (

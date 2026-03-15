@@ -186,16 +186,18 @@ export function MemberGroupView({
               <div>
                 <CardTitle>Your payment status</CardTitle>
                 <CardDescription>
-                  Your amount and status per period. Open the full list to see all.
+                  Your amount and status per period.{!memberToken && " Open the full list to see all."}
                 </CardDescription>
               </div>
-              <Link
-                href={`/dashboard/groups/${group._id}/billing`}
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
-                <ExternalLink className="mr-2 size-4" />
-                View all periods
-              </Link>
+              {!memberToken && (
+                <Link
+                  href={`/dashboard/groups/${group._id}/billing`}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  <ExternalLink className="mr-2 size-4" />
+                  View all periods
+                </Link>
+              )}
             </CardHeader>
             <CardContent>
               <PaymentMatrix

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Check,
-  ChevronDown,
   Info,
   Loader2,
   Minus,
@@ -444,6 +444,8 @@ export function PaymentMatrix({
   const [advanceMonths, setAdvanceMonths] = useState("3");
   const [advanceLoading, setAdvanceLoading] = useState(false);
 
+  const router = useRouter();
+
   const generateAdvancePeriods = useCallback(async () => {
     const months = parseInt(advanceMonths, 10);
     if (!months || months < 1 || months > 12) return;
@@ -456,36 +458,50 @@ export function PaymentMatrix({
       });
       if (res.ok) {
         setAdvanceOpen(false);
-        window.location.reload();
+        router.refresh();
       }
     } finally {
       setAdvanceLoading(false);
     }
-  }, [groupId, advanceMonths]);
+  }, [groupId, advanceMonths, router]);
 
   // backfill (previous) periods state
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [backfillMonths, setBackfillMonths] = useState("3");
   const [backfillLoading, setBackfillLoading] = useState(false);
+  const [backfillError, setBackfillError] = useState<string | null>(null);
 
   const generateBackfillPeriods = useCallback(async () => {
     const months = parseInt(backfillMonths, 10);
     if (!months || months < 1 || months > 12) return;
     setBackfillLoading(true);
+    setBackfillError(null);
     try {
       const res = await fetch(`/api/groups/${groupId}/billing/backfill`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ monthsBack: months }),
       });
+      const json = await res.json().catch(() => ({}));
       if (res.ok) {
-        setBackfillOpen(false);
-        window.location.reload();
+        const created = json?.data?.created ?? 0;
+        if (created > 0) {
+          setBackfillOpen(false);
+          router.refresh();
+        } else {
+          setBackfillError(
+            "No new periods were created. They may already exist for those months."
+          );
+        }
+      } else {
+        setBackfillError(json?.error?.message ?? "Failed to create previous periods");
       }
+    } catch {
+      setBackfillError("Something went wrong");
     } finally {
       setBackfillLoading(false);
     }
-  }, [groupId, backfillMonths]);
+  }, [groupId, backfillMonths, router]);
 
   if (periods.length === 0) return null;
 
@@ -901,29 +917,27 @@ export function PaymentMatrix({
         </DialogContent>
       </Dialog>
 
-      {/* create periods: dropdown + advance + backfill dialogs */}
+      {/* create periods: two buttons + advance + backfill dialogs */}
       {isAdmin && (
         <>
-          <div className="flex justify-end border-t px-4 py-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                className={cn(
-                  buttonVariants({ variant: "outline", size: "sm" }),
-                  "gap-2"
-                )}
-              >
-                Create periods
-                <ChevronDown className="size-4 opacity-50" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setAdvanceOpen(true)}>
-                  Upcoming periods…
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setBackfillOpen(true)}>
-                  Previous periods…
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <div className="flex flex-wrap justify-end gap-2 border-t px-4 py-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAdvanceOpen(true)}
+            >
+              Create upcoming periods
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setBackfillError(null);
+                setBackfillOpen(true);
+              }}
+            >
+              Create previous periods
+            </Button>
           </div>
           <Dialog open={advanceOpen} onOpenChange={setAdvanceOpen}>
             <DialogContent className="sm:max-w-sm">
@@ -958,7 +972,13 @@ export function PaymentMatrix({
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <Dialog open={backfillOpen} onOpenChange={setBackfillOpen}>
+          <Dialog
+            open={backfillOpen}
+            onOpenChange={(open) => {
+              setBackfillOpen(open);
+              if (!open) setBackfillError(null);
+            }}
+          >
             <DialogContent className="sm:max-w-sm">
               <DialogHeader>
                 <DialogTitle>Create past periods</DialogTitle>
@@ -968,6 +988,15 @@ export function PaymentMatrix({
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
+                {backfillError && (
+                  <p
+                    className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                    role="alert"
+                  >
+                    <AlertTriangle className="size-4 shrink-0" />
+                    {backfillError}
+                  </p>
+                )}
                 <div className="grid gap-2">
                   <Label htmlFor="backfillMonths">How many months back? (1–12)</Label>
                   <Input
@@ -981,7 +1010,13 @@ export function PaymentMatrix({
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setBackfillOpen(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setBackfillOpen(false);
+                    setBackfillError(null);
+                  }}
+                >
                   Cancel
                 </Button>
                 <Button onClick={generateBackfillPeriods} disabled={backfillLoading}>

@@ -44,13 +44,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
+          console.warn("[auth] credentials: missing email or password");
           return null;
         }
         await dbConnect();
-        const user = await User.findOne({
-          email: (credentials.email as string).toLowerCase().trim(),
-        }).lean();
-        if (!user?.hashedPassword) {
+        const email = (credentials.email as string).toLowerCase().trim();
+        const user = await User.findOne({ email }).lean();
+        if (!user) {
+          console.warn("[auth] credentials: user not found");
+          return null;
+        }
+        if (!user.hashedPassword) {
+          console.warn("[auth] credentials: user has no password set");
           return null;
         }
         const match = await compare(
@@ -58,6 +63,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           user.hashedPassword
         );
         if (!match) {
+          console.warn("[auth] credentials: password mismatch");
           return null;
         }
         return {
@@ -78,18 +84,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         const token = credentials?.token;
         if (typeof token !== "string" || !token) {
-          console.warn("magic-invite: missing or invalid token in credentials");
+          console.warn("[auth] magic-invite: missing or invalid token in credentials");
           return null;
         }
         const payload = await verifyMagicLoginToken(token);
         if (!payload) {
-          console.warn("magic-invite: token invalid or expired");
+          console.warn("[auth] magic-invite: token invalid or expired");
           return null;
         }
         await dbConnect();
         const user = await User.findById(payload.userId).lean();
         if (!user) {
-          console.warn("magic-invite: user not found for id", payload.userId);
+          console.warn("[auth] magic-invite: user not found for id", payload.userId);
           return null;
         }
         return {

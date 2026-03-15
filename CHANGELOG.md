@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.26.2] - 2026-03-19
+
+### Fixed
+
+- **Admin alert when a member marks paid (self-confirm)** — Dashboard and member-portal `POST .../self-confirm` now enqueues the same `admin_confirmation_request` task as the email “I paid” link and Telegram member confirm, so the admin is always nudged to verify.
+
+### Changed
+
+- **Verification nudge delivery** — When the admin has Telegram notifications on and a linked account, “someone paid / please verify” uses **Telegram only** for that nudge (no duplicate email). If Telegram cannot be used (not linked, toggle off, or bot unavailable), email is used when email notifications are allowed.
+
 ## [0.26.1] - 2026-03-19
 
 ### Fixed

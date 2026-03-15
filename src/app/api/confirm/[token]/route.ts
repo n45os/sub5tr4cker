@@ -61,7 +61,7 @@ export async function GET(
   payment.memberConfirmedAt = new Date();
   await period.save();
 
-  // enqueue admin nudge so admin gets email + telegram via notification service
+  // enqueue admin verification nudge (telegram by default when linked; email if tg unavailable)
   const group = await Group.findById(payload.groupId);
   if (group) {
     await enqueueTask({

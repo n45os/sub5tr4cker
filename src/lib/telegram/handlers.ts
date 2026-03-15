@@ -137,7 +137,7 @@ async function handleMemberConfirm(
     "You've confirmed payment for this period. Waiting for admin verification."
   );
 
-  // enqueue admin nudge (email + telegram) via notification task queue
+  // enqueue admin verification nudge (telegram when linked; email fallback)
   const group = await Group.findById(period.group);
   if (group) {
     await enqueueTask({

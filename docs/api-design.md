@@ -286,7 +286,7 @@ Email "I paid" handler. The token is a signed payload containing memberId, perio
 1. Validate HMAC signature and expiry
 2. Find the billing period and member payment
 3. Set status to `member_confirmed`
-4. Notify admin via preferred channel
+4. Enqueue an `admin_confirmation_request` task and run the notification worker (admin gets Telegram when linked and Telegram notifications are on; otherwise email if allowed)
 5. Redirect to a "thank you" page
 
 **Response:** Redirect to `/confirmed?group=...&period=...`
@@ -306,7 +306,7 @@ Admin confirms a member's payment. Admin only.
 
 ### `POST /api/groups/[groupId]/billing/[periodId]/self-confirm`
 
-Authenticated member confirms their own payment (alternative to email token).
+Member confirms their own payment (session or `memberToken` in the body, same as other member routes). On success, enqueues `admin_confirmation_request` like the email confirm flow so the admin can verify.
 
 ## Notifications
 

@@ -71,7 +71,11 @@ Update period (e.g. waive member, add notes). Admin only.
 
 ### `GET /api/confirm/[token]`
 
-Handles “I’ve paid” email link. Token is HMAC-signed. No auth. Validates token, sets payment to `member_confirmed`, notifies admin, redirects to a thank-you URL.
+Handles “I’ve paid” email link. Token is HMAC-signed. No auth. Validates token, sets payment to `member_confirmed`, enqueues an admin verification nudge (Telegram when the admin has it linked and enabled; otherwise email if allowed), redirects to a thank-you URL.
+
+### `POST /api/groups/[groupId]/billing/[periodId]/self-confirm`
+
+Member marks paid from the app (session or `memberToken`). Same admin verification nudge enqueue as the email confirm flow.
 
 ### `POST /api/groups/[groupId]/billing/[periodId]/confirm`
 

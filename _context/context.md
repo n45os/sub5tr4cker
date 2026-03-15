@@ -29,7 +29,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 1. Admin creates group → adds members → sets billing config
 2. Cron creates billing periods monthly (or manual for variable mode)
 3. Reminders sent via email/Telegram with payment link
-4. Member confirms ("I paid") via email link or dashboard self-confirm or Telegram
+4. Member confirms ("I paid") via email link, `POST .../self-confirm`, or Telegram → `admin_confirmation_request` notifies the admin (Telegram when linked and Telegram notifications are on; otherwise email if allowed)
 5. Admin confirms in dashboard or via Telegram → status confirmed
 
 ## Implemented APIs (see docs/api-design.md)

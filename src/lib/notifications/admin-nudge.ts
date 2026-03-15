@@ -6,6 +6,7 @@ import {
   buildAdminFollowUpEmailHtml,
   buildAdminFollowUpTelegramText,
 } from "@/lib/email/templates/admin-follow-up";
+import { isTelegramEnabled } from "@/lib/telegram/bot";
 
 type GroupDoc = IGroup & { _id: { toString: () => string } };
 type PeriodDoc = IBillingPeriod & {
@@ -47,14 +48,21 @@ export async function sendAdminConfirmationNudge(
   const emailHtml = buildAdminFollowUpEmailHtml(templateParams);
   const telegramText = buildAdminFollowUpTelegramText(templateParams);
 
+  // when telegram is linked + enabled in profile, nudge on tg only; otherwise email (if allowed)
+  const telegramPref = admin.notificationPreferences?.telegram ?? false;
+  const emailPref = admin.notificationPreferences?.email ?? true;
+  const botOn = await isTelegramEnabled();
+  const canDeliverTelegram =
+    telegramPref && !!admin.telegram?.chatId && botOn;
+
   await sendNotification(
     {
       email: admin.email,
       telegramChatId: admin.telegram?.chatId,
       userId: admin._id.toString(),
       preferences: {
-        email: admin.notificationPreferences?.email ?? true,
-        telegram: admin.notificationPreferences?.telegram ?? false,
+        telegram: telegramPref,
+        email: !canDeliverTelegram && emailPref,
       },
     },
     {

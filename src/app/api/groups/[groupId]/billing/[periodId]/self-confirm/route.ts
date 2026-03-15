@@ -7,6 +7,8 @@ import { dbConnect } from "@/lib/db/mongoose";
 import { Group, BillingPeriod } from "@/models";
 import type { IGroupMember, IMemberPayment } from "@/models";
 import { verifyMemberPortalToken } from "@/lib/tokens";
+import { enqueueTask } from "@/lib/tasks/queue";
+import { runNotificationTasks } from "@/jobs/run-notification-tasks";
 
 const selfConfirmSchema = z.object({
   memberToken: z.string().optional(),
@@ -140,6 +142,16 @@ export async function POST(
   payment.status = "member_confirmed";
   payment.memberConfirmedAt = new Date();
   await period.save();
+
+  await enqueueTask({
+    type: "admin_confirmation_request",
+    runAt: new Date(),
+    payload: {
+      groupId,
+      billingPeriodId: periodId,
+    },
+  });
+  await runNotificationTasks({ limit: 5 });
 
   await logAudit({
     actorId,

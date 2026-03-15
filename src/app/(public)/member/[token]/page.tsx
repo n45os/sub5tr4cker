@@ -65,9 +65,11 @@ export default async function MemberPortalPage({
     .limit(24)
     .lean<IBillingPeriod[]>();
 
+  // chronological newest-first — no fancy reordering on the member portal
   const memberPeriods = periods.map((p) => ({
     _id: p._id.toString(),
     periodStart: p.periodStart.toISOString().slice(0, 10),
+    periodEnd: p.periodEnd.toISOString().slice(0, 10),
     periodLabel: p.periodLabel,
     totalPrice: p.totalPrice,
     isFullyPaid: p.isFullyPaid,

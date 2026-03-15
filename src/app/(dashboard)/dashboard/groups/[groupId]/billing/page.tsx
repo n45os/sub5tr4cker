@@ -7,10 +7,6 @@ import { NoPeriodsCard } from "@/components/features/billing/no-periods-card";
 import { PaymentMatrix } from "@/components/features/billing/payment-matrix";
 import { ImportHistoryDialog } from "@/components/features/billing/import-history-dialog";
 import { auth } from "@/lib/auth";
-import {
-  DEFAULT_MAX_FUTURE_PERIODS,
-  orderPeriodsForDisplay,
-} from "@/lib/billing/period-display";
 import { getServerBaseUrl } from "@/lib/server-url";
 
 const BILLING_PAGE_LIMIT = 50;
@@ -100,10 +96,8 @@ export default async function GroupBillingPage({
     cookieHeader,
     BILLING_PAGE_LIMIT
   );
-  // current first, then all past, max 2 future periods (more on analytical page)
-  const periods = orderPeriodsForDisplay(periodsRaw, {
-    maxFuture: DEFAULT_MAX_FUTURE_PERIODS,
-  });
+  // newest first — API already returns periodStart desc
+  const periods = periodsRaw;
   const currentPeriod = periods[0];
   const isAdmin = group.role === "admin";
   const adminMembers = group.members ?? [];

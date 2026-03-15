@@ -21,10 +21,6 @@ import { MemberGroupView } from "@/components/features/groups/member-group-view"
 import { CollapsibleNotificationsPanel } from "@/components/features/notifications/collapsible-notifications-panel";
 import { auth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
-import {
-  DEFAULT_MAX_FUTURE_PERIODS,
-  orderPeriodsForDisplay,
-} from "@/lib/billing/period-display";
 import { getServerBaseUrl } from "@/lib/server-url";
 
 interface MemberRow {
@@ -170,13 +166,19 @@ export default async function GroupDetailPage({
     getBillingPeriods(groupId, cookieHeader, 12),
     getNotifications(groupId, cookieHeader, isAdmin),
   ]);
-  // current first, then past, max 2 future periods; take first 6 for preview
-  const periods = orderPeriodsForDisplay(periodsRaw, {
-    maxFuture: DEFAULT_MAX_FUTURE_PERIODS,
-  }).slice(
-    0,
-    6
+  // split into future vs current+past, cap future to 2 on the preview
+  const MAX_FUTURE_PREVIEW = 2;
+  const now = new Date();
+  const futurePeriods = periodsRaw.filter(
+    (p) => p.periodStart && new Date(p.periodStart) > now
   );
+  const nonFuturePeriods = periodsRaw.filter(
+    (p) => !p.periodStart || new Date(p.periodStart) <= now
+  );
+  const futurePreview = futurePeriods.slice(0, MAX_FUTURE_PREVIEW);
+  const hiddenFutureCount = futurePeriods.length - futurePreview.length;
+  const pastSlots = Math.max(0, 6 - futurePreview.length);
+  const periods = [...futurePreview, ...nonFuturePeriods.slice(0, pastSlots)];
   const currentPeriod = periods[0];
   const acceptedCount = isAdmin
     ? members.filter((m) => !!m.acceptedAt).length
@@ -186,8 +188,8 @@ export default async function GroupDetailPage({
     (session?.user?.email && members.find((m) => m.email === session.user.email)?._id) ??
     null;
 
-  // total outstanding across all open periods
-  const totalOutstanding = periods.reduce((sum, period) => {
+  // total owed as of today: only periods that have started (current + past), not future
+  const totalOutstanding = nonFuturePeriods.reduce((sum, period) => {
     return sum + period.payments
       .filter((p: { status: string }) => p.status === "pending" || p.status === "overdue")
       .reduce((pSum: number, p: { amount: number }) => pSum + p.amount, 0);
@@ -305,14 +307,14 @@ export default async function GroupDetailPage({
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Total outstanding</CardDescription>
+            <CardDescription>Owed until now</CardDescription>
             <CardTitle className="font-mono text-3xl tabular-nums">
               {totalOutstanding.toFixed(2)} {group.billing.currency}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
             <AlertTriangle className="size-4" />
-            Pending + overdue
+            Pending + overdue in current and past periods only
           </CardContent>
         </Card>
       </section>
@@ -327,7 +329,8 @@ export default async function GroupDetailPage({
             <div>
               <CardTitle>Billing periods</CardTitle>
               <CardDescription>
-                Latest 6 periods. Open the full list to edit, add, or view history.
+                Latest periods.{hiddenFutureCount > 0 && ` ${hiddenFutureCount} more future period${hiddenFutureCount !== 1 ? "s" : ""} on the full page.`}{" "}
+                Open the full list to edit, add, or view history.
               </CardDescription>
             </div>
             <Link

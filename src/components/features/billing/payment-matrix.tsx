@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   AlertTriangle,
   Check,
@@ -163,6 +163,10 @@ export function PaymentMatrix({
   const [periods, setPeriods] = useState<PeriodRow[]>(initialPeriods);
   const [loadingCell, setLoadingCell] = useState<string | null>(null);
   const [errorCell, setErrorCell] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPeriods(initialPeriods);
+  }, [initialPeriods]);
 
   const updateCell = useCallback(
     (periodId: string, memberId: string, update: Partial<PaymentCell>) => {

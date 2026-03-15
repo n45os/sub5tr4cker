@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { CalendarDays, CheckCircle, Clock, CreditCard, AlertTriangle, ExternalLink, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +43,7 @@ export interface MemberGroupViewGroup {
 export interface MemberGroupViewPeriod {
   _id: string;
   periodStart: string;
+  periodEnd?: string;
   periodLabel: string;
   totalPrice: number;
   payments: Array<{
@@ -74,6 +75,7 @@ export function MemberGroupView({
   memberToken,
 }: MemberGroupViewProps) {
   const [showAllPeriods, setShowAllPeriods] = useState(false);
+  const paymentBoardRef = useRef<HTMLDivElement | null>(null);
   const currentPeriod = periods[0];
   const myMembership = group.myMembership;
   const membersForMatrix = myMembership
@@ -193,7 +195,7 @@ export function MemberGroupView({
           </CardHeader>
         </Card>
       ) : (
-        <div className="w-fit max-w-full">
+        <div ref={paymentBoardRef} className="w-fit max-w-full">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div>
@@ -232,7 +234,15 @@ export function MemberGroupView({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setShowAllPeriods(true)}
+                      onClick={() => {
+                        setShowAllPeriods(true);
+                        requestAnimationFrame(() => {
+                          paymentBoardRef.current?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start",
+                          });
+                        });
+                      }}
                     >
                       Load all periods
                     </Button>

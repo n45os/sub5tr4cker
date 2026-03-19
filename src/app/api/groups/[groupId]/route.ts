@@ -3,6 +3,9 @@ import { z } from "zod";
 import mongoose from "mongoose";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
+import {
+  recalculateEqualSplitPeriodsForGroup,
+} from "@/lib/billing/backfill";
 import { calculateShares } from "@/lib/billing/calculator";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group, BillingPeriod, PriceHistory } from "@/models";
@@ -167,6 +170,7 @@ export async function PATCH(
 
   const body = parsed.data;
   const previousPrice = group.billing.currentPrice;
+  const previousAdminIncludedInSplit = group.billing.adminIncludedInSplit;
 
   if (body.name !== undefined) group.name = body.name;
   if (body.description !== undefined) group.description = body.description;
@@ -202,6 +206,21 @@ export async function PATCH(
   }
 
   await group.save();
+
+  const adminIncludedInSplitChanged =
+    body.billing?.adminIncludedInSplit !== undefined &&
+    previousAdminIncludedInSplit !== group.billing.adminIncludedInSplit;
+
+  if (adminIncludedInSplitChanged) {
+    try {
+      await recalculateEqualSplitPeriodsForGroup(group);
+    } catch (error) {
+      console.error(
+        "recalculate billing periods after adminIncludedInSplit change failed:",
+        error,
+      );
+    }
+  }
 
   const actorName =
     (session.user.name as string) ||

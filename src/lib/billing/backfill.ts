@@ -39,6 +39,17 @@ function shouldRecalculateExistingPayments(group: IGroup): boolean {
   return group.billing.mode === "equal_split" || group.billing.mode === "variable";
 }
 
+// automatic price-change rows from PATCH /groups/[id]; safe to replace on roster/split recalc
+function isPriceSyncAdjustment(payment: IMemberPayment): boolean {
+  const r = payment.adjustmentReason;
+  if (r == null || r === "") return false;
+  return r.startsWith("price updated from");
+}
+
+function hasManualAmountOverride(payment: IMemberPayment): boolean {
+  return payment.adjustedAmount != null && !isPriceSyncAdjustment(payment);
+}
+
 function recalculatePeriodPayments(
   period: { payments: IMemberPayment[] },
   group: IGroup,
@@ -51,13 +62,43 @@ function recalculatePeriodPayments(
   );
 
   for (const payment of period.payments) {
-    if (payment.adjustedAmount != null) continue;
+    if (hasManualAmountOverride(payment)) continue;
 
     const nextAmount = shareByMemberId.get(payment.memberId.toString());
     if (nextAmount == null) continue;
 
     payment.amount = nextAmount;
+
+    if (payment.adjustedAmount != null && isPriceSyncAdjustment(payment)) {
+      payment.adjustedAmount = null;
+      payment.adjustmentReason = null;
+    }
   }
+}
+
+// re-run equal/variable shares for every period (e.g. admin included-in-split toggled)
+export async function recalculateEqualSplitPeriodsForGroup(
+  group: IGroup,
+): Promise<{ periodsUpdated: number }> {
+  if (!shouldRecalculateExistingPayments(group)) {
+    return { periodsUpdated: 0 };
+  }
+
+  const periods = await BillingPeriod.find({ group: group._id }).sort({
+    periodStart: 1,
+  });
+
+  let periodsUpdated = 0;
+  for (const period of periods) {
+    recalculatePeriodPayments(period, group, period.totalPrice, period.periodStart);
+    period.isFullyPaid = period.payments.every(
+      (p: IMemberPayment) => p.status === "confirmed" || p.status === "waived",
+    );
+    await period.save();
+    periodsUpdated++;
+  }
+
+  return { periodsUpdated };
 }
 
 // backfill a member into existing billing periods that started on or after

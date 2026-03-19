@@ -117,7 +117,14 @@ export async function POST(
       credit: number;
     }>;
   }> = [];
-  if (added.billingStartsAt && added.billingStartsAt < new Date()) {
+  const memberBillingStart =
+    (added.billingStartsAt as Date | null | undefined) ??
+    (added.joinedAt as Date);
+  if (
+    memberBillingStart &&
+    !Number.isNaN(memberBillingStart.getTime()) &&
+    memberBillingStart.getTime() <= Date.now()
+  ) {
     const result = await backfillMemberIntoPeriods(group, added);
     backfilledPeriods = result.backfilledCount;
     creditSummary = result.creditSummary;

@@ -192,7 +192,7 @@ export async function DELETE(
   let newShareAmount = recalcResult.newShareAmount;
   if (!newShareAmount) {
     const nextStart = getNextPeriodStart(group.billing.cycleDay ?? 1);
-    const shares = calculateShares(group, group.price, nextStart);
+    const shares = calculateShares(group, group.billing.currentPrice, nextStart);
     newShareAmount = shares.length > 0 ? shares[0].amount : 0;
   }
 
@@ -213,7 +213,7 @@ export async function DELETE(
     data: {
       success: true,
       newShareAmount,
-      currency: group.currency,
+      currency: group.billing.currency,
       recalculatedCount: recalcResult.recalculatedCount,
       removedMemberPendingPeriods: recalcResult.removedMemberPendingPeriods,
     },

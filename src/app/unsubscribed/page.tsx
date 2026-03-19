@@ -1,3 +1,5 @@
+import { REPO_URL } from "@/lib/site";
+
 export default async function UnsubscribedPage({
   searchParams,
 }: {
@@ -43,7 +45,7 @@ export default async function UnsubscribedPage({
         )}
         <p className="text-sm text-zinc-500">
           <a
-            href="https://github.com/n45os/sub5tr4cker"
+            href={REPO_URL}
             className="underline hover:text-zinc-700"
           >
             sub5tr4cker

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, Space_Grotesk, Syne, JetBrains_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
+import { RepoTopBar } from "@/components/layout/repo-top-bar";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -39,7 +40,10 @@ export default function RootLayout({
         className={`${dmSans.variable} ${spaceGrotesk.variable} ${syne.variable} ${jetbrainsMono.variable} min-h-screen bg-background font-sans antialiased`}
         suppressHydrationWarning
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          <RepoTopBar />
+          {children}
+        </Providers>
       </body>
     </html>
   );

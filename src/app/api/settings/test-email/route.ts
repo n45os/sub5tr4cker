@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { sendEmail } from "@/lib/email/client";
+import { buildEmailFooterHtml } from "@/lib/email/footer";
 import { getSetting } from "@/lib/settings/service";
 
 export async function POST() {
@@ -22,7 +23,10 @@ export async function POST() {
           <p style="margin: 0 0 8px; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #71717a;">sub5tr4cker</p>
           <h1 style="margin: 0 0 12px; font-size: 24px;">Email settings look good</h1>
           <p style="margin: 0 0 16px; color: #52525b;">This test email confirms the current email configuration can send messages successfully.</p>
-          <p style="margin: 0; color: #71717a;">Workspace URL: ${appUrl}</p>
+          <p style="margin: 0 0 16px; color: #71717a;">Workspace URL: ${appUrl}</p>
+          <div style="padding-top: 16px; border-top: 1px solid #e4e4e7;">
+            ${buildEmailFooterHtml({})}
+          </div>
         </div>
       </div>
     `,

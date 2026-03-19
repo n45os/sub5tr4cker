@@ -80,7 +80,7 @@ A subscription group managed by an admin.
   // payment method
   payment: {
     platform: 'revolut' | 'paypal' | 'bank_transfer' | 'stripe' | 'custom',
-    link: string | null,                  // e.g., "https://revolut.me/example"
+    link: string | null,                  // e.g., "https://revolut.me/yourname"
     instructions: string | null,          // free text for bank transfer, etc.
     stripeAccountId: string | null,       // for Stripe integration (phase 2)
   },

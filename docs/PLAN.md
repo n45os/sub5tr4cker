@@ -141,7 +141,7 @@ Member receives Telegram message:
 │ YouTube Premium — March 2026        │
 │ Your share: €4.00                   │
 │                                     │
-│ Pay via: revolut.me/example         │
+│ Pay via: (payment link)             │
 │                                     │
 │ [   I've Paid   ] [  Remind Later  ]│
 └─────────────────────────────────────┘

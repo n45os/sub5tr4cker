@@ -272,6 +272,12 @@ Manually create a billing period (for variable mode). Admin only.
 }
 ```
 
+### `POST /api/groups/[groupId]/billing/reconcile`
+
+Re-runs equal-split / variable share math for **every** billing period on the group: updates `amount` (and clears automatic price-sync adjustments), removes payment rows for active members who are not owed for that period (e.g. billing start date after `periodStart`), and keeps rows for inactive or former members. Admin only. Empty body.
+
+**Response:** `{ "data": { "periodsUpdated": number } }`
+
 ### `PATCH /api/groups/[groupId]/billing/[periodId]`
 
 Update a billing period (change price, waive a member, add notes). Admin only.

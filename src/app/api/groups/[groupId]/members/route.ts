@@ -3,7 +3,10 @@ import { z } from "zod";
 import mongoose from "mongoose";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
-import { backfillMemberIntoPeriods } from "@/lib/billing/backfill";
+import {
+  backfillMemberIntoPeriods,
+  recalculateEqualSplitPeriodsForGroup,
+} from "@/lib/billing/backfill";
 import { calculateShares, getNextPeriodStart } from "@/lib/billing/calculator";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group } from "@/models";
@@ -130,6 +133,19 @@ export async function POST(
     creditSummary = result.creditSummary;
   }
 
+  // resync all periods: drop orphan rows and align shares after roster change
+  let periodsReconciled = 0;
+  if (
+    group.billing.mode === "equal_split" ||
+    group.billing.mode === "variable"
+  ) {
+    const fresh = await Group.findById(groupId);
+    if (fresh) {
+      const reconciled = await recalculateEqualSplitPeriodsForGroup(fresh);
+      periodsReconciled = reconciled.periodsUpdated;
+    }
+  }
+
   // new per-member share for next period (for UI display)
   const nextPeriodStart = getNextPeriodStart(group.billing.cycleDay);
   const nextShares = calculateShares(group, undefined, nextPeriodStart);
@@ -152,6 +168,7 @@ export async function POST(
       nickname: added.nickname,
       backfilledPeriods,
       creditSummaryCount: creditSummary.length,
+      periodsReconciled,
     },
   });
 
@@ -164,6 +181,7 @@ export async function POST(
       isActive: added.isActive,
       backfilledPeriods,
       creditSummary,
+      periodsReconciled,
       newShareAmount,
       currency,
     },

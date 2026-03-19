@@ -3,7 +3,11 @@ import { z } from "zod";
 import mongoose from "mongoose";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
-import { backfillMemberIntoPeriods, recalculatePeriodsOnMemberRemoval } from "@/lib/billing/backfill";
+import {
+  backfillMemberIntoPeriods,
+  recalculateEqualSplitPeriodsForGroup,
+  recalculatePeriodsOnMemberRemoval,
+} from "@/lib/billing/backfill";
 import { calculateShares, getNextPeriodStart } from "@/lib/billing/calculator";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group } from "@/models";
@@ -108,6 +112,16 @@ export async function PATCH(
   ) {
     const result = await backfillMemberIntoPeriods(group, member);
     backfilledPeriods = result.backfilledCount;
+  }
+
+  if (
+    backfilledPeriods > 0 &&
+    (group.billing.mode === "equal_split" || group.billing.mode === "variable")
+  ) {
+    const fresh = await Group.findById(groupId);
+    if (fresh) {
+      await recalculateEqualSplitPeriodsForGroup(fresh);
+    }
   }
 
   const actorName =

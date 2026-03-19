@@ -60,6 +60,20 @@ function recalculatePeriodPayments(
   const shareByMemberId = new Map(
     shares.map((share) => [share.memberId, share.amount]),
   );
+  const owedMemberIds = new Set(shares.map((s) => s.memberId));
+
+  // drop rows for active members who are not in this period's split (e.g. billing
+  // starts mid-year but a bogus row exists from an old fallback). keep former members
+  // and manual admin overrides.
+  period.payments = period.payments.filter((p: IMemberPayment) => {
+    if (hasManualAmountOverride(p)) return true;
+    const mid = p.memberId.toString();
+    if (owedMemberIds.has(mid)) return true;
+    const m = group.members.find((x) => x._id.toString() === mid);
+    if (!m) return false;
+    if (!m.isActive || m.leftAt) return true;
+    return false;
+  });
 
   for (const payment of period.payments) {
     if (hasManualAmountOverride(payment)) continue;
@@ -144,14 +158,10 @@ export async function backfillMemberIntoPeriods(
       (s) => s.memberId === member._id.toString(),
     );
 
-    const amount = memberShare?.amount ?? (
-      period.payments.length > 0
-        ? period.payments.reduce(
-            (s: number, p: IMemberPayment) => s + p.amount,
-            0,
-          ) / period.payments.length
-        : 0
-    );
+    // member is not valid for this period's split (billing start after period start)
+    if (!memberShare) continue;
+
+    const amount = memberShare.amount;
 
     if (amount <= 0) continue;
 

@@ -96,6 +96,13 @@ export async function sendAggregatedReminder(
     });
   }
 
+  const distinctGroupCount = new Set(
+    payments.map((i) => (i.group._id as { toString: () => string }).toString())
+  ).size;
+  const distinctPeriodCount = new Set(
+    payments.map((i) => (i.period._id as { toString: () => string }).toString())
+  ).size;
+
   const first = payments[0];
   const firstMemberId = (first.payment.memberId as { toString: () => string }).toString();
   const firstGroupId = (first.group._id as { toString: () => string }).toString();
@@ -109,6 +116,8 @@ export async function sendAggregatedReminder(
   const emailHtml = buildAggregatedPaymentReminderEmailHtml({
     memberName,
     entries,
+    distinctGroupCount,
+    distinctPeriodCount,
     unsubscribeUrl,
     accentColor,
   });
@@ -116,6 +125,8 @@ export async function sendAggregatedReminder(
   const telegramText = buildAggregatedPaymentReminderTelegramText({
     memberName,
     entries,
+    distinctGroupCount,
+    distinctPeriodCount,
   });
 
   const firstPeriodId = (first.period._id as { toString: () => string }).toString();
@@ -133,7 +144,10 @@ export async function sendAggregatedReminder(
     },
     {
       type: "payment_reminder",
-      subject: `Payment reminders — ${entries.length} group(s)`,
+      subject:
+        distinctGroupCount > 1
+          ? `Payment reminders — ${distinctPeriodCount} period(s), ${distinctGroupCount} groups`
+          : `Payment reminders — ${distinctPeriodCount} period(s)`,
       emailHtml,
       telegramText,
       telegramKeyboard: keyboard,

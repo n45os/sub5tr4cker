@@ -21,6 +21,10 @@ export interface AggregatedPaymentEntry {
 export interface AggregatedPaymentReminderTemplateParams {
   memberName: string;
   entries: AggregatedPaymentEntry[];
+  /** distinct groups represented in entries (entries.length can be multiple periods in one group) */
+  distinctGroupCount: number;
+  /** distinct billing periods represented in entries */
+  distinctPeriodCount: number;
   /** optional; when set, footer includes unsubscribe link */
   unsubscribeUrl?: string | null;
   /** optional; hex accent for header and primary buttons (falls back to first entry or default) */
@@ -33,6 +37,16 @@ function escapeHtml(s: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function buildAggregatedIntroText(
+  distinctPeriodCount: number,
+  distinctGroupCount: number
+): string {
+  if (distinctGroupCount <= 1) {
+    return `You have unpaid amounts for ${distinctPeriodCount} billing period(s):`;
+  }
+  return `You have unpaid amounts for ${distinctPeriodCount} billing period(s) across ${distinctGroupCount} subscription groups:`;
 }
 
 export function buildAggregatedPaymentReminderEmailHtml(
@@ -98,7 +112,7 @@ export function buildAggregatedPaymentReminderEmailHtml(
         </div>
         <div class="body">
           <p>Hi ${escapeHtml(params.memberName)},</p>
-          <p>You have unpaid amounts across ${params.entries.length} subscription group(s):</p>
+          <p>${escapeHtml(buildAggregatedIntroText(params.distinctPeriodCount, params.distinctGroupCount))}</p>
           <div class="total">Total: ${totalAmount.toFixed(2)}${currency}</div>
           ${sectionsHtml}
           <p>Thank you!</p>
@@ -115,15 +129,19 @@ export function buildAggregatedPaymentReminderEmailHtml(
 export function buildAggregatedPaymentReminderTelegramText(
   params: Pick<
     AggregatedPaymentReminderTemplateParams,
-    "memberName" | "entries"
+    "memberName" | "entries" | "distinctGroupCount" | "distinctPeriodCount"
   >
 ): string {
   const totalAmount = params.entries.reduce((sum, e) => sum + e.amount, 0);
   const currency = params.entries[0]?.currency ?? "€";
+  const intro = buildAggregatedIntroText(
+    params.distinctPeriodCount,
+    params.distinctGroupCount
+  );
   const lines: string[] = [
     "💳 <b>Payment Reminders</b>",
     "",
-    `${params.memberName}, you have unpaid amounts:`,
+    `${params.memberName}, ${intro.replace(/^You have /, "you have ")}`,
     `<b>Total: ${totalAmount.toFixed(2)}${currency}</b>`,
     "",
   ];

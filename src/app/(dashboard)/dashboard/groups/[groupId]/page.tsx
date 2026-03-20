@@ -351,6 +351,7 @@ export default async function GroupDetailPage({
               members={members.map((m) => ({ _id: m._id, nickname: m.nickname, email: m.email }))}
               isAdmin
               currentMemberId={currentMemberId}
+              billingMode={group.billing.mode}
             />
           </CardContent>
         </Card>

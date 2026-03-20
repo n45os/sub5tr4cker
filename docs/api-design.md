@@ -278,6 +278,14 @@ Re-runs equal-split / variable share math for **every** billing period on the gr
 
 **Response:** `{ "data": { "periodsUpdated": number } }`
 
+### `POST /api/groups/[groupId]/billing/[periodId]/recalculate`
+
+Re-applies **equal_split** / **variable** share rules for **this period only** (same logic as full-group reconcile). Admin only. Empty body.
+
+**Response:** `{ "data": { "_id", "periodLabel", "totalPrice", "currency", "priceNote", "payments": [...], "isFullyPaid" } }`
+
+**Errors:** `400` if billing mode is `fixed_amount`.
+
 ### `PATCH /api/groups/[groupId]/billing/[periodId]`
 
 Update a billing period (change price, waive a member, add notes). Admin only.

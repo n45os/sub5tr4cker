@@ -126,6 +126,12 @@ export async function PATCH(
         adjustmentReason: p.adjustmentReason,
         status: p.status,
         notes: p.notes,
+        memberConfirmedAt: p.memberConfirmedAt
+          ? (p.memberConfirmedAt as Date).toISOString()
+          : null,
+        adminConfirmedAt: p.adminConfirmedAt
+          ? (p.adminConfirmedAt as Date).toISOString()
+          : null,
       })),
       isFullyPaid: period.isFullyPaid,
     },

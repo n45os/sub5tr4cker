@@ -115,6 +115,27 @@ export async function recalculateEqualSplitPeriodsForGroup(
   return { periodsUpdated };
 }
 
+// recompute shares for one period from current group rules (equal_split / variable)
+export function recalculateSinglePeriodFromGroupRules(
+  group: IGroup,
+  period: {
+    payments: IMemberPayment[];
+    totalPrice: number;
+    periodStart: Date;
+  },
+): boolean {
+  if (!shouldRecalculateExistingPayments(group)) {
+    return false;
+  }
+  recalculatePeriodPayments(
+    period,
+    group,
+    period.totalPrice,
+    period.periodStart,
+  );
+  return true;
+}
+
 // backfill a member into existing billing periods that started on or after
 // their billingStartsAt date. only adds payment entries where the member
 // is not already present. returns backfilled count and credit summary for

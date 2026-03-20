@@ -6,15 +6,21 @@ import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Check,
+  ChevronDown,
   Info,
   Loader2,
   Minus,
   MoreVertical,
   Pencil,
+  RefreshCw,
   Trash2,
   UserCheck,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -40,6 +46,7 @@ import {
 } from "@/components/ui/tooltip";
 import { getPeriodDisplayState } from "@/lib/billing/period-display";
 import { cn } from "@/lib/utils";
+import type { BillingMode } from "@/types";
 
 export interface PaymentCell {
   memberId: string;
@@ -73,6 +80,46 @@ function effectiveAmount(payment: PaymentCell): number {
   return payment.adjustedAmount ?? payment.amount;
 }
 
+type EditPeriodMemberRow = {
+  memberId: string;
+  memberNickname: string;
+  overrideAmount: string;
+  reason: string;
+};
+
+function buildMemberRowsFromPeriod(period: PeriodRow): EditPeriodMemberRow[] {
+  return period.payments.map((p) => ({
+    memberId: p.memberId,
+    memberNickname: p.memberNickname,
+    overrideAmount: p.adjustedAmount != null ? String(p.adjustedAmount) : "",
+    reason: p.adjustmentReason ?? "",
+  }));
+}
+
+function mapApiPaymentsToCells(
+  payments: Array<{
+    memberId: string;
+    memberNickname: string;
+    amount: number;
+    adjustedAmount?: number | null;
+    adjustmentReason?: string | null;
+    status: string;
+    memberConfirmedAt: string | null;
+    adminConfirmedAt: string | null;
+  }>,
+): PaymentCell[] {
+  return payments.map((pay) => ({
+    memberId: pay.memberId,
+    memberNickname: pay.memberNickname,
+    amount: pay.amount,
+    adjustedAmount: pay.adjustedAmount ?? null,
+    adjustmentReason: pay.adjustmentReason ?? null,
+    status: pay.status,
+    memberConfirmedAt: pay.memberConfirmedAt,
+    adminConfirmedAt: pay.adminConfirmedAt,
+  }));
+}
+
 interface PaymentMatrixProps {
   groupId: string;
   currency: string;
@@ -80,6 +127,8 @@ interface PaymentMatrixProps {
   members: MemberColumn[];
   isAdmin: boolean;
   currentMemberId: string | null;
+  /** used to hide share recalculate in fixed-amount groups */
+  billingMode?: BillingMode;
   memberToken?: string;
   paymentPlatform?: string | null;
   paymentLink?: string | null;
@@ -169,12 +218,15 @@ export function PaymentMatrix({
   members,
   isAdmin,
   currentMemberId,
+  billingMode,
   memberToken,
   paymentPlatform,
   paymentLink,
   paymentInstructions,
   onPeriodsChange,
 }: PaymentMatrixProps) {
+  const canRecalculateShares =
+    billingMode !== "fixed_amount";
   const [periods, setPeriods] = useState<PeriodRow[]>(initialPeriods);
   const [loadingCell, setLoadingCell] = useState<string | null>(null);
   const [errorCell, setErrorCell] = useState<string | null>(null);
@@ -389,10 +441,13 @@ export function PaymentMatrix({
     periodLabel: string;
     totalPrice: string;
     priceNote: string;
+    memberRows: EditPeriodMemberRow[];
   } | null>(null);
   const [editPeriodSaving, setEditPeriodSaving] = useState(false);
+  const [editPeriodRecalculating, setEditPeriodRecalculating] = useState(false);
   const [editPeriodDeleting, setEditPeriodDeleting] = useState(false);
   const [editPeriodDeleteConfirm, setEditPeriodDeleteConfirm] = useState(false);
+  const [customPricesOpen, setCustomPricesOpen] = useState(false);
 
   const deletePeriod = useCallback(async () => {
     if (!editPeriodDialog) return;
@@ -412,12 +467,86 @@ export function PaymentMatrix({
     }
   }, [editPeriodDialog, groupId]);
 
+  const recalculateEditPeriod = useCallback(async () => {
+    if (!editPeriodDialog) return;
+    setEditPeriodRecalculating(true);
+    try {
+      const res = await fetch(
+        `/api/groups/${groupId}/billing/${editPeriodDialog.periodId}/recalculate`,
+        { method: "POST" },
+      );
+      const json = await res.json();
+      if (!res.ok) return;
+      const data = json.data as {
+        totalPrice: number;
+        priceNote: string | null;
+        payments: Parameters<typeof mapApiPaymentsToCells>[0];
+        isFullyPaid: boolean;
+      };
+      const cells = mapApiPaymentsToCells(data.payments);
+      setPeriods((prev) => {
+        const next = prev.map((p) =>
+          p._id === editPeriodDialog.periodId
+            ? {
+                ...p,
+                totalPrice: data.totalPrice,
+                priceNote: data.priceNote ?? null,
+                payments: cells,
+                isFullyPaid: data.isFullyPaid,
+              }
+            : p,
+        );
+        onPeriodsChange?.(next);
+        return next;
+      });
+      setEditPeriodDialog((prev) =>
+        prev && prev.periodId === editPeriodDialog.periodId
+          ? {
+              ...prev,
+              totalPrice: String(data.totalPrice),
+              priceNote: data.priceNote ?? "",
+              memberRows: data.payments.map((pay) => ({
+                memberId: pay.memberId,
+                memberNickname: pay.memberNickname,
+                overrideAmount:
+                  pay.adjustedAmount != null ? String(pay.adjustedAmount) : "",
+                reason: pay.adjustmentReason ?? "",
+              })),
+            }
+          : prev,
+      );
+    } finally {
+      setEditPeriodRecalculating(false);
+    }
+  }, [editPeriodDialog, groupId, onPeriodsChange]);
+
   const saveEditPeriod = useCallback(async () => {
     if (!editPeriodDialog) return;
     const totalPrice = parseFloat(editPeriodDialog.totalPrice);
     if (!Number.isFinite(totalPrice) || totalPrice <= 0) return;
     setEditPeriodSaving(true);
     try {
+      const paymentsPayload = editPeriodDialog.memberRows.map((row) => {
+        const trimmed = row.overrideAmount.trim();
+        if (!trimmed) {
+          return {
+            memberId: row.memberId,
+            adjustedAmount: null as number | null,
+            adjustmentReason: null as string | null,
+          };
+        }
+        const n = parseFloat(trimmed);
+        if (!Number.isFinite(n) || n < 0) {
+          return null;
+        }
+        return {
+          memberId: row.memberId,
+          adjustedAmount: n,
+          adjustmentReason: row.reason.trim() || null,
+        };
+      });
+      if (paymentsPayload.some((x) => x === null)) return;
+
       const res = await fetch(
         `/api/groups/${groupId}/billing/${editPeriodDialog.periodId}`,
         {
@@ -426,30 +555,41 @@ export function PaymentMatrix({
           body: JSON.stringify({
             totalPrice,
             priceNote: editPeriodDialog.priceNote.trim() || null,
+            payments: paymentsPayload,
           }),
         },
       );
       if (res.ok) {
         const json = await res.json();
-        const data = json.data;
-        setPeriods((prev) =>
-          prev.map((p) =>
+        const data = json.data as {
+          totalPrice: number;
+          priceNote: string | null;
+          payments: Parameters<typeof mapApiPaymentsToCells>[0];
+          isFullyPaid: boolean;
+        };
+        const cells = mapApiPaymentsToCells(data.payments);
+        setPeriods((prev) => {
+          const next = prev.map((p) =>
             p._id === editPeriodDialog.periodId
               ? {
                   ...p,
                   totalPrice: data.totalPrice,
                   priceNote: data.priceNote ?? null,
+                  payments: cells,
                   isFullyPaid: data.isFullyPaid,
                 }
               : p,
-          ),
-        );
+          );
+          onPeriodsChange?.(next);
+          return next;
+        });
         setEditPeriodDialog(null);
+        setCustomPricesOpen(false);
       }
     } finally {
       setEditPeriodSaving(false);
     }
-  }, [editPeriodDialog, groupId]);
+  }, [editPeriodDialog, groupId, onPeriodsChange]);
 
   // advance periods state
   const [advanceOpen, setAdvanceOpen] = useState(false);
@@ -591,14 +731,16 @@ export function PaymentMatrix({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start">
                         <DropdownMenuItem
-                          onClick={() =>
+                          onClick={() => {
+                            setCustomPricesOpen(false);
                             setEditPeriodDialog({
                               periodId: period._id,
                               periodLabel: period.periodLabel,
                               totalPrice: String(period.totalPrice),
                               priceNote: period.priceNote ?? "",
-                            })
-                          }
+                              memberRows: buildMemberRowsFromPeriod(period),
+                            });
+                          }}
                         >
                           <Pencil className="mr-2 size-3.5" />
                           Edit period
@@ -1073,10 +1215,11 @@ export function PaymentMatrix({
           if (!open) {
             setEditPeriodDialog(null);
             setEditPeriodDeleteConfirm(false);
+            setCustomPricesOpen(false);
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
               {editPeriodDeleteConfirm ? "Delete period?" : "Edit period"}
@@ -1084,7 +1227,7 @@ export function PaymentMatrix({
             <DialogDescription>
               {editPeriodDeleteConfirm
                 ? `Remove ${editPeriodDialog?.periodLabel} and all its payment records. This cannot be undone.`
-                : `Update total price or add a note for ${editPeriodDialog?.periodLabel}. Member amounts stay as-is unless you adjust them per cell.`}
+                : `Update total price, re-run splits from group rules, or set per-member overrides for ${editPeriodDialog?.periodLabel}.`}
             </DialogDescription>
           </DialogHeader>
           {editPeriodDeleteConfirm ? (
@@ -1110,7 +1253,64 @@ export function PaymentMatrix({
             </DialogFooter>
           ) : (
             <>
-              <div className="grid gap-4 py-4">
+              <div className="flex flex-wrap items-center gap-2 py-2">
+                {canRecalculateShares && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void recalculateEditPeriod()}
+                    disabled={
+                      editPeriodSaving ||
+                      editPeriodRecalculating ||
+                      editPeriodDeleting
+                    }
+                  >
+                    {editPeriodRecalculating ? (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="mr-2 size-4" />
+                    )}
+                    Recalculate shares
+                  </Button>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "sm" }),
+                      "gap-1",
+                    )}
+                    disabled={
+                      editPeriodSaving ||
+                      editPeriodRecalculating ||
+                      editPeriodDeleting
+                    }
+                  >
+                    More
+                    <ChevronDown className="size-3.5 opacity-70" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem
+                      onClick={() => setCustomPricesOpen((o) => !o)}
+                    >
+                      {customPricesOpen ? "Hide" : "Show"} custom member amounts
+                    </DropdownMenuItem>
+                    {canRecalculateShares && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => void recalculateEditPeriod()}
+                          disabled={editPeriodRecalculating}
+                        >
+                          <RefreshCw className="mr-2 size-3.5" />
+                          Recalculate from group rules
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <div className="grid gap-4 py-2">
                 <div className="grid gap-2">
                   <Label htmlFor="edit-totalPrice">Total price ({currency})</Label>
                   <Input
@@ -1140,13 +1340,73 @@ export function PaymentMatrix({
                     }
                   />
                 </div>
+                <Collapsible open={customPricesOpen} onOpenChange={setCustomPricesOpen}>
+                  <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out">
+                    <div className="space-y-3 rounded-md border border-border bg-muted/20 p-3">
+                      <p className="text-sm font-medium">Custom member amounts</p>
+                      <p className="text-xs text-muted-foreground">
+                        Override the calculated share for this month only. Leave empty
+                        to use the amount from group rules (run Recalculate to refresh).
+                      </p>
+                      {editPeriodDialog?.memberRows.map((row, idx) => (
+                        <div
+                          key={row.memberId}
+                          className="space-y-2 rounded-md border bg-card p-3 shadow-sm"
+                        >
+                          <p className="text-sm font-medium">{row.memberNickname}</p>
+                          <div className="grid gap-1.5">
+                            <Label htmlFor={`override-${row.memberId}`} className="text-xs">
+                              Override ({currency})
+                            </Label>
+                            <Input
+                              id={`override-${row.memberId}`}
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="e.g. 4.50 — leave empty for calculated"
+                              value={row.overrideAmount}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setEditPeriodDialog((prev) => {
+                                  if (!prev) return null;
+                                  const next = [...prev.memberRows];
+                                  next[idx] = { ...next[idx], overrideAmount: v };
+                                  return { ...prev, memberRows: next };
+                                });
+                              }}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label htmlFor={`reason-${row.memberId}`} className="text-xs">
+                              Reason (optional)
+                            </Label>
+                            <Input
+                              id={`reason-${row.memberId}`}
+                              placeholder="e.g. partial month"
+                              value={row.reason}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setEditPeriodDialog((prev) => {
+                                  if (!prev) return null;
+                                  const next = [...prev.memberRows];
+                                  next[idx] = { ...next[idx], reason: v };
+                                  return { ...prev, memberRows: next };
+                                });
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
               <DialogFooter className="flex-col gap-2 sm:flex-row">
                 <Button
                   variant="ghost"
                   className="mr-auto text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={() => setEditPeriodDeleteConfirm(true)}
-                  disabled={editPeriodSaving}
+                  disabled={editPeriodSaving || editPeriodRecalculating}
                 >
                   <Trash2 className="mr-2 size-4" />
                   Delete period
@@ -1155,10 +1415,18 @@ export function PaymentMatrix({
                   <Button
                     variant="outline"
                     onClick={() => setEditPeriodDialog(null)}
+                    disabled={editPeriodRecalculating}
                   >
                     Cancel
                   </Button>
-                  <Button onClick={saveEditPeriod} disabled={editPeriodSaving}>
+                  <Button
+                    onClick={saveEditPeriod}
+                    disabled={
+                      editPeriodSaving ||
+                      editPeriodRecalculating ||
+                      editPeriodDeleting
+                    }
+                  >
                     {editPeriodSaving && (
                       <Loader2 className="mr-2 size-4 animate-spin" />
                     )}

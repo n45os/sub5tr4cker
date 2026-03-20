@@ -20,7 +20,11 @@ interface MemberRow {
 interface GroupBillingDetail {
   _id: string;
   name: string;
-  billing: { currency: string; cycleDay: number };
+  billing: {
+    currency: string;
+    cycleDay: number;
+    mode?: "equal_split" | "fixed_amount" | "variable";
+  };
   role: string;
   members?: MemberRow[];
   myMembership?: { _id: string; nickname: string } | null;
@@ -155,6 +159,7 @@ export default async function GroupBillingPage({
           members={membersForMatrix}
           isAdmin={isAdmin}
           currentMemberId={currentMemberId}
+          billingMode={group.billing.mode ?? "equal_split"}
         />
       )}
     </div>

@@ -32,7 +32,7 @@ const keyboard = new InlineKeyboard()
 
 - Max 64 bytes per callback_data
 - Use colon-delimited format: `action:param1:param2`
-- Common prefixes: `confirm:`, `admin_confirm:`, `admin_reject:`, `snooze:`
+- Common prefixes: `confirm:`, `paydetails:`, `admin_confirm:`, `admin_reject:`, `snooze:`
 
 ## Reference
 

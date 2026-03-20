@@ -66,7 +66,7 @@ SubsTrack is an open-source web app for managing shared subscriptions. One perso
 A single **notification service** (`src/lib/notifications/service.ts`) dispatches to:
 
 - **Email** — Resend; templates can be React Email or HTML.
-- **Telegram** — grammy bot; messages can include inline keyboards (e.g. “I’ve paid”, “Confirm”).
+- **Telegram** — grammy bot; messages can include inline keyboards (e.g. “I’ve paid”, “Show paying details”, “Confirm”).
 
 Recipients have preferences (email on/off, Telegram on/off). The service checks those and sends to the right channels.
 

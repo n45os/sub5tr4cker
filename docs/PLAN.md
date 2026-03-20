@@ -128,7 +128,7 @@ Inspired by OpenClaw's grammy integration:
 
 - **Bot setup**: grammy with polling (simple) or webhook (production)
 - **User linking**: User provides their Telegram username or starts a chat with the bot → bot receives chat ID → linked to their account
-- **Reminders**: Sent as Telegram messages with inline keyboard buttons
+- **Reminders**: Sent as Telegram messages with inline keyboard buttons (**I've Paid**, **Remind later**, **Show paying details** — details reply uses group payment settings)
 - **"I paid" button**: Inline keyboard callback → marks as `member_confirmed`
 - **Admin notifications**: Bot sends message to admin when member confirms
 - **Admin confirmation**: Inline keyboard "Confirm" / "Reject" buttons
@@ -144,6 +144,7 @@ Member receives Telegram message:
 │ Pay via: (payment link)             │
 │                                     │
 │ [   I've Paid   ] [  Remind Later  ]│
+│ [      Show paying details         ]│
 └─────────────────────────────────────┘
 
 Admin receives after member confirms:

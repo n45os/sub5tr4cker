@@ -1,4 +1,4 @@
-<!-- last-updated: 2026-03-18 -->
+<!-- last-updated: 2026-03-20 -->
 
 # Integrations
 
@@ -22,7 +22,7 @@
 - Webhook secret via `TELEGRAM_WEBHOOK_SECRET`
 - Bot code in `src/lib/telegram/`
 - Polling mode for development, webhook via `/api/telegram/webhook` for production
-- Inline keyboards for payment confirmation buttons
+- Inline keyboards for payment confirmation (**I've Paid**, **Remind later**, **Show paying details**) and admin **Confirm** / **Reject**
 
 ## Auth.js v5
 

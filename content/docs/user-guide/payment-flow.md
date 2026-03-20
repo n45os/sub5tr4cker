@@ -42,7 +42,7 @@ The reminder includes:
 Two ways:
 
 1. **Email** — Click the “I’ve paid” link in the reminder. The link is unique and expires after a few days.
-2. **Telegram** — Tap the “I’ve paid” button under the reminder message.
+2. **Telegram** — Use **Show paying details** if you need the full payment instructions; tap **I’ve paid** under the reminder when you’ve sent the money.
 
 After that, their status becomes **member_confirmed**. They may see a message like “Waiting for admin verification.”
 

@@ -130,7 +130,9 @@ export async function sendAggregatedReminder(
   });
 
   const firstPeriodId = (first.period._id as { toString: () => string }).toString();
-  const keyboard = paymentConfirmationKeyboard(firstPeriodId, firstMemberId);
+  const keyboard = paymentConfirmationKeyboard(firstPeriodId, firstMemberId, {
+    includePayDetails: distinctGroupCount === 1,
+  });
 
   const result = await sendNotification(
     {

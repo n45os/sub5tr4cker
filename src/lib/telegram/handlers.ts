@@ -12,6 +12,7 @@ import { enqueueTask } from "@/lib/tasks/queue";
 import { runNotificationTasks } from "@/jobs/run-notification-tasks";
 import { sendNotification } from "@/lib/notifications/service";
 import { buildTelegramWelcomeEmailHtml } from "@/lib/email/templates/group-invite";
+import { formatGroupPaymentDetailsPlainText } from "@/lib/telegram/payment-details-text";
 
 function buildBillingSummary(group: {
   billing: {
@@ -87,6 +88,9 @@ export function registerHandlers(bot: Bot): void {
       case "confirm":
         await handleMemberConfirm(ctx as Context, periodId, memberId);
         break;
+      case "paydetails":
+        await handlePayDetails(ctx as Context, periodId);
+        break;
       case "snooze":
         await handleSnooze(ctx as Context);
         break;
@@ -150,6 +154,34 @@ async function handleMemberConfirm(
     });
     await runNotificationTasks({ limit: 5 });
   }
+}
+
+async function handlePayDetails(ctx: Context, periodId: string): Promise<void> {
+  await dbConnect();
+
+  const period = await BillingPeriod.findById(periodId);
+  if (!period) {
+    await ctx.answerCallbackQuery({ text: "Period not found" });
+    return;
+  }
+
+  const group = await Group.findById(period.group);
+  if (!group) {
+    await ctx.answerCallbackQuery({ text: "Group not found" });
+    return;
+  }
+
+  const detailText = formatGroupPaymentDetailsPlainText(group);
+
+  await ctx
+    .answerCallbackQuery({
+      text: "Sending how-to-pay details in a follow-up message.",
+    })
+    .catch(() => {});
+
+  await ctx.reply(detailText).catch((err) => {
+    console.error("telegram paydetails reply error:", err);
+  });
 }
 
 async function handleSnooze(ctx: Context): Promise<void> {

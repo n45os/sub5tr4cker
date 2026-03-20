@@ -32,3 +32,5 @@ Uses HMAC-signed tokens (not JWTs) for email "I paid" links. Token contains memb
 ## Telegram Bot
 
 grammy library. Supports polling (dev) and webhook (prod) modes. Inspired by OpenClaw's architecture.
+
+Reminder keyboards include **Show paying details** (`paydetails:periodId:memberId`): handler loads the billing period’s group and replies with platform, link, instructions, and optional announcement note (plain text).

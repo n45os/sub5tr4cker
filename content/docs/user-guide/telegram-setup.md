@@ -29,15 +29,15 @@ Your SubsTrack user is now linked to your Telegram chat. Reminders and confirmat
 - **Payment reminders** — When you owe a share, the bot sends a message with:
   - Group name and period
   - Amount to pay
-  - Payment link
-  - Buttons: **I’ve paid** / **Remind later**
+  - Payment link (when configured)
+  - Buttons: **I’ve paid** / **Remind later** / **Show paying details** (extra message with platform, link, and any instructions the admin saved for the group)
 - **Admin confirmation requests** — If you’re the admin, when a member confirms payment you get a message with **Confirm** / **Reject** buttons.
 
 ## Confirming payment in Telegram
 
 When you get a payment reminder:
 
-1. Pay the admin using the payment link (Revolut, PayPal, etc.).
+1. Pay the admin using the payment link or tap **Show paying details** to open a second message with the full how-to-pay text from the group settings.
 2. Tap **I’ve paid** in the Telegram message.
 3. The bot updates the message to “Waiting for admin verification” (or similar).
 4. When the admin confirms, that period is done for you.

@@ -30,6 +30,7 @@ type GroupLike = {
     icon: string | null;
     url: string | null;
     accentColor?: string | null;
+    emailTheme?: "clean" | "minimal" | "bold" | "rounded" | "corporate";
   };
   billing: {
     mode: "equal_split" | "fixed_amount" | "variable";

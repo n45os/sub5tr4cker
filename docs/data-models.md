@@ -63,6 +63,7 @@ A subscription group managed by an admin.
     icon: string | null,                  // URL or emoji
     url: string | null,                   // service URL
     accentColor: string | null,           // hex e.g. #3b82f6; used in notification emails
+    emailTheme: 'clean' | 'minimal' | 'bold' | 'rounded' | 'corporate', // notification template style preset
   },
 
   // billing configuration

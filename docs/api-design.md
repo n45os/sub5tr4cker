@@ -45,7 +45,11 @@ Create a new subscription group. Authenticated user becomes the admin.
 ```json
 {
   "name": "YouTube Premium Family",
-  "service": { "name": "YouTube Premium", "accentColor": "#3b82f6" },
+  "service": {
+    "name": "YouTube Premium",
+    "accentColor": "#3b82f6",
+    "emailTheme": "clean"
+  },
   "billing": {
     "mode": "equal_split",
     "currentPrice": 18,
@@ -75,8 +79,14 @@ Get full group details. Admin sees everything, members see limited info.
 Update group settings. Admin only.
 
 The editable payload covers general details, service (including optional
-`service.accentColor` hex for notification email branding), billing configuration,
+`service.accentColor` hex and `service.emailTheme` preset for notification email branding), billing configuration,
 payment instructions, and the values used by the dashboard edit flow.
+
+### `GET /api/groups/[groupId]/notification-preview`
+
+Returns a rendered HTML preview for group notifications (currently payment reminder only), using the group's payment config, accent color, and theme. Admin only.
+
+**Query params:** `type` (`payment_reminder`), `theme` (optional override: `clean` | `minimal` | `bold` | `rounded` | `corporate`)
 
 ### `DELETE /api/groups/[groupId]`
 
@@ -292,18 +302,18 @@ Update a billing period (change price, waive a member, add notes). Admin only.
 
 ## Payment Confirmation
 
-### `POST /api/confirm/[token]`
+### `GET /api/confirm/[token]`
 
-Email "I paid" handler. The token is a signed payload containing memberId, periodId, groupId. No authentication required (the token itself is the auth).
+Legacy email confirm handler. The token is a signed payload containing memberId, periodId, groupId. No authentication required (the token itself is the auth).
 
 **Flow:**
 1. Validate HMAC signature and expiry
 2. Find the billing period and member payment
 3. Set status to `member_confirmed`
 4. Enqueue an `admin_confirmation_request` task and run the notification worker (admin gets Telegram when linked and Telegram notifications are on; otherwise email if allowed)
-5. Redirect to a "thank you" page
+5. Redirect to member portal
 
-**Response:** Redirect to `/confirmed?group=...&period=...`
+New reminder emails now route members to the member portal (`/member/[token]?pay=<periodId>&open=confirm`) where they review payment details and submit confirmation from a modal.
 
 ### `POST /api/groups/[groupId]/billing/[periodId]/confirm`
 
@@ -352,6 +362,8 @@ Return the notification template registry, including email and Telegram previews
 ### `GET /api/notifications/templates/[type]/preview`
 
 Return a single template preview with HTML, Telegram text, and variable metadata.
+
+**Query params:** `theme` (optional: `clean` | `minimal` | `bold` | `rounded` | `corporate`)
 
 ## Price Changes
 

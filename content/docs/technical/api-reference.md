@@ -25,7 +25,7 @@ List groups the authenticated user belongs to (admin or member).
 
 ### `POST /api/groups`
 
-Create a group. Body: `name`, `service`, `billing`, `payment`, `members`. Authenticated user becomes admin.
+Create a group. Body: `name`, `service`, `billing`, `payment`, `members`. `service` supports `accentColor` and `emailTheme` (`clean` | `minimal` | `bold` | `rounded` | `corporate`). Authenticated user becomes admin.
 
 ### `GET /api/groups/[groupId]`
 
@@ -34,6 +34,14 @@ Get group details. Admin sees full config; members see limited info.
 ### `PATCH /api/groups/[groupId]`
 
 Update group. Admin only.
+
+### `GET /api/groups/[groupId]/notification-preview`
+
+Return rendered HTML preview for group notifications (currently payment reminder). Admin only.
+
+Query params:
+- `type` (currently `payment_reminder`)
+- `theme` (optional theme override: `clean` | `minimal` | `bold` | `rounded` | `corporate`)
 
 ### `DELETE /api/groups/[groupId]`
 
@@ -71,11 +79,13 @@ Update period (e.g. waive member, add notes). Admin only.
 
 ### `GET /api/confirm/[token]`
 
-Handles “I’ve paid” email link. Token is HMAC-signed. No auth. Validates token, sets payment to `member_confirmed`, enqueues an admin verification nudge (Telegram when the admin has it linked and enabled; otherwise email if allowed), redirects to a thank-you URL.
+Legacy “I’ve paid” email link handler. Token is HMAC-signed. No auth. Validates token, sets payment to `member_confirmed`, enqueues an admin verification nudge (Telegram when the admin has it linked and enabled; otherwise email if allowed), redirects to member portal.
 
 ### `POST /api/groups/[groupId]/billing/[periodId]/self-confirm`
 
 Member marks paid from the app (session or `memberToken`). Same admin verification nudge enqueue as the email confirm flow.
+
+New reminder emails route users to member portal deep links (`/member/[token]?pay=<periodId>&open=confirm`) so confirmation happens from the portal dialog.
 
 ### `POST /api/groups/[groupId]/billing/[periodId]/confirm`
 
@@ -86,6 +96,13 @@ Admin confirms a member’s payment. Body: `memberId`, `action` (`confirm` | `re
 ### `POST /api/groups/[groupId]/notify`
 
 Trigger notifications manually. Body: `type`, `message`, `channels`. Admin only.
+
+### `GET /api/notifications/templates/[type]/preview`
+
+Return one template preview with HTML, Telegram text, and variable metadata.
+
+Query params:
+- `theme` (optional theme override: `clean` | `minimal` | `bold` | `rounded` | `corporate`)
 
 ## Dashboard
 

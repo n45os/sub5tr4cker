@@ -436,6 +436,7 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
       telegramInviteLink: null,
       unsubscribeUrl,
       accentColor: group.service?.accentColor ?? null,
+      theme: group.service?.emailTheme ?? "clean",
       magicLoginUrl,
     });
     await sendNotification(

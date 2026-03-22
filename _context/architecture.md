@@ -1,4 +1,4 @@
-<!-- last-updated: 2026-03-18 -->
+<!-- last-updated: 2026-03-21 -->
 
 # Architecture
 
@@ -16,11 +16,13 @@ Unified dispatcher in `src/lib/notifications/service.ts` that routes to:
 - Email via Resend (`src/lib/email/`)
 - Telegram via grammy (`src/lib/telegram/`)
 
+Email templates now share a common shell (`src/lib/email/layout.ts`) and theme presets (`src/lib/email/themes.ts`) selected per group via `group.service.emailTheme`.
+
 Members choose their preferred channel(s). The dispatcher checks preferences and sends accordingly.
 
 ## Payment Confirmation
 
-Uses HMAC-signed tokens (not JWTs) for email "I paid" links. Token contains memberId + periodId + expiry. Validated without DB lookup. Telegram uses inline keyboard callbacks with colon-delimited data.
+Primary flow uses member-portal deep links from reminder emails (`/member/[token]?pay=<periodId>&open=confirm`) so members review details before confirming. Legacy HMAC token links (`/api/confirm/[token]`) remain as fallback for previously sent emails. Telegram uses inline keyboard callbacks with colon-delimited data.
 
 ## Cron Jobs and Notification Queue
 

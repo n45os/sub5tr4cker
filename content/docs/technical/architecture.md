@@ -15,7 +15,7 @@ SubsTrack is an open-source web app for managing shared subscriptions. One perso
 
 - **Group** — One shared subscription (e.g. YouTube Premium Family). Has an admin, members, billing config, and payment method.
 - **Billing period** — One cycle (e.g. one month) per group. Contains per-member payment entries and statuses.
-- **Payment flow** — `pending` → member confirms → `member_confirmed` → admin verifies → `confirmed`.
+- **Payment flow** — `pending` → member verifies payment (email deep link or Telegram action) → `member_confirmed` → admin verifies → `confirmed`.
 
 ## Tech stack
 
@@ -65,14 +65,14 @@ SubsTrack is an open-source web app for managing shared subscriptions. One perso
 
 A single **notification service** (`src/lib/notifications/service.ts`) dispatches to:
 
-- **Email** — Resend; templates can be React Email or HTML.
+- **Email** — Resend; templates use a shared HTML shell with per-group theme presets (`clean`, `minimal`, `bold`, `rounded`, `corporate`) and accent color.
 - **Telegram** — grammy bot; messages can include inline keyboards (e.g. “I’ve paid”, “Show paying details”, “Confirm”).
 
 Recipients have preferences (email on/off, Telegram on/off). The service checks those and sends to the right channels.
 
 ## Payment confirmation
 
-- **Email** — HMAC-signed tokens in “I’ve paid” links. Token payload: memberId, periodId, groupId, expiry. Verified without DB lookup.
+- **Email** — Reminder CTA links to member portal deep links (`/member/[token]?pay=<periodId>&open=confirm`) so users review details before confirming. Legacy token links (`/api/confirm/[token]`) remain as fallback.
 - **Telegram** — Inline keyboard callbacks with `action:periodId:memberId`. Handlers update BillingPeriod and optionally notify the admin.
 
 ## Cron jobs and notification queue

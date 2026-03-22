@@ -5,7 +5,8 @@ import { sendNotification } from "@/lib/notifications/service";
 import { getReminderEligibility, type PaymentLike } from "@/lib/notifications/reminder-targeting";
 import { paymentConfirmationKeyboard } from "@/lib/telegram/keyboards";
 import {
-  getConfirmationUrl,
+  createMemberPortalToken,
+  getMemberPortalUrl,
   createUnsubscribeToken,
   getUnsubscribeUrl,
 } from "@/lib/tokens";
@@ -46,9 +47,12 @@ export async function sendReminderForPayment(
   );
   const user = member?.user ? await User.findById(member.user) : null;
 
-  const confirmUrl = payment.confirmationToken
-    ? await getConfirmationUrl(payment.confirmationToken)
-    : null;
+  const periodId = (period._id as { toString: () => string }).toString();
+  const groupId = (group._id as { toString: () => string }).toString();
+  const memberId = payment.memberId.toString();
+  const portalToken = await createMemberPortalToken(memberId, groupId);
+  const portalUrl = await getMemberPortalUrl(portalToken);
+  const confirmUrl = `${portalUrl}?pay=${periodId}&open=confirm`;
 
   const paymentLink = group.payment?.link ?? null;
   const currency = period.currency || "€";
@@ -75,6 +79,7 @@ export async function sendReminderForPayment(
     currency,
     paymentPlatform: group.payment?.platform ?? "custom",
     paymentLink,
+    paymentInstructions: group.payment?.instructions ?? null,
     confirmUrl,
     ownerName: "the admin",
     extraText: group.announcements?.extraText ?? null,
@@ -82,6 +87,7 @@ export async function sendReminderForPayment(
     priceNote,
     unsubscribeUrl,
     accentColor: group.service?.accentColor ?? null,
+    theme: group.service?.emailTheme ?? "clean",
   });
 
   const keyboard = paymentConfirmationKeyboard(
@@ -115,7 +121,7 @@ export async function sendReminderForPayment(
       }),
       telegramKeyboard: keyboard,
       groupId: (group._id as { toString: () => string }).toString(),
-      billingPeriodId: (period._id as { toString: () => string }).toString(),
+      billingPeriodId: periodId,
     }
   );
 

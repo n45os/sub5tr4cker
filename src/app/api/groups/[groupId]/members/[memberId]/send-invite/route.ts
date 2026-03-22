@@ -167,6 +167,7 @@ export async function POST(
     acceptInviteUrl,
     unsubscribeUrl,
     accentColor: group.service?.accentColor ?? null,
+    theme: group.service?.emailTheme ?? "clean",
   };
 
   const subject = `You've been added to ${group.name}`;

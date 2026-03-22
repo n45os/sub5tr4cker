@@ -16,10 +16,11 @@ const BUILT_IN_TYPES = new Set<NotificationTemplateType>([
 export type { NotificationTemplatePreview, NotificationTemplateType };
 
 export function getNotificationTemplatePreview(
-  type: string
+  type: string,
+  options?: { theme?: string | null }
 ): NotificationTemplatePreview | null {
   if (BUILT_IN_TYPES.has(type as NotificationTemplateType)) {
-    return getBuiltInPreview(type as NotificationTemplateType);
+    return getBuiltInPreview(type as NotificationTemplateType, options);
   }
   if (type.startsWith("plugin:")) {
     const parts = type.slice(7).split(":");
@@ -68,8 +69,10 @@ function getPluginTemplatePreview(
   }
 }
 
-export function getNotificationTemplates(): NotificationTemplatePreview[] {
-  const builtIn = getBuiltInTemplates();
+export function getNotificationTemplates(options?: {
+  theme?: string | null;
+}): NotificationTemplatePreview[] {
+  const builtIn = getBuiltInTemplates(options);
   const pluginRegistrations = getPluginTemplates();
   const pluginPreviews: NotificationTemplatePreview[] = [];
 

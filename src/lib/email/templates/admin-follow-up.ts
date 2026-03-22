@@ -1,5 +1,4 @@
-import { buildEmailFooterHtml } from "@/lib/email/footer";
-import { buildAutomatedMessageBadgeHtml } from "@/lib/email/branding";
+import { buildEmailShell } from "@/lib/email/layout";
 
 export interface AdminFollowUpTemplateParams {
   groupName: string;
@@ -9,8 +8,10 @@ export interface AdminFollowUpTemplateParams {
     memberNickname: string;
     amount: number;
   }>;
-  /** optional; not used for this minimal template, kept for consistency */
+  dashboardUrl?: string | null;
+  /** optional; kept for consistency */
   accentColor?: string | null;
+  theme?: string | null;
 }
 
 export const adminFollowUpSampleParams: AdminFollowUpTemplateParams = {
@@ -21,32 +22,48 @@ export const adminFollowUpSampleParams: AdminFollowUpTemplateParams = {
     { memberNickname: "Alex", amount: 4.99 },
     { memberNickname: "Sofia", amount: 4.99 },
   ],
+  dashboardUrl: "https://substrack.example.com/dashboard/groups/group-1/billing",
 };
 
 export function buildAdminFollowUpEmailHtml(
   params: AdminFollowUpTemplateParams
 ): string {
-  const memberList = params.unverifiedMembers
+  const totalAmount = params.unverifiedMembers.reduce(
+    (sum, member) => sum + member.amount,
+    0
+  );
+  const rows = params.unverifiedMembers
     .map(
-      (member) =>
-        `• ${member.memberNickname} — ${member.amount.toFixed(2)}${params.currency}`
+      (member) => `
+        <div class="row">
+          <span class="label">${member.memberNickname}</span>
+          <span class="value">${params.currency} ${member.amount.toFixed(2)}</span>
+        </div>
+      `
     )
-    .join("\n");
-
-  return `
-    <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-      ${buildAutomatedMessageBadgeHtml()}
-      <div style="padding: 24px;">
-        <p>Hi,</p>
-        <p>The following members say they've paid for <strong>${params.groupName}</strong> — ${params.periodLabel}:</p>
-        <pre>${memberList}</pre>
-        <p>Please verify their payments in the dashboard.</p>
-      </div>
-      <div style="margin-top: 24px; padding: 16px 24px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
-        ${buildEmailFooterHtml({})}
-      </div>
+    .join("");
+  const bodyHtml = `
+    <p>The following members marked payment as completed for <strong>${params.groupName}</strong> — ${params.periodLabel}.</p>
+    <div class="summary-card">
+      <p class="kicker">Awaiting admin verification</p>
+      <p class="amount">${params.currency} ${totalAmount.toFixed(2)}</p>
+      <p class="muted">${params.unverifiedMembers.length} member(s) pending</p>
+      <div class="rows">${rows}</div>
     </div>
+    <p>Please verify these payments in the dashboard.</p>
+    ${params.dashboardUrl ? `
+      <div class="cta">
+        <a href="${params.dashboardUrl}" class="btn">Verify in dashboard</a>
+      </div>
+    ` : ""}
   `;
+
+  return buildEmailShell({
+    title: "Payments Awaiting Verification",
+    bodyHtml,
+    accentColor: params.accentColor ?? null,
+    theme: params.theme ?? null,
+  });
 }
 
 export function buildAdminFollowUpTelegramText(

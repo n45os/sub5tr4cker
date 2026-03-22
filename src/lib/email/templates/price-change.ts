@@ -1,5 +1,4 @@
-import { buildEmailFooterHtml } from "@/lib/email/footer";
-import { getAccentColor, buildAutomatedMessageBadgeHtml } from "@/lib/email/branding";
+import { buildEmailShell } from "@/lib/email/layout";
 
 export interface PriceChangeTemplateParams {
   groupName: string;
@@ -7,10 +6,15 @@ export interface PriceChangeTemplateParams {
   oldPrice: number;
   newPrice: number;
   currency: string;
+  oldMemberShare?: number | null;
+  newMemberShare?: number | null;
+  nextPeriodLabel?: string | null;
   /** optional; when set, footer includes unsubscribe link */
   unsubscribeUrl?: string | null;
   /** optional; hex accent for header */
   accentColor?: string | null;
+  /** optional; template style preset */
+  theme?: string | null;
 }
 
 export const priceChangeSampleParams: PriceChangeTemplateParams = {
@@ -19,52 +23,60 @@ export const priceChangeSampleParams: PriceChangeTemplateParams = {
   oldPrice: 23.99,
   newPrice: 27.99,
   currency: "EUR",
+  oldMemberShare: 4.8,
+  newMemberShare: 5.6,
+  nextPeriodLabel: "Apr 2026",
 };
 
 // build HTML body for price-change announcement emails
 export function buildPriceChangeEmailHtml(
   params: PriceChangeTemplateParams
 ): string {
-  const accent = getAccentColor(params.accentColor);
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .header { background: ${accent}; color: #fff; padding: 24px; text-align: center; }
-        .header h1 { margin: 0; font-size: 20px; }
-        .body { padding: 24px; }
-        .price-row { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 20px 0; flex-wrap: wrap; }
-        .old-price { font-size: 18px; color: #94a3b8; text-decoration: line-through; }
-        .new-price { font-size: 24px; font-weight: bold; color: #1e293b; }
-        .footer { padding: 16px 24px; background: #f8fafc; color: #94a3b8; font-size: 12px; text-align: center; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        ${buildAutomatedMessageBadgeHtml()}
-        <div class="header">
-          <h1>Price update</h1>
-        </div>
-        <div class="body">
-          <p>The subscription price for <strong>${params.groupName}</strong> (${params.serviceName}) has been updated.</p>
-          <div class="price-row">
-            <span class="old-price">${params.oldPrice.toFixed(2)}${params.currency}</span>
-            <span aria-hidden="true">→</span>
-            <span class="new-price">${params.newPrice.toFixed(2)}${params.currency}</span>
+  const memberImpact =
+    params.oldMemberShare != null && params.newMemberShare != null
+      ? `
+        <div class="section-card">
+          <p class="kicker">Your share</p>
+          <div class="rows">
+            <div class="row">
+              <span class="label">Previous</span>
+              <span class="value">${params.currency} ${params.oldMemberShare.toFixed(2)}</span>
+            </div>
+            <div class="row">
+              <span class="label">New</span>
+              <span class="value">${params.currency} ${params.newMemberShare.toFixed(2)}</span>
+            </div>
           </div>
-          <p>Your next billing cycle will use the new amount. If you have any questions, contact your group admin.</p>
         </div>
-        <div class="footer">
-          ${buildEmailFooterHtml({ unsubscribeUrl: params.unsubscribeUrl ?? null })}
+      `
+      : "";
+
+  const bodyHtml = `
+    <p>The subscription price for <strong>${params.groupName}</strong> (${params.serviceName}) has been updated.</p>
+    <div class="section-card">
+      <p class="kicker">Group total price</p>
+      <div class="rows">
+        <div class="row">
+          <span class="label">Previous</span>
+          <span class="value">${params.currency} ${params.oldPrice.toFixed(2)}</span>
+        </div>
+        <div class="row">
+          <span class="label">New</span>
+          <span class="value">${params.currency} ${params.newPrice.toFixed(2)}</span>
         </div>
       </div>
-    </body>
-    </html>
+    </div>
+    ${memberImpact}
+    <p>${params.nextPeriodLabel ? `Starting from ${params.nextPeriodLabel}, ` : "Your next billing cycle "}this new amount will be used.</p>
   `;
+
+  return buildEmailShell({
+    title: "Price Update",
+    bodyHtml,
+    accentColor: params.accentColor ?? null,
+    theme: params.theme ?? null,
+    unsubscribeUrl: params.unsubscribeUrl ?? null,
+  });
 }
 
 export function buildPriceChangeTelegramText(

@@ -24,7 +24,7 @@ User ──┬── owns ──── Group ──── has many ──── 
 
 ## Group
 
-- **Fields**: name, description, admin (ref User), service (name, icon, url), billing (mode, currentPrice, currency, cycleDay, cycleType, adminIncludedInSplit, fixedMemberAmount, gracePeriodDays), payment (platform, link, instructions, stripeAccountId), members (array of { user, email, nickname, role, joinedAt, leftAt, isActive, customAmount }), announcements (notifyOnPriceChange, extraText), telegramGroup (chatId, linkedAt), isActive, inviteCode, timestamps.
+- **Fields**: name, description, admin (ref User), service (name, icon, url, accentColor, emailTheme), billing (mode, currentPrice, currency, cycleDay, cycleType, adminIncludedInSplit, fixedMemberAmount, gracePeriodDays), payment (platform, link, instructions, stripeAccountId), members (array of { user, email, nickname, role, joinedAt, leftAt, isActive, customAmount }), announcements (notifyOnPriceChange, extraText), telegramGroup (chatId, linkedAt), isActive, inviteCode, timestamps.
 - **Indexes**: admin, members.user, members.email, inviteCode (sparse unique).
 
 ## BillingPeriod

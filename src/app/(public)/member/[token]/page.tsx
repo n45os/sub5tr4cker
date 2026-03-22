@@ -91,6 +91,9 @@ export default async function MemberPortalPage({
 
   const confirmed = query.confirmed === "true";
   const joined = query.joined === "true";
+  const initialPayPeriodId =
+    typeof query.pay === "string" && query.pay.trim() ? query.pay : null;
+  const initialOpenConfirm = query.open === "confirm";
 
   // load user's telegram link state when member has an account (for "Connect Telegram" card)
   let telegramLinked = false;
@@ -172,6 +175,8 @@ export default async function MemberPortalPage({
           periods={memberPeriods}
           currentMemberId={member._id.toString()}
           memberToken={token}
+          initialPayPeriodId={initialPayPeriodId}
+          initialOpenConfirm={initialOpenConfirm}
         />
 
         {member.user && (

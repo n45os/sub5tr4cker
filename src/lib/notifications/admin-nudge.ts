@@ -7,6 +7,7 @@ import {
   buildAdminFollowUpTelegramText,
 } from "@/lib/email/templates/admin-follow-up";
 import { isTelegramEnabled } from "@/lib/telegram/bot";
+import { getSetting } from "@/lib/settings/service";
 
 type GroupDoc = IGroup & { _id: { toString: () => string } };
 type PeriodDoc = IBillingPeriod & {
@@ -31,6 +32,10 @@ export async function sendAdminConfirmationNudge(
 
   const admin = await User.findById(group.admin);
   if (!admin) return;
+  const appUrl = ((await getSetting("general.appUrl")) || "").replace(/\/$/, "");
+  const dashboardUrl = appUrl
+    ? `${appUrl}/dashboard/groups/${group._id.toString()}/billing`
+    : null;
 
   const templateParams = {
     groupName: group.name,
@@ -42,7 +47,9 @@ export async function sendAdminConfirmationNudge(
         amount: payment.amount,
       })
     ),
+    dashboardUrl,
     accentColor: group.service?.accentColor ?? null,
+    theme: group.service?.emailTheme ?? "clean",
   };
 
   const emailHtml = buildAdminFollowUpEmailHtml(templateParams);

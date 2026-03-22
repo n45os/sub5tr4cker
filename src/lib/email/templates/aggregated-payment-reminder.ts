@@ -1,8 +1,4 @@
-import { buildEmailFooterHtml } from "@/lib/email/footer";
-import {
-  getAccentColor,
-  buildAutomatedMessageBadgeHtml,
-} from "@/lib/email/branding";
+import { buildEmailShell } from "@/lib/email/layout";
 
 export interface AggregatedPaymentEntry {
   groupName: string;
@@ -12,10 +8,12 @@ export interface AggregatedPaymentEntry {
   currency: string;
   paymentPlatform: string;
   paymentLink: string | null;
+  paymentInstructions?: string | null;
   confirmUrl: string | null;
   adjustmentReason?: string | null;
   priceNote?: string | null;
   accentColor?: string | null;
+  theme?: string | null;
 }
 
 export interface AggregatedPaymentReminderTemplateParams {
@@ -29,6 +27,8 @@ export interface AggregatedPaymentReminderTemplateParams {
   unsubscribeUrl?: string | null;
   /** optional; hex accent for header and primary buttons (falls back to first entry or default) */
   accentColor?: string | null;
+  /** optional; template style preset */
+  theme?: string | null;
 }
 
 function escapeHtml(s: string): string {
@@ -52,10 +52,6 @@ function buildAggregatedIntroText(
 export function buildAggregatedPaymentReminderEmailHtml(
   params: AggregatedPaymentReminderTemplateParams
 ): string {
-  const accent =
-    params.accentColor ?? params.entries[0]?.accentColor ?? null;
-  const accentStyle = getAccentColor(accent);
-
   const totalAmount = params.entries.reduce((sum, e) => sum + e.amount, 0);
   const currency = params.entries[0]?.currency ?? "€";
 
@@ -70,18 +66,31 @@ export function buildAggregatedPaymentReminderEmailHtml(
           : "";
       const payBtn = entry.paymentLink
         ? `<div style="text-align: center; margin: 16px 0;">
-             <a href="${escapeHtml(entry.paymentLink)}" style="display: inline-block; background: ${accentStyle}; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600;">Pay via ${escapeHtml(entry.paymentPlatform)}</a>
+             <a href="${escapeHtml(entry.paymentLink)}" class="btn">Pay now</a>
            </div>`
         : "";
       const confirmBtn = entry.confirmUrl
         ? `<div style="text-align: center; margin: 16px 0;">
-             <a href="${escapeHtml(entry.confirmUrl)}" style="display: inline-block; background: #22c55e; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600;">I've Paid</a>
+             <a href="${escapeHtml(entry.confirmUrl)}" class="btn btn-confirm">Verify payment</a>
            </div>`
         : "";
       return `
-        <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-          <p style="margin: 0 0 8px; font-weight: 600;">${escapeHtml(entry.groupName)} — ${escapeHtml(entry.periodLabel)}</p>
-          <p style="margin: 0; font-size: 18px; font-weight: bold; color: #1e293b;">${entry.amount.toFixed(2)}${entry.currency}</p>
+        <div class="section-card" style="border-left: 4px solid ${entry.accentColor || "#3b82f6"};">
+          <p class="kicker">${escapeHtml(entry.serviceName)}</p>
+          <p style="margin: 0 0 4px; font-weight: 600;">${escapeHtml(entry.groupName)} — ${escapeHtml(entry.periodLabel)}</p>
+          <p style="margin: 0; font-size: 20px; font-weight: 700; color: #0f172a;">${entry.currency} ${entry.amount.toFixed(2)}</p>
+          <div class="rows">
+            <div class="row">
+              <span class="label">Method</span>
+              <span class="value" style="text-transform: capitalize;">${escapeHtml(entry.paymentPlatform.replaceAll("_", " "))}</span>
+            </div>
+            ${entry.paymentInstructions ? `
+              <div class="row">
+                <span class="label">Instructions</span>
+                <span class="value">${escapeHtml(entry.paymentInstructions)}</span>
+              </div>
+            ` : ""}
+          </div>
           ${note}
           ${payBtn}
           ${confirmBtn}
@@ -89,41 +98,25 @@ export function buildAggregatedPaymentReminderEmailHtml(
     })
     .join("");
 
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .header { background: ${accentStyle}; color: #fff; padding: 24px; text-align: center; }
-        .header h1 { margin: 0; font-size: 20px; }
-        .body { padding: 24px; }
-        .total { font-size: 24px; font-weight: bold; color: #1e293b; text-align: center; margin: 16px 0; padding: 16px; background: #f8fafc; border-radius: 8px; }
-        .footer { padding: 16px 24px; background: #f8fafc; color: #94a3b8; font-size: 12px; text-align: center; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        ${buildAutomatedMessageBadgeHtml()}
-        <div class="header">
-          <h1>Payment Reminders</h1>
-        </div>
-        <div class="body">
-          <p>Hi ${escapeHtml(params.memberName)},</p>
-          <p>${escapeHtml(buildAggregatedIntroText(params.distinctPeriodCount, params.distinctGroupCount))}</p>
-          <div class="total">Total: ${totalAmount.toFixed(2)}${currency}</div>
-          ${sectionsHtml}
-          <p>Thank you!</p>
-        </div>
-        <div class="footer">
-          ${buildEmailFooterHtml({ unsubscribeUrl: params.unsubscribeUrl ?? null })}
-        </div>
-      </div>
-    </body>
-    </html>
+  const bodyHtml = `
+    <p>Hi ${escapeHtml(params.memberName)},</p>
+    <p>${escapeHtml(buildAggregatedIntroText(params.distinctPeriodCount, params.distinctGroupCount))}</p>
+    <div class="summary-card">
+      <p class="kicker">Total due</p>
+      <p class="amount">${currency} ${totalAmount.toFixed(2)}</p>
+      <p class="muted">${params.distinctPeriodCount} period(s) · ${params.distinctGroupCount} group(s)</p>
+    </div>
+    ${sectionsHtml}
+    <p class="muted">Use the verify button after each transfer so the admin can approve it.</p>
   `;
+
+  return buildEmailShell({
+    title: "Payment Reminders",
+    bodyHtml,
+    accentColor: params.accentColor ?? params.entries[0]?.accentColor ?? null,
+    theme: params.theme ?? params.entries[0]?.theme ?? null,
+    unsubscribeUrl: params.unsubscribeUrl ?? null,
+  });
 }
 
 export function buildAggregatedPaymentReminderTelegramText(
@@ -157,6 +150,6 @@ export function buildAggregatedPaymentReminderTelegramText(
       lines.push(`  Pay: ${entry.paymentLink}`);
     }
   }
-  lines.push("", "Tap below to confirm once paid (per group).");
+  lines.push("", "Tap below to verify payment once paid (per group).");
   return lines.join("\n");
 }

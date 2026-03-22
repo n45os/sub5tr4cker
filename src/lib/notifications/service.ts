@@ -39,6 +39,15 @@ interface NotificationResult {
   telegram: { sent: boolean; messageId?: number };
 }
 
+function estimatePerMemberShare(group: IGroup, totalPrice: number): number | null {
+  const activeMemberCount = group.members.filter(
+    (member) => member.isActive && !member.leftAt
+  ).length;
+  const splitCount = activeMemberCount + (group.billing.adminIncludedInSplit ? 1 : 0);
+  if (splitCount <= 0) return null;
+  return totalPrice / splitCount;
+}
+
 // send a notification through built-in channels (email, telegram) from the channel registry
 export async function sendNotification(
   target: NotificationTarget,
@@ -182,13 +191,19 @@ export async function sendPriceChangeAnnouncements(
   const { previousPrice, newPrice, currency, serviceName } = params;
   const groupName = group.name;
   const subject = `Price update: ${groupName} (${serviceName})`;
+  const oldMemberShare = estimatePerMemberShare(group, previousPrice);
+  const newMemberShare = estimatePerMemberShare(group, newPrice);
   const emailHtml = buildPriceChangeEmailHtml({
     groupName,
     serviceName,
     oldPrice: previousPrice,
     newPrice,
     currency,
+    oldMemberShare,
+    newMemberShare,
+    nextPeriodLabel: "next billing cycle",
     accentColor: group.service?.accentColor ?? null,
+    theme: group.service?.emailTheme ?? "clean",
   });
   const telegramText = buildPriceChangeTelegramText({
     groupName,
@@ -262,8 +277,12 @@ export async function sendPriceChangeAnnouncements(
         oldPrice: previousPrice,
         newPrice,
         currency,
+        oldMemberShare,
+        newMemberShare,
+        nextPeriodLabel: "next billing cycle",
         unsubscribeUrl,
         accentColor: group.service?.accentColor ?? null,
+        theme: group.service?.emailTheme ?? "clean",
       });
       await sendNotification(
         {
@@ -430,10 +449,12 @@ export async function sendMemberAddedNotifications(
         currency,
         reason,
         paymentLink: null,
+        paymentInstructions: null,
         confirmUrl: null,
         isCredit: difference > 0,
         unsubscribeUrl,
         accentColor: group.service?.accentColor ?? null,
+        theme: group.service?.emailTheme ?? "clean",
       });
       const telegramText = buildPriceAdjustmentTelegramText({
         memberName: target.memberNickname,

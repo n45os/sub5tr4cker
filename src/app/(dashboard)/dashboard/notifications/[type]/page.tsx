@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -11,14 +12,19 @@ import {
   getNotificationTemplatePreview,
 } from "@/lib/plugins/templates";
 import { TemplateTestActions } from "@/components/features/notifications/template-test-actions";
+import { EMAIL_THEME_OPTIONS } from "@/lib/email/themes";
 
 export default async function NotificationTemplatePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ type: string }>;
+  searchParams: Promise<{ theme?: string }>;
 }) {
   const { type } = await params;
-  const template = getNotificationTemplatePreview(type);
+  const { theme } = await searchParams;
+  const selectedTheme = theme ?? "clean";
+  const template = getNotificationTemplatePreview(type, { theme: selectedTheme });
 
   if (!template) {
     notFound();
@@ -48,6 +54,24 @@ export default async function NotificationTemplatePage({
                 <CardDescription>{template.subject}</CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {EMAIL_THEME_OPTIONS.map((themeOption) => {
+                    const isActive = selectedTheme === themeOption.id;
+                    return (
+                      <Link
+                        key={themeOption.id}
+                        href={`/dashboard/notifications/${template.type}?theme=${themeOption.id}`}
+                        className={`rounded-full border px-3 py-1 text-xs transition ${
+                          isActive
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border text-muted-foreground hover:border-primary/40"
+                        }`}
+                      >
+                        {themeOption.name}
+                      </Link>
+                    );
+                  })}
+                </div>
                 <iframe
                   title={`${template.name} email preview`}
                   srcDoc={template.emailHtml}

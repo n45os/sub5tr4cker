@@ -28,6 +28,9 @@ const updateGroupSchema = z
         icon: z.string().max(20).optional().nullable(),
         url: z.string().url().max(500).optional().nullable(),
         accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
+        emailTheme: z
+          .enum(["clean", "minimal", "bold", "rounded", "corporate"])
+          .optional(),
       })
       .optional(),
     billing: z
@@ -179,6 +182,9 @@ export async function PATCH(
     if ("icon" in body.service) group.service.icon = body.service.icon ?? null;
     if ("url" in body.service) group.service.url = body.service.url ?? null;
     if ("accentColor" in body.service) group.service.accentColor = body.service.accentColor ?? null;
+    if ("emailTheme" in body.service && body.service.emailTheme) {
+      group.service.emailTheme = body.service.emailTheme;
+    }
   }
   if (body.billing) {
     if (body.billing.mode !== undefined) group.billing.mode = body.billing.mode;

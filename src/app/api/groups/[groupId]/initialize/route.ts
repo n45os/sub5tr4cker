@@ -172,6 +172,7 @@ export async function POST(
       acceptInviteUrl,
       unsubscribeUrl,
       accentColor: group.service?.accentColor ?? null,
+      theme: group.service?.emailTheme ?? "clean",
     };
 
     const emailHtml = buildGroupInviteEmailHtml(params);

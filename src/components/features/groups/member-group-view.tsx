@@ -64,6 +64,8 @@ interface MemberGroupViewProps {
   currentMemberId: string | null;
   /** portal token for unauthenticated member actions */
   memberToken?: string;
+  initialPayPeriodId?: string | null;
+  initialOpenConfirm?: boolean;
 }
 
 const MEMBER_PERIOD_PREVIEW_COUNT = 6;
@@ -75,6 +77,8 @@ export function MemberGroupView({
   periods,
   currentMemberId,
   memberToken,
+  initialPayPeriodId,
+  initialOpenConfirm,
 }: MemberGroupViewProps) {
   const [showAllPeriods, setShowAllPeriods] = useState(false);
   const paymentBoardRef = useRef<HTMLDivElement | null>(null);
@@ -230,6 +234,8 @@ export function MemberGroupView({
                     paymentPlatform={group.payment.platform}
                     paymentLink={group.payment.link}
                     paymentInstructions={group.payment.instructions}
+                    initialSelectedPeriodId={initialPayPeriodId ?? null}
+                    initialOpenConfirm={initialOpenConfirm}
                   />
                   {periods.length > MEMBER_PERIOD_PREVIEW_COUNT && (
                     <div className="mt-4 flex justify-end">

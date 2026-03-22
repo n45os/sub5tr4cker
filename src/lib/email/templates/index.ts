@@ -36,9 +36,15 @@ export interface NotificationTemplatePreview {
   telegramText: string;
 }
 
+interface NotificationTemplatePreviewOptions {
+  theme?: string | null;
+}
+
 export function getNotificationTemplatePreview(
-  type: NotificationTemplateType
+  type: NotificationTemplateType,
+  options?: NotificationTemplatePreviewOptions
 ): NotificationTemplatePreview | null {
+  const theme = options?.theme ?? "clean";
   switch (type) {
     case "payment_reminder":
       return {
@@ -63,6 +69,7 @@ export function getNotificationTemplatePreview(
         emailHtml: buildPaymentReminderEmailHtml({
           ...paymentReminderSampleParams,
           accentColor: "#3b82f6",
+          theme,
         }),
         telegramText: buildPaymentReminderTelegramText(paymentReminderSampleParams),
       };
@@ -78,6 +85,7 @@ export function getNotificationTemplatePreview(
         emailHtml: buildAdminFollowUpEmailHtml({
           ...adminFollowUpSampleParams,
           accentColor: "#3b82f6",
+          theme,
         }),
         telegramText: buildAdminFollowUpTelegramText(adminFollowUpSampleParams),
       };
@@ -100,6 +108,7 @@ export function getNotificationTemplatePreview(
         emailHtml: buildPriceChangeEmailHtml({
           ...priceChangeSampleParams,
           accentColor: "#3b82f6",
+          theme,
         }),
         telegramText: buildPriceChangeTelegramText(priceChangeSampleParams),
       };
@@ -130,6 +139,7 @@ export function getNotificationTemplatePreview(
         emailHtml: buildGroupInviteEmailHtml({
           ...groupInviteSampleParams,
           accentColor: "#3b82f6",
+          theme,
         }),
         telegramText: buildGroupInviteTelegramText(groupInviteSampleParams),
       };
@@ -138,11 +148,11 @@ export function getNotificationTemplatePreview(
   }
 }
 
-export function getNotificationTemplates() {
+export function getNotificationTemplates(options?: NotificationTemplatePreviewOptions) {
   return [
-    getNotificationTemplatePreview("payment_reminder"),
-    getNotificationTemplatePreview("admin_confirmation_request"),
-    getNotificationTemplatePreview("price_change"),
-    getNotificationTemplatePreview("invite"),
+    getNotificationTemplatePreview("payment_reminder", options),
+    getNotificationTemplatePreview("admin_confirmation_request", options),
+    getNotificationTemplatePreview("price_change", options),
+    getNotificationTemplatePreview("invite", options),
   ].filter((template): template is NotificationTemplatePreview => template !== null);
 }

@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { getNotificationTemplatePreview } from "@/lib/plugins/templates";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ type: string }> }
 ) {
   const session = await auth();
@@ -15,7 +15,8 @@ export async function GET(
   }
 
   const { type } = await context.params;
-  const preview = getNotificationTemplatePreview(type);
+  const theme = request.nextUrl.searchParams.get("theme");
+  const preview = getNotificationTemplatePreview(type, { theme });
 
   if (!preview) {
     return NextResponse.json(

@@ -1,5 +1,5 @@
 <!-- context-status: active -->
-<!-- last-updated: 2026-03-19 -->
+<!-- last-updated: 2026-03-21 -->
 
 # SubsTrack — Project Context
 
@@ -10,7 +10,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 - **Stack**: Next.js 15 (App Router), MongoDB/Mongoose, Auth.js v5, Resend, grammy, node-cron, persisted notification task queue (ScheduledTask)
 - **UI**: Tailwind CSS + shadcn/ui with a sidebar dashboard shell, richer cards, tabs, and settings surfaces
 - **Origin**: Migrated from a Google Sheets + Apps Script setup (see `docs/legacy/`)
-- **Phase**: Core MVP plus dashboard refresh, editable groups, DB-backed app settings, notification previews, per-group email accent color, automated-message badge in emails, setup CLI, aggregated reminders by user (optional), and profile email/Telegram toggles
+- **Phase**: Core MVP plus dashboard refresh, editable groups, DB-backed app settings, notification previews, per-group email accent + style presets with live preview, shared themed email templates, aggregated reminders by user (optional), and profile email/Telegram toggles
 
 ## Key Directories
 
@@ -29,7 +29,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 1. Admin creates group → adds members → sets billing config
 2. Cron creates billing periods monthly (or manual for variable mode)
 3. Reminders sent via email/Telegram with payment link
-4. Member confirms ("I paid") via email link, `POST .../self-confirm`, or Telegram → `admin_confirmation_request` notifies the admin (Telegram when linked and Telegram notifications are on; otherwise email if allowed)
+4. Member verifies payment via member-portal deep link (`?pay=...&open=confirm`), `POST .../self-confirm`, or Telegram → `admin_confirmation_request` notifies the admin (Telegram when linked and Telegram notifications are on; otherwise email if allowed)
 5. Admin confirms in dashboard or via Telegram → status confirmed
 
 ## Implemented APIs (see docs/api-design.md)
@@ -39,6 +39,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 - Members: POST/PATCH/DELETE /api/groups/[groupId]/members(/[memberId])
 - Billing: GET/POST /api/groups/[groupId]/billing, PATCH period, confirm, self-confirm
 - Notifications: GET /api/notifications, GET /api/notifications/templates, GET /api/notifications/templates/[type]/preview
+- Group preview: GET /api/groups/[groupId]/notification-preview
 - Settings: GET/PATCH /api/settings, POST /api/settings/test-email, POST /api/settings/test-telegram
 - Auth: /api/auth/[...nextauth], POST /api/register
 - Telegram: POST /api/telegram/webhook, POST /api/telegram/link

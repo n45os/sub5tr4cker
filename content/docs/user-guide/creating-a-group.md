@@ -13,6 +13,12 @@ A **group** in SubsTrack represents one shared subscription. This page explains 
 - **Service name** — The product or bill (e.g. “YouTube Premium”, “Netflix”, “Internet bill”).
 - **Description** (optional) — Internal note; not sent to members.
 
+## Notification style
+
+- **Accent color** — Primary color used in notification emails for this group.
+- **Notification style** — Pick one template style preset (`Clean`, `Minimal`, `Bold`, `Rounded`, `Corporate`).
+- **Live preview** — The form shows a reminder preview so you can verify copy, hierarchy, and CTA style before saving.
+
 ## Billing
 
 ### Total price

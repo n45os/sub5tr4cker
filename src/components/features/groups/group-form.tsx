@@ -29,6 +29,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
+import { EMAIL_THEME_OPTIONS, type EmailTheme } from "@/lib/email/themes";
+import { buildPaymentReminderEmailHtml } from "@/lib/email/templates/payment-reminder";
 
 type BillingMode = "equal_split" | "fixed_amount" | "variable";
 type CycleType = "monthly" | "yearly";
@@ -46,6 +48,7 @@ export interface GroupFormValues {
   serviceIcon: string;
   serviceUrl: string;
   serviceAccentColor: string;
+  serviceEmailTheme: EmailTheme;
   billingMode: BillingMode;
   currentPrice: string;
   currency: string;
@@ -72,6 +75,7 @@ const defaultValues: GroupFormValues = {
   serviceIcon: "",
   serviceUrl: "",
   serviceAccentColor: "",
+  serviceEmailTheme: "clean",
   billingMode: "equal_split",
   currentPrice: "",
   currency: "EUR",
@@ -149,6 +153,43 @@ export function GroupForm({
           },
     [mode]
   );
+  const normalizedAccentColor = /^#[0-9A-Fa-f]{6}$/.test(form.serviceAccentColor)
+    ? form.serviceAccentColor
+    : "#3b82f6";
+  const templatePreviewHtml = useMemo(
+    () =>
+      buildPaymentReminderEmailHtml({
+        memberName: "Alex",
+        groupName: form.name.trim() || "Family subscription",
+        periodLabel: "Apr 2026",
+        amount: Number.parseFloat(form.currentPrice || "0") > 0
+          ? Number.parseFloat(form.currentPrice)
+          : 5.99,
+        currency: form.currency.trim().toUpperCase() || "EUR",
+        paymentPlatform: form.paymentPlatform,
+        paymentLink: form.paymentLink.trim() || "https://example.com/pay",
+        paymentInstructions:
+          form.paymentInstructions.trim() || "Include your nickname in the transfer note.",
+        confirmUrl: "https://example.com/member/demo-token?pay=periodId&open=confirm",
+        ownerName: "Group admin",
+        extraText:
+          "This is a preview. Members will see the real period amount and payment details.",
+        adjustmentReason: null,
+        priceNote: null,
+        accentColor: normalizedAccentColor,
+        theme: form.serviceEmailTheme,
+      }),
+    [
+      form.currency,
+      form.currentPrice,
+      form.name,
+      form.paymentInstructions,
+      form.paymentLink,
+      form.paymentPlatform,
+      form.serviceEmailTheme,
+      normalizedAccentColor,
+    ]
+  );
 
   function updateField<K extends keyof GroupFormValues>(
     key: K,
@@ -208,6 +249,7 @@ export function GroupForm({
         accentColor: /^#[0-9A-Fa-f]{6}$/.test(form.serviceAccentColor.trim())
           ? form.serviceAccentColor.trim()
           : null,
+        emailTheme: form.serviceEmailTheme,
       },
       billing: {
         mode: form.billingMode,
@@ -386,9 +428,7 @@ export function GroupForm({
                     type="color"
                     className="h-10 w-14 cursor-pointer rounded border border-input bg-background p-1"
                     value={
-                      /^#[0-9A-Fa-f]{6}$/.test(form.serviceAccentColor)
-                        ? form.serviceAccentColor
-                        : "#3b82f6"
+                      normalizedAccentColor
                     }
                     onChange={(event) =>
                       updateField("serviceAccentColor", event.target.value)
@@ -406,6 +446,50 @@ export function GroupForm({
                     maxLength={7}
                   />
                 </div>
+              </div>
+
+              <div className="grid gap-3">
+                <FieldLabel htmlFor="service-email-theme" hint="Controls the notification email style for this group.">
+                  Notification style
+                </FieldLabel>
+                <div
+                  id="service-email-theme"
+                  className="grid gap-2 sm:grid-cols-2"
+                >
+                  {EMAIL_THEME_OPTIONS.map((themeOption) => {
+                    const selected = form.serviceEmailTheme === themeOption.id;
+                    return (
+                      <button
+                        key={themeOption.id}
+                        type="button"
+                        onClick={() => updateField("serviceEmailTheme", themeOption.id)}
+                        className={`rounded-lg border p-3 text-left transition ${
+                          selected
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-primary/40"
+                        }`}
+                        aria-pressed={selected}
+                      >
+                        <p className="text-sm font-medium">{themeOption.name}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {themeOption.description}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <FieldLabel htmlFor="template-preview" hint="Live preview of the payment reminder using this group's style settings.">
+                  Preview notifications
+                </FieldLabel>
+                <iframe
+                  id="template-preview"
+                  title="Payment reminder preview"
+                  srcDoc={templatePreviewHtml}
+                  className="h-[380px] w-full rounded-lg border bg-white"
+                />
               </div>
             </CardContent>
           </Card>

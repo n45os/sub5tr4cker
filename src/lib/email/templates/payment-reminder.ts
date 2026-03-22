@@ -1,5 +1,4 @@
-import { buildEmailFooterHtml } from "@/lib/email/footer";
-import { getAccentColor, buildAutomatedMessageBadgeHtml } from "@/lib/email/branding";
+import { buildEmailShell } from "@/lib/email/layout";
 
 export interface PaymentReminderTemplateParams {
   memberName: string;
@@ -9,6 +8,7 @@ export interface PaymentReminderTemplateParams {
   currency: string;
   paymentPlatform: string;
   paymentLink: string | null;
+  paymentInstructions?: string | null;
   confirmUrl: string | null;
   ownerName: string;
   extraText: string | null;
@@ -20,6 +20,8 @@ export interface PaymentReminderTemplateParams {
   unsubscribeUrl?: string | null;
   /** optional; hex accent for header and primary buttons */
   accentColor?: string | null;
+  /** optional; template style preset */
+  theme?: string | null;
 }
 
 export const paymentReminderSampleParams: PaymentReminderTemplateParams = {
@@ -30,7 +32,8 @@ export const paymentReminderSampleParams: PaymentReminderTemplateParams = {
   currency: "EUR",
   paymentPlatform: "revolut",
   paymentLink: "https://revolut.me/example",
-  confirmUrl: "https://example.com/api/confirm/example-token",
+  paymentInstructions: "Use reference \"YouTube\" in the transfer note.",
+  confirmUrl: "https://example.com/member/example-token?pay=periodId",
   ownerName: "Nassos",
   extraText: "Please pay before the end of the week so access stays uninterrupted.",
 };
@@ -38,60 +41,62 @@ export const paymentReminderSampleParams: PaymentReminderTemplateParams = {
 export function buildPaymentReminderEmailHtml(
   params: PaymentReminderTemplateParams
 ): string {
-  const accent = getAccentColor(params.accentColor);
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .header { background: ${accent}; color: #fff; padding: 24px; text-align: center; }
-        .header h1 { margin: 0; font-size: 20px; }
-        .body { padding: 24px; }
-        .amount { font-size: 28px; font-weight: bold; color: #1e293b; text-align: center; margin: 20px 0; }
-        .btn { display: inline-block; background: ${accent}; color: #fff; text-decoration: none; padding: 12px 32px; border-radius: 6px; font-weight: 600; }
-        .btn-confirm { background: #22c55e; }
-        .footer { padding: 16px 24px; background: #f8fafc; color: #94a3b8; font-size: 12px; text-align: center; }
-        .cta { text-align: center; margin: 24px 0; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        ${buildAutomatedMessageBadgeHtml()}
-        <div class="header">
-          <h1>Payment Reminder</h1>
-        </div>
-        <div class="body">
-          <p>Hi ${params.memberName},</p>
-          <p>You owe for <strong>${params.groupName}</strong> — ${params.periodLabel}:</p>
-          <div class="amount">${params.amount.toFixed(2)}${params.currency}</div>
-          ${(params.adjustmentReason || params.priceNote) ? `
-            <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin: 16px 0; font-size: 13px; color: #78350f;">
-              <strong>Note:</strong> ${params.adjustmentReason || params.priceNote}
-            </div>
-          ` : ""}
-          ${params.paymentLink ? `
-            <div class="cta">
-              <a href="${params.paymentLink}" class="btn">Pay via ${params.paymentPlatform}</a>
-            </div>
-          ` : ""}
-          ${params.confirmUrl ? `
-            <div class="cta">
-              <a href="${params.confirmUrl}" class="btn btn-confirm">I've Paid</a>
-            </div>
-          ` : ""}
-          ${params.extraText ? `<p style="color: #64748b; font-size: 13px;">${params.extraText}</p>` : ""}
-          <p>Thank you!</p>
-        </div>
-        <div class="footer">
-          ${buildEmailFooterHtml({ unsubscribeUrl: params.unsubscribeUrl ?? null })}
-        </div>
+  const bodyHtml = `
+    <p class="kicker">${params.periodLabel}</p>
+    <p>Hi ${params.memberName},</p>
+    <p>You have an unpaid share for <strong>${params.groupName}</strong>.</p>
+    <div class="amount-card">
+      <p class="muted">Amount due</p>
+      <p class="amount">${params.currency} ${params.amount.toFixed(2)}</p>
+      <p class="muted">Managed by ${params.ownerName}</p>
+    </div>
+    ${(params.adjustmentReason || params.priceNote) ? `
+      <div class="note-box">
+        <strong>Note:</strong> ${params.adjustmentReason || params.priceNote}
       </div>
-    </body>
-    </html>
+    ` : ""}
+    <div class="section-card">
+      <p class="kicker">Payment details</p>
+      <div class="rows">
+        <div class="row">
+          <span class="label">Method</span>
+          <span class="value" style="text-transform: capitalize;">${params.paymentPlatform.replaceAll("_", " ")}</span>
+        </div>
+        ${params.paymentLink ? `
+          <div class="row">
+            <span class="label">Link</span>
+            <span class="value"><a href="${params.paymentLink}">Open payment link</a></span>
+          </div>
+        ` : ""}
+        ${params.paymentInstructions ? `
+          <div class="row">
+            <span class="label">Instructions</span>
+            <span class="value">${params.paymentInstructions}</span>
+          </div>
+        ` : ""}
+      </div>
+    </div>
+    ${params.paymentLink ? `
+      <div class="cta">
+        <a href="${params.paymentLink}" class="btn">Pay now</a>
+      </div>
+    ` : ""}
+    ${params.confirmUrl ? `
+      <div class="cta">
+        <a href="${params.confirmUrl}" class="btn btn-confirm">Verify payment</a>
+      </div>
+    ` : ""}
+    ${params.extraText ? `<p class="muted">${params.extraText}</p>` : ""}
+    <p>After you pay, click <strong>Verify payment</strong> so your admin can confirm it.</p>
   `;
+
+  return buildEmailShell({
+    title: "Payment Reminder",
+    bodyHtml,
+    accentColor: params.accentColor ?? null,
+    theme: params.theme ?? null,
+    unsubscribeUrl: params.unsubscribeUrl ?? null,
+  });
 }
 
 export function buildPaymentReminderTelegramText(
@@ -109,6 +114,6 @@ export function buildPaymentReminderTelegramText(
     `for <b>${params.groupName}</b> — ${params.periodLabel}\n` +
     noteLine + `\n` +
     (params.paymentLink ? `Pay: ${params.paymentLink}\n\n` : "") +
-    `Tap below to confirm once paid.`
+    `Tap below to verify payment once paid.`
   );
 }

@@ -4,7 +4,8 @@ import type { IBillingPeriod, IMemberPayment } from "@/models/billing-period";
 import { sendNotification } from "@/lib/notifications/service";
 import { paymentConfirmationKeyboard } from "@/lib/telegram/keyboards";
 import {
-  getConfirmationUrl,
+  createMemberPortalToken,
+  getMemberPortalUrl,
   createUnsubscribeToken,
   getUnsubscribeUrl,
 } from "@/lib/tokens";
@@ -24,8 +25,16 @@ export type ChannelOverride = "email" | "telegram" | "both";
 type GroupDoc = IGroup & {
   _id: { toString: () => string };
   name: string;
-  service?: { name?: string; accentColor?: string | null } | null;
-  payment?: { platform?: string; link?: string | null } | null;
+  service?: {
+    name?: string;
+    accentColor?: string | null;
+    emailTheme?: "clean" | "minimal" | "bold" | "rounded" | "corporate";
+  } | null;
+  payment?: {
+    platform?: string;
+    link?: string | null;
+    instructions?: string | null;
+  } | null;
   members: IGroup["members"];
 };
 
@@ -77,9 +86,12 @@ export async function sendAggregatedReminder(
 
   const entries: AggregatedPaymentEntry[] = [];
   for (const { group, period, payment } of payments) {
-    const confirmUrl = payment.confirmationToken
-      ? await getConfirmationUrl(payment.confirmationToken)
-      : null;
+    const periodId = period._id.toString();
+    const groupId = group._id.toString();
+    const memberId = payment.memberId.toString();
+    const portalToken = await createMemberPortalToken(memberId, groupId);
+    const portalUrl = await getMemberPortalUrl(portalToken);
+    const confirmUrl = `${portalUrl}?pay=${periodId}&open=confirm`;
     const effectiveAmount = payment.adjustedAmount ?? payment.amount;
     entries.push({
       groupName: group.name,
@@ -89,10 +101,12 @@ export async function sendAggregatedReminder(
       currency: period.currency || "€",
       paymentPlatform: group.payment?.platform ?? "custom",
       paymentLink: group.payment?.link ?? null,
+      paymentInstructions: group.payment?.instructions ?? null,
       confirmUrl,
       adjustmentReason: payment.adjustmentReason ?? null,
       priceNote: period.priceNote ?? null,
       accentColor: group.service?.accentColor ?? null,
+      theme: group.service?.emailTheme ?? "clean",
     });
   }
 
@@ -120,6 +134,7 @@ export async function sendAggregatedReminder(
     distinctPeriodCount,
     unsubscribeUrl,
     accentColor,
+    theme: entries[0]?.theme ?? "clean",
   });
 
   const telegramText = buildAggregatedPaymentReminderTelegramText({

@@ -16,6 +16,9 @@ const createGroupSchema = z.object({
     icon: z.string().max(20).optional().nullable(),
     url: z.string().url().max(500).optional().nullable(),
     accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
+    emailTheme: z
+      .enum(["clean", "minimal", "bold", "rounded", "corporate"])
+      .optional(),
   }),
   billing: z.object({
     mode: z.enum(["equal_split", "fixed_amount", "variable"]),
@@ -161,6 +164,7 @@ export async function POST(request: NextRequest) {
       icon: body.service.icon ?? null,
       url: body.service.url ?? null,
       accentColor: body.service.accentColor ?? null,
+      emailTheme: body.service.emailTheme ?? "clean",
     },
     billing: {
       mode: body.billing.mode,

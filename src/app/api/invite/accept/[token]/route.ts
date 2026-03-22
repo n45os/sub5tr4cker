@@ -226,6 +226,7 @@ export async function GET(
             telegramInviteLink,
             unsubscribeUrl,
             accentColor: group.service?.accentColor ?? null,
+            theme: group.service?.emailTheme ?? "clean",
             // template still uses this prop name, but it now points to the member portal
             magicLoginUrl: memberPortalUrl,
           });

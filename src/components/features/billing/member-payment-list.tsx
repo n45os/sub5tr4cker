@@ -50,6 +50,8 @@ interface MemberPaymentListProps {
   paymentPlatform?: string | null;
   paymentLink?: string | null;
   paymentInstructions?: string | null;
+  initialSelectedPeriodId?: string | null;
+  initialOpenConfirm?: boolean;
 }
 
 function statusIcon(status: string) {
@@ -125,6 +127,8 @@ export function MemberPaymentList({
   paymentPlatform,
   paymentLink,
   paymentInstructions,
+  initialSelectedPeriodId,
+  initialOpenConfirm = false,
 }: MemberPaymentListProps) {
   const [periods, setPeriods] = useState(initialPeriods);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -132,10 +136,36 @@ export function MemberPaymentList({
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [initialSelectionApplied, setInitialSelectionApplied] = useState(false);
 
   useEffect(() => {
     setPeriods(initialPeriods);
   }, [initialPeriods]);
+
+  useEffect(() => {
+    if (initialSelectionApplied || !initialSelectedPeriodId) return;
+    const period = initialPeriods.find((p) => p._id === initialSelectedPeriodId);
+    if (!period) return;
+    const pay = currentMemberId
+      ? period.payments.find((p) => p.memberId === currentMemberId)
+      : null;
+    const selectable = pay?.status === "pending" || pay?.status === "overdue";
+    if (!selectable) {
+      setInitialSelectionApplied(true);
+      return;
+    }
+    setSelectedIds(new Set([initialSelectedPeriodId]));
+    if (initialOpenConfirm) {
+      setConfirmOpen(true);
+    }
+    setInitialSelectionApplied(true);
+  }, [
+    currentMemberId,
+    initialOpenConfirm,
+    initialPeriods,
+    initialSelectedPeriodId,
+    initialSelectionApplied,
+  ]);
 
   const getMyPayment = useCallback(
     (period: Period) => {

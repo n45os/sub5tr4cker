@@ -11,7 +11,7 @@ SubsTrack automates reminders and tracks who has paid. Here’s the full flow.
 
 1. **Billing period** — Created automatically (or manually) for each month.
 2. **Reminders** — Sent by email (and optionally Telegram) to members who haven’t paid.
-3. **Member confirms** — Member clicks “I’ve paid” in the email or Telegram.
+3. **Member confirms** — Member opens “Verify payment” from email (member portal) or taps “I’ve paid” in Telegram.
 4. **Admin verifies** — You confirm the payment in the dashboard or in Telegram.
 5. **Done** — Status is set to confirmed; no more reminders for that period.
 
@@ -35,13 +35,13 @@ The reminder includes:
 - Group name and period (e.g. “March 2026”)
 - Amount they owe
 - Your payment link
-- Button or link: **“I’ve paid”**
+- Button or link: **“Verify payment”** (email) or **“I’ve paid”** (Telegram)
 
 ## Confirming payment (member)
 
 Two ways:
 
-1. **Email** — Click the “I’ve paid” link in the reminder. The link is unique and expires after a few days.
+1. **Email** — Click **Verify payment** in the reminder. It opens your member portal with the period preselected, where you review payment details and submit confirmation in a modal.
 2. **Telegram** — Use **Show paying details** if you need the full payment instructions; tap **I’ve paid** under the reminder when you’ve sent the money.
 
 After that, their status becomes **member_confirmed**. They may see a message like “Waiting for admin verification.”

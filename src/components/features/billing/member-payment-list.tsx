@@ -436,7 +436,7 @@ export function MemberPaymentList({
               )}
             </div>
           )}
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="flex-wrap gap-2">
             <Button
               variant="outline"
               onClick={() => setConfirmOpen(false)}

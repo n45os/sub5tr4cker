@@ -63,6 +63,9 @@ src/
 | `src/lib/telegram/handlers.ts` | Telegram callback handlers (payment confirmations) |
 | `src/lib/tokens.ts` | HMAC token generation/verification for email links |
 | `src/jobs/runner.ts` | node-cron scheduler entry point |
+| `src/components/features/groups/delete-group-button.tsx` | Admin soft-delete group (calls `DELETE /api/groups/[groupId]`) |
+| `src/lib/tasks/worker.ts` | Executes scheduled notification tasks (skips if payment no longer unpaid) |
+| `src/app/api/scheduled-tasks/` | Admin list/cancel/retry/bulk-cancel for the task queue |
 
 ## Data Models
 
@@ -73,7 +76,7 @@ See `docs/data-models.md`. Quick summary:
 - **BillingPeriod** — one cycle per group per month, with per-member payment statuses
 - **PriceHistory** — price change log per group
 - **Notification** — delivery log for all sent messages
-- **ScheduledTask** — queue for notification delivery (pending → locked → completed/failed)
+- **ScheduledTask** — queue for notification delivery (pending → locked → completed/failed/cancelled); admins manage via `/dashboard/scheduled-tasks` and `/api/scheduled-tasks/*`
 
 ## Conventions
 

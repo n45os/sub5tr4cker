@@ -12,7 +12,8 @@ export type ScheduledTaskStatus =
   | "pending"
   | "locked"
   | "completed"
-  | "failed";
+  | "failed"
+  | "cancelled";
 
 export interface IScheduledTaskPayload {
   groupId?: string;
@@ -44,6 +45,8 @@ export interface IScheduledTask extends Document {
   completedAt: Date | null;
   idempotencyKey: string;
   payload: IScheduledTaskPayload;
+  /** set when status is cancelled (admin or bulk cancel) */
+  cancelledAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -64,7 +67,7 @@ const scheduledTaskSchema = new Schema<IScheduledTask>(
     },
     status: {
       type: String,
-      enum: ["pending", "locked", "completed", "failed"],
+      enum: ["pending", "locked", "completed", "failed", "cancelled"],
       default: "pending",
     },
     runAt: { type: Date, required: true },
@@ -74,6 +77,7 @@ const scheduledTaskSchema = new Schema<IScheduledTask>(
     maxAttempts: { type: Number, default: 5 },
     lastError: { type: String, default: null },
     completedAt: { type: Date, default: null },
+    cancelledAt: { type: Date, default: null },
     idempotencyKey: { type: String, required: true },
     payload: {
       type: Schema.Types.Mixed,

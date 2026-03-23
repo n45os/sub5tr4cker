@@ -82,7 +82,7 @@ export function InitializeNotifyButton({
               {error}
             </p>
           ) : null}
-          <DialogFooter showCloseButton>
+          <DialogFooter>
             <Button
               variant="outline"
               onClick={() => setOpen(false)}

@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.30.0] - 2026-03-23
+
+### Added
+
+- **Scheduled tasks (admin)** — Dashboard page **Scheduled tasks** lists queued notification tasks for groups you administer; cancel pending/locked tasks, retry failed ones, or bulk-cancel by group id, member email (aggregated reminders), or task type. APIs: `GET /api/scheduled-tasks`, `PATCH /api/scheduled-tasks/[taskId]`, `POST /api/scheduled-tasks/bulk-cancel`.
+- **`cancelled` status** on `ScheduledTask` plus `cancelledAt` for admin cancellations.
+
+### Fixed
+
+- **Reminder worker** — Skips sending when a payment is no longer `pending` or `overdue` at execution time (avoids reminders after a paid member was still queued).
+
+### Changed
+
+- **Dialog footers** — Clearer labels (e.g. close without notifying, skip without sending) and consistent button spacing (`gap-2` on desktop); removed redundant extra **Close** buttons where **Cancel** already dismisses.
+
+## [0.29.0] - 2026-03-23
+
+### Added
+
+- **Delete group (UI)** — Admins can remove a group from the dashboard via the group header, the home **Subscriptions you pay for** admin table, or the **Danger zone** on the edit group screen (soft delete; existing `DELETE /api/groups/[groupId]`).
+- **Admin services table on dashboard** — The home page shows a table of subscription groups you own (service, pricing, members, next cycle, unpaid attention) with Open and Delete actions.
+
 ## [0.28.0] - 2026-03-21
 
 ### Added

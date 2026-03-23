@@ -120,6 +120,22 @@ Preview unpaid reminder candidates (by group, period, payment) with eligibility 
 
 Send payment reminders. Optional body: `groupIds` (string[]), `paymentIds` (string[]), `channelPreference` (`"email"` | `"telegram"` | `"both"`). Always groups by member email (one combined message per user). Response: `{ "data": { "emailSent", "telegramSent", "skipped", "failed" } }`.
 
+## Scheduled tasks
+
+Group admins only. Queue inspection and cancellation for groups you administer.
+
+### `GET /api/scheduled-tasks`
+
+Query: `page`, `limit`, optional `status`, optional `type`.
+
+### `PATCH /api/scheduled-tasks/[taskId]`
+
+Body: `{ "action": "cancel" | "retry" }` — cancel pending/locked tasks or retry failed ones.
+
+### `POST /api/scheduled-tasks/bulk-cancel`
+
+Body: at least one of `groupId`, `memberEmail`, `type`. Cancels matching pending/locked tasks.
+
 ## Cron
 
 All cron routes require header: `x-cron-secret: <secret>`.
@@ -138,7 +154,7 @@ Reconcile overdue payments and enqueue admin nudge tasks, then run the worker. R
 
 ### `POST /api/cron/notification-tasks`
 
-Run the notification task worker (claim and execute due tasks). Call frequently (e.g. every 5 min). Response: `claimed`, `completed`, `failed`, `counts` (pending, locked, completed, failed).
+Run the notification task worker (claim and execute due tasks). Call frequently (e.g. every 5 min). Response: `claimed`, `completed`, `failed`, `counts` (pending, locked, completed, failed, cancelled).
 
 ## Error format
 

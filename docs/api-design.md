@@ -414,6 +414,29 @@ Reminders are grouped by member email (case-insensitive): each unique email rece
 
 **Response:** `{ "data": { "emailSent", "telegramSent", "skipped", "failed" } }`.
 
+## Scheduled tasks (notification queue)
+
+Group admins only. Lists and manages `ScheduledTask` rows for groups where the user is the admin (including aggregated reminders that reference any of those groups).
+
+### `GET /api/scheduled-tasks`
+
+Query: `page`, `limit` (max 50), optional `status` (`pending` \| `locked` \| `completed` \| `failed` \| `cancelled`), optional `type` (task type enum).
+
+**Response:** `{ "data": { "items": [...], "pagination": { "page", "totalPages", "total" } } }` — each item includes `summary` and `payload` for display.
+
+### `PATCH /api/scheduled-tasks/[taskId]`
+
+**Body:** `{ "action": "cancel" | "retry" }`
+
+- `cancel` — allowed only when `status` is `pending` or `locked`; sets `cancelled` and `cancelledAt`.
+- `retry` — allowed only when `status` is `failed`; resets to `pending`, clears attempts/error, sets `runAt` to now.
+
+### `POST /api/scheduled-tasks/bulk-cancel`
+
+**Body:** at least one of `groupId`, `memberEmail`, or `type`. Cancels all **pending** and **locked** tasks matching the filters. `groupId` must be a group the admin owns. `memberEmail` matches `payload.memberEmail` on aggregated reminders (case-insensitive).
+
+**Response:** `{ "data": { "cancelled": number } }`.
+
 ## Telegram
 
 ### `POST /api/telegram/webhook`
@@ -450,7 +473,7 @@ Reconcile overdue payment state (pending → overdue after 14 days) and enqueue 
 
 ### `POST /api/cron/notification-tasks`
 
-Run the notification task worker: claim due tasks, execute sends via the notification service, return counts. Intended to be called frequently (e.g. every 5 min). Response includes `claimed`, `completed`, `failed`, and `counts` (pending, locked, completed, failed) for observability.
+Run the notification task worker: claim due tasks, execute sends via the notification service, return counts. Intended to be called frequently (e.g. every 5 min). Response includes `claimed`, `completed`, `failed`, and `counts` (pending, locked, completed, failed, cancelled) for observability.
 
 ## User Settings
 

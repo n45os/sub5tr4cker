@@ -1075,7 +1075,7 @@ export function PaymentMatrix({
               )}
             </div>
           )}
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="flex-wrap gap-2">
             <Button
               variant="outline"
               onClick={() => setConfirmDialogOpen(false)}
@@ -1231,7 +1231,7 @@ export function PaymentMatrix({
             </DialogDescription>
           </DialogHeader>
           {editPeriodDeleteConfirm ? (
-            <DialogFooter className="gap-2 sm:gap-0">
+            <DialogFooter className="flex-wrap gap-2">
               <Button
                 variant="outline"
                 onClick={() => setEditPeriodDeleteConfirm(false)}

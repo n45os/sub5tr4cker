@@ -10,6 +10,10 @@ import {
 import { sendAdminConfirmationNudge } from "@/lib/notifications/admin-nudge";
 import { completeTask, failTask } from "./queue";
 
+function isPaymentStillUnpaid(payment: IMemberPayment): boolean {
+  return payment.status === "pending" || payment.status === "overdue";
+}
+
 /**
  * Execute a single scheduled task (load data, send notification, update task state).
  */
@@ -47,6 +51,10 @@ export async function executeTask(task: IScheduledTask): Promise<void> {
         if (!payment) {
           throw new Error("payment not found");
         }
+        if (!isPaymentStillUnpaid(payment)) {
+          await completeTask(task);
+          return;
+        }
         await sendReminderForPayment(group, period, payment);
         break;
       }
@@ -68,6 +76,7 @@ export async function executeTask(task: IScheduledTask): Promise<void> {
               (p._id as Types.ObjectId).toString() === ref.paymentId
           );
           if (!payment) continue;
+          if (!isPaymentStillUnpaid(payment)) continue;
           inputs.push({
             group: group as AggregatedPaymentInput["group"],
             period: period as AggregatedPaymentInput["period"],
@@ -75,7 +84,8 @@ export async function executeTask(task: IScheduledTask): Promise<void> {
           });
         }
         if (inputs.length === 0) {
-          throw new Error("aggregated_payment_reminder: no valid payments found");
+          await completeTask(task);
+          return;
         }
         const memberName = inputs[0].payment.memberNickname;
         await sendAggregatedReminder(

@@ -203,13 +203,15 @@ export async function getTaskCounts(): Promise<{
   locked: number;
   completed: number;
   failed: number;
+  cancelled: number;
 }> {
   await dbConnect();
-  const [pending, locked, completed, failed] = await Promise.all([
+  const [pending, locked, completed, failed, cancelled] = await Promise.all([
     ScheduledTask.countDocuments({ status: "pending" }),
     ScheduledTask.countDocuments({ status: "locked" }),
     ScheduledTask.countDocuments({ status: "completed" }),
     ScheduledTask.countDocuments({ status: "failed" }),
+    ScheduledTask.countDocuments({ status: "cancelled" }),
   ]);
-  return { pending, locked, completed, failed };
+  return { pending, locked, completed, failed, cancelled };
 }

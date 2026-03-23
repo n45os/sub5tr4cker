@@ -38,6 +38,14 @@ A **group** is one shared subscription (e.g. “YouTube Premium Family”). You�
 
 SubsTrack will create a **billing period** for the current month and, when the time comes, send **payment reminders** to everyone who hasn’t paid.
 
+## Dashboard overview
+
+The home dashboard lists every group you belong to — as **owner** or **member**. If you own at least one group, a **Subscriptions you pay for** table summarizes those services (price, member count, next billing date, and who still needs attention) with **Open** and **Delete** shortcuts.
+
+## Deleting a group
+
+Only the **admin** can delete a group. You’ll find **Delete** on the group page header, in the admin table on the dashboard, or under **Danger zone** at the bottom of **Edit group**. Deleting removes the group from the app for everyone; billing history is retained for audit.
+
 ## What happens next
 
 - **Reminders** — On the schedule you set (or the default), members get an email (and optionally Telegram) with the amount they owe and your payment link.

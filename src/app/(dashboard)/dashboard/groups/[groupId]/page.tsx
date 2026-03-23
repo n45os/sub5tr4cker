@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ImportHistoryDialog } from "@/components/features/billing/import-history-dialog";
+import { DeleteGroupButton } from "@/components/features/groups/delete-group-button";
 import { NoPeriodsCard } from "@/components/features/billing/no-periods-card";
 import { PaymentMatrix } from "@/components/features/billing/payment-matrix";
 import { GroupMembersPanel } from "@/components/features/groups/group-members-panel";
@@ -256,6 +257,13 @@ export default async function GroupDetailPage({
             <Pencil className="size-4" />
             Edit group
           </Link>
+          <DeleteGroupButton
+            groupId={groupId}
+            groupName={group.name}
+            buttonVariant="outline"
+            label="Delete"
+            className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive dark:hover:bg-destructive/20"
+          />
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { Bell, CreditCard, Users } from "lucide-react";
+import { AdminServicesTable } from "@/components/features/dashboard/admin-services-table";
 import { GroupCard } from "@/components/features/groups/GroupCard";
 import { AllGroupsQuickStatus } from "@/components/features/dashboard/all-groups-quick-status";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +40,7 @@ export default async function DashboardPage() {
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
   const groups = await getGroups(cookieHeader);
+  const adminGroups = groups.filter((g) => g.role === "admin");
   const totalMembers = groups.reduce((sum, group) => sum + group.memberCount, 0);
   const totalPending = groups.reduce((sum, group) => sum + group.unpaidCount, 0);
   const totalSpend = groups.reduce(
@@ -95,6 +97,12 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </section>
+
+      {adminGroups.length > 0 ? (
+        <section>
+          <AdminServicesTable groups={adminGroups} />
+        </section>
+      ) : null}
 
       <section>
         <AllGroupsQuickStatus />

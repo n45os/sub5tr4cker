@@ -259,7 +259,7 @@ export function InviteLinkCard({ groupId }: InviteLinkCardProps) {
               The current link will stop working. No one else can join via it. You can generate a new link later.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter showCloseButton>
+          <DialogFooter className="flex-wrap gap-2">
             <Button
               variant="outline"
               onClick={() => setDestroyOpen(false)}

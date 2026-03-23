@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Info, Loader2, Sparkles } from "lucide-react";
+import { DeleteGroupButton } from "@/components/features/groups/delete-group-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -709,6 +710,27 @@ export function GroupForm({
               </div>
             </CardContent>
           </Card>
+
+          {mode === "edit" && groupId ? (
+            <Card className="border-destructive/30 bg-destructive/3">
+              <CardHeader>
+                <CardTitle className="text-destructive">Danger zone</CardTitle>
+                <CardDescription>
+                  Deleting removes this group from your dashboard. Historical billing
+                  records are retained for audit, but members will no longer see this
+                  group.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DeleteGroupButton
+                  groupId={groupId}
+                  groupName={form.name.trim() || "this group"}
+                  size="default"
+                  label="Delete group"
+                />
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
 
         <div className="flex items-center justify-end gap-3">

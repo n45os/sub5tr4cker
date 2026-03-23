@@ -1,5 +1,5 @@
 <!-- context-status: active -->
-<!-- last-updated: 2026-03-21 -->
+<!-- last-updated: 2026-03-23 -->
 
 # SubsTrack — Project Context
 
@@ -10,18 +10,18 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 - **Stack**: Next.js 15 (App Router), MongoDB/Mongoose, Auth.js v5, Resend, grammy, node-cron, persisted notification task queue (ScheduledTask)
 - **UI**: Tailwind CSS + shadcn/ui with a sidebar dashboard shell, richer cards, tabs, and settings surfaces
 - **Origin**: Migrated from a Google Sheets + Apps Script setup (see `docs/legacy/`)
-- **Phase**: Core MVP plus dashboard refresh, editable groups, DB-backed app settings, notification previews, per-group email accent + style presets with live preview, shared themed email templates, aggregated reminders by user (optional), and profile email/Telegram toggles
+- **Phase**: Core MVP plus dashboard refresh (including an admin “subscriptions you pay for” table), editable groups with soft-delete from the UI, DB-backed app settings, notification previews, **scheduled tasks** page for admins to cancel/retry queued reminders, per-group email accent + style presets with live preview, shared themed email templates, aggregated reminders by user (optional), and profile email/Telegram toggles
 
 ## Key Directories
 
 - `src/app/` — pages + API routes (auth, dashboard, groups, billing, telegram, cron)
 - `src/app/(auth)/` — login, register
-- `src/app/(dashboard)/` — dashboard home, group detail/edit/new, notification previews, settings
-- `src/app/api/` — groups CRUD, group notification toggles, billing, notifications, settings, confirm, telegram webhook/link, cron, register
+- `src/app/(dashboard)/` — dashboard home, group detail/edit/new, notification previews, scheduled tasks (queue), activity, settings
+- `src/app/api/` — groups CRUD, group notification toggles, billing, notifications, scheduled tasks (queue admin), settings, confirm, telegram webhook/link, cron, register
 - `src/lib/` — db, auth, settings service, tokens (confirmation + link), email, telegram, billing calculator, notifications, tasks (queue + worker)
 - `src/models/` — Mongoose schemas (User, Group, BillingPeriod, PriceHistory, Notification, Settings, ScheduledTask)
 - `src/jobs/` — check-billing-periods, enqueue-reminders, enqueue-follow-ups, reconcile-overdue, send-follow-ups, run-notification-tasks, runner
-- `src/components/features/groups/` — GroupCard and group UI
+- `src/components/features/groups/` — GroupCard, group form, delete-group flow, and group UI
 - `docs/` — architecture plan, data models, API design
 
 ## Core Flow
@@ -44,6 +44,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 - Auth: /api/auth/[...nextauth], POST /api/register
 - Telegram: POST /api/telegram/webhook, POST /api/telegram/link
 - Dashboard: GET /api/dashboard/quick-status, GET/POST /api/dashboard/notify-unpaid (POST accepts optional groupIds, paymentIds, channelPreference; always groups by member email for one combined message per user; cron aggregation uses the notifications.aggregateReminders setting)
+- Scheduled tasks (admin): GET /api/scheduled-tasks, PATCH /api/scheduled-tasks/[taskId], POST /api/scheduled-tasks/bulk-cancel
 - Cron: POST /api/cron/billing, reminders, follow-ups, notification-tasks (x-cron-secret)
 - Confirm: GET /api/confirm/[token] (email "I paid")
 

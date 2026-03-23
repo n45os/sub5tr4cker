@@ -571,7 +571,7 @@ export function GroupMembersPanel({
                       ))}
                     </TableBody>
                   </Table>
-                  <DialogFooter className="gap-2 sm:gap-0">
+                  <DialogFooter className="flex-wrap gap-2">
                     <Button
                       variant="outline"
                       onClick={() => {
@@ -586,7 +586,7 @@ export function GroupMembersPanel({
                   </DialogFooter>
                 </>
               ) : (
-                <DialogFooter className="gap-2 sm:gap-0">
+                <DialogFooter className="flex-wrap gap-2">
                   <Button
                     variant="outline"
                     onClick={() => {
@@ -594,7 +594,7 @@ export function GroupMembersPanel({
                       setPostAddStep(1);
                     }}
                   >
-                    Close
+                    Skip, don&apos;t notify
                   </Button>
                   <Button
                     onClick={() => {
@@ -654,7 +654,7 @@ export function GroupMembersPanel({
                   </div>
                 );
               })}
-              <DialogFooter className="gap-2 sm:gap-0">
+              <DialogFooter className="flex-wrap gap-2">
                 <Button
                   variant="outline"
                   onClick={() => setPostAddStep(1)}
@@ -674,7 +674,7 @@ export function GroupMembersPanel({
           )}
           {postAddModal && postAddStep === 3 && (
             <div className="space-y-4 py-2">
-              <DialogFooter className="gap-2 sm:gap-0 flex-col sm:flex-row">
+              <DialogFooter className="flex flex-wrap gap-2 sm:flex-row">
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -684,7 +684,7 @@ export function GroupMembersPanel({
                   }}
                   disabled={notifyMembersLoading}
                 >
-                  Skip
+                  Done, don&apos;t notify
                 </Button>
                 <Button
                   variant="outline"
@@ -696,7 +696,7 @@ export function GroupMembersPanel({
                   ) : (
                     <>
                       <Mail className="size-4 mr-2" />
-                      Send invite to {postAddModal.nickname}
+                      Send invite only
                     </>
                   )}
                 </Button>
@@ -707,7 +707,7 @@ export function GroupMembersPanel({
                   {notifyMembersLoading ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : (
-                    "Notify members & send invite"
+                    "Notify all & send invite"
                   )}
                 </Button>
               </DialogFooter>
@@ -729,13 +729,13 @@ export function GroupMembersPanel({
                 : ""}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="flex-wrap gap-2">
             <Button
               variant="outline"
               onClick={() => setInviteDialog(null)}
               disabled={inviteSending}
             >
-              Skip
+              Skip, don&apos;t send
             </Button>
             <Button
               onClick={handleSendInvite}
@@ -772,7 +772,7 @@ export function GroupMembersPanel({
               {error}
             </p>
           ) : null}
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="flex-wrap gap-2">
             <Button
               variant="outline"
               onClick={() => setRemoveMember(null)}
@@ -863,7 +863,7 @@ export function GroupMembersPanel({
                   {error}
                 </p>
               ) : null}
-              <DialogFooter className="gap-2 sm:gap-0">
+              <DialogFooter className="flex-wrap gap-2">
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -872,7 +872,7 @@ export function GroupMembersPanel({
                   }}
                   disabled={notifyRemovalLoading}
                 >
-                  Close
+                  Close without notifying
                 </Button>
                 <Button
                   onClick={handlePostRemoveNotify}
@@ -970,7 +970,7 @@ export function GroupMembersPanel({
                 </p>
               </div>
             </div>
-            <DialogFooter className="gap-2 sm:gap-0">
+            <DialogFooter className="flex-wrap gap-2">
               <Button
                 type="button"
                 variant="outline"

@@ -713,7 +713,7 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
           </div>
 
           {preview && !previewLoading && (
-            <DialogFooter showCloseButton className="mx-0 mt-0 shrink-0 border-t">
+            <DialogFooter className="mx-0 mt-0 shrink-0 flex-wrap gap-2 border-t">
               <Button variant="outline" onClick={() => setOpen(false)} disabled={sending}>
                 {showResult ? "Close" : "Cancel"}
               </Button>

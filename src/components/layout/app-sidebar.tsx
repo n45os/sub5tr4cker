@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react";
 import {
   Activity,
   Bell,
+  CalendarClock,
   ChevronsUpDown,
   CreditCard,
   LayoutDashboard,
@@ -45,6 +46,11 @@ const NAV_ITEMS = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Groups", href: "/dashboard/groups", icon: Users },
   { title: "Activity", href: "/dashboard/activity", icon: Activity },
+  {
+    title: "Scheduled tasks",
+    href: "/dashboard/scheduled-tasks",
+    icon: CalendarClock,
+  },
   { title: "Payments", href: "/dashboard/payments", icon: Wallet },
   { title: "Notifications", href: "/dashboard/notifications", icon: Bell },
 ];

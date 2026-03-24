@@ -24,7 +24,7 @@ User ──┬── owns ──── Group ──── has many ──── 
 
 ## Group
 
-- **Fields**: name, description, admin (ref User), service (name, icon, url, accentColor, emailTheme), billing (mode, currentPrice, currency, cycleDay, cycleType, adminIncludedInSplit, fixedMemberAmount, gracePeriodDays, paymentInAdvanceDays), payment (platform, link, instructions, stripeAccountId), members (array of { user, email, nickname, role, joinedAt, leftAt, isActive, customAmount }), announcements (notifyOnPriceChange, extraText), telegramGroup (chatId, linkedAt), isActive, inviteCode, timestamps.
+- **Fields**: name, description, admin (ref User), service (name, icon, url, accentColor, emailTheme), billing (mode, currentPrice, currency, cycleDay, cycleType, adminIncludedInSplit, fixedMemberAmount, gracePeriodDays, paymentInAdvanceDays), payment (platform, link, instructions, stripeAccountId), notifications (remindersEnabled, followUpsEnabled, priceChangeEnabled, saveEmailParams), members (array of { user, email, nickname, role, joinedAt, leftAt, isActive, customAmount }), announcements (notifyOnPriceChange, extraText), telegramGroup (chatId, linkedAt), isActive, inviteCode, timestamps.
 - **Indexes**: admin, members.user, members.email, inviteCode (sparse unique).
 
 ## BillingPeriod
@@ -40,8 +40,8 @@ User ──┬── owns ──── Group ──── has many ──── 
 
 ## Notification
 
-- **Fields**: recipient (ref User), recipientEmail, group (ref), billingPeriod (ref), type, channel (email | telegram), status (sent | failed | pending), subject, preview, externalId, error, deliveredAt, timestamps.
-- **Types**: payment_reminder, payment_confirmed, admin_confirmation_request, price_change, announcement, invite, follow_up.
+- **Fields**: recipient (ref User), recipientEmail, group (ref), billingPeriod (ref), type, channel (email | telegram), status (sent | failed | pending), subject, preview, emailParams (optional Mixed; template args when the group has saveEmailParams for activity email preview), externalId, error, deliveredAt, timestamps.
+- **Types**: payment_reminder, payment_confirmed, admin_confirmation_request, price_change, price_adjustment, announcement, invite, follow_up, member_message.
 
 ## ScheduledTask
 

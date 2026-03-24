@@ -10,7 +10,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 - **Stack**: Next.js 15 (App Router), MongoDB/Mongoose, Auth.js v5, Resend, grammy, node-cron, persisted notification task queue (ScheduledTask)
 - **UI**: Tailwind CSS + shadcn/ui with a sidebar dashboard shell, richer cards, tabs, and settings surfaces
 - **Origin**: Migrated from a Google Sheets + Apps Script setup (see `docs/legacy/`)
-- **Phase**: Core MVP plus dashboard refresh (including an admin “subscriptions you pay for” table), editable groups with soft-delete from the UI, DB-backed app settings, notification previews, **scheduled tasks** page for admins to cancel/retry queued reminders, per-group email accent + style presets with live preview, shared themed email templates, aggregated reminders by user (optional), and profile email/Telegram toggles
+- **Phase**: Core MVP plus dashboard refresh (including an admin “subscriptions you pay for” table), editable groups with soft-delete from the UI, DB-backed app settings, notification previews, **scheduled tasks** page for admins to cancel/retry queued reminders, per-group email accent + style presets with live preview, shared themed email templates, aggregated reminders by user (optional), profile email/Telegram toggles, optional per-group **save email params** for Activity sent-email preview
 
 ## Key Directories
 
@@ -37,7 +37,8 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 ## Implemented APIs (see docs/api-design.md)
 
 - Groups: GET/POST /api/groups, GET/PATCH/DELETE /api/groups/[groupId]
-- Group notifications: PATCH /api/groups/[groupId]/notifications
+- Group notifications: PATCH /api/groups/[groupId]/notifications (includes `saveEmailParams`)
+- Activity: GET /api/activity, GET /api/activity/notifications/[notificationId]/email (rebuild from stored template params)
 - Members: POST/PATCH/DELETE /api/groups/[groupId]/members(/[memberId])
 - Billing: GET/POST /api/groups/[groupId]/billing, PATCH period, confirm, self-confirm
 - Notifications: GET /api/notifications (templates list/preview APIs exist but are deprecated for first-party UI — use `docs/api-design.md`)

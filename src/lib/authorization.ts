@@ -52,6 +52,7 @@ type GroupLike = {
     remindersEnabled?: boolean;
     followUpsEnabled?: boolean;
     priceChangeEnabled?: boolean;
+    saveEmailParams?: boolean;
   };
   announcements?: {
     notifyOnPriceChange?: boolean;
@@ -135,6 +136,7 @@ export function filterGroupForMember(
           group.notifications?.priceChangeEnabled ??
           group.announcements?.notifyOnPriceChange ??
           true,
+        saveEmailParams: group.notifications?.saveEmailParams ?? false,
       },
       isActive: group.isActive,
       initializedAt: group.initializedAt
@@ -191,6 +193,7 @@ export function filterGroupForMember(
         group.notifications?.priceChangeEnabled ??
         group.announcements?.notifyOnPriceChange ??
         true,
+      saveEmailParams: group.notifications?.saveEmailParams ?? false,
     },
     isActive: group.isActive,
     initializedAt: group.initializedAt

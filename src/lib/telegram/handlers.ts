@@ -420,7 +420,7 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
       : null;
 
     const admin = await User.findById(group.admin);
-    const emailHtml = buildTelegramWelcomeEmailHtml({
+    const telegramWelcomeParams = {
       memberName: member.nickname,
       groupName: group.name,
       groupId: group._id.toString(),
@@ -438,7 +438,12 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
       accentColor: group.service?.accentColor ?? null,
       theme: group.service?.emailTheme ?? "clean",
       magicLoginUrl,
-    });
+    };
+    const emailHtml = buildTelegramWelcomeEmailHtml(telegramWelcomeParams);
+    const emailParams =
+      group.notifications?.saveEmailParams === true
+        ? { template: "telegram_welcome" as const, ...telegramWelcomeParams }
+        : undefined;
     await sendNotification(
       {
         email: user.email,
@@ -455,6 +460,7 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
         emailHtml,
         telegramText: `Welcome to ${group.name}`,
         groupId: group._id.toString(),
+        emailParams,
       }
     );
     await ctx.reply(

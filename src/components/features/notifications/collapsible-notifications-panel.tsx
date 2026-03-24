@@ -17,6 +17,7 @@ interface CollapsibleNotificationsPanelProps {
     remindersEnabled: boolean;
     followUpsEnabled: boolean;
     priceChangeEnabled: boolean;
+    saveEmailParams: boolean;
   };
   recentNotifications: Array<{
     _id: string;

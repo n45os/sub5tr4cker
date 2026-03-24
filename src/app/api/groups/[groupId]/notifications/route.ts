@@ -10,6 +10,7 @@ const updateNotificationsSchema = z
     remindersEnabled: z.boolean().optional(),
     followUpsEnabled: z.boolean().optional(),
     priceChangeEnabled: z.boolean().optional(),
+    saveEmailParams: z.boolean().optional(),
   })
   .strict();
 
@@ -77,6 +78,10 @@ export async function PATCH(
   if (body.priceChangeEnabled !== undefined) {
     group.notifications.priceChangeEnabled = body.priceChangeEnabled;
     group.announcements.notifyOnPriceChange = body.priceChangeEnabled;
+  }
+
+  if (body.saveEmailParams !== undefined) {
+    group.notifications.saveEmailParams = body.saveEmailParams;
   }
 
   await group.save();

@@ -210,7 +210,7 @@ export async function GET(
           }
 
           const admin = await User.findById(group.admin);
-          const emailHtml = buildTelegramWelcomeEmailHtml({
+          const telegramWelcomeParams = {
             memberName: member.nickname,
             groupName: group.name,
             groupId: groupIdStr,
@@ -229,7 +229,15 @@ export async function GET(
             theme: group.service?.emailTheme ?? "clean",
             // template still uses this prop name, but it now points to the member portal
             magicLoginUrl: memberPortalUrl,
-          });
+          };
+          const emailHtml = buildTelegramWelcomeEmailHtml(telegramWelcomeParams);
+          const emailParams =
+            group.notifications?.saveEmailParams === true
+              ? {
+                  template: "telegram_welcome" as const,
+                  ...telegramWelcomeParams,
+                }
+              : undefined;
 
           await sendNotification(
             {
@@ -244,6 +252,7 @@ export async function GET(
               emailHtml,
               telegramText: `Welcome to ${group.name}`,
               groupId: groupIdStr,
+              emailParams,
             }
           );
         } catch (emailError) {

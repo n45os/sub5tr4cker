@@ -134,9 +134,12 @@ Update per-group notification toggles. Admin only.
 {
   "remindersEnabled": true,
   "followUpsEnabled": true,
-  "priceChangeEnabled": true
+  "priceChangeEnabled": true,
+  "saveEmailParams": false
 }
 ```
+
+`saveEmailParams` (default `false`): when `true`, outgoing emails for this group persist structured template arguments on each `Notification` row so the Activity page can rebuild the exact HTML.
 
 ## Members
 
@@ -613,6 +616,12 @@ Authenticated admin. Sends aggregated unpaid reminders; optional `groupIds`, `pa
 ### `GET /api/activity`
 
 Authenticated. Unified feed: sent notifications, audit events, and upcoming reminder/follow-up previews.
+
+Notification items include `hasEmailParams` when `emailParams` was stored for that row (see `PATCH .../notifications` `saveEmailParams`).
+
+### `GET /api/activity/notifications/[notificationId]/email`
+
+Authenticated. User must be able to access the notification’s group. Rebuilds HTML from stored `emailParams` and returns `{ data: { html } }`, or `{ data: { unavailable: true, reason } }` when no params were saved or preview is not applicable. Email channel only.
 
 ### `GET /api/payments`
 

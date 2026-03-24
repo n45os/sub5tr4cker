@@ -193,6 +193,7 @@ export async function POST(request: NextRequest) {
       remindersEnabled: true,
       followUpsEnabled: true,
       priceChangeEnabled: true,
+      saveEmailParams: false,
     },
     members,
     isActive: true,

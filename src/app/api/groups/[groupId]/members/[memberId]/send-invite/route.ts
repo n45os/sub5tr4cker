@@ -174,6 +174,11 @@ export async function POST(
   const emailHtml = buildGroupInviteEmailHtml(params);
   const telegramText = buildGroupInviteTelegramText(params);
 
+  const emailParams =
+    group.notifications?.saveEmailParams === true
+      ? { template: "group_invite" as const, ...params }
+      : undefined;
+
   try {
     const result = await sendNotification(
       {
@@ -188,6 +193,7 @@ export async function POST(
         emailHtml,
         telegramText,
         groupId: groupIdStr,
+        emailParams,
       }
     );
     const sent = result.email.sent || result.telegram.sent;

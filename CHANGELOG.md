@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.33.0] - 2026-03-24
+
+### Added
+
+- **Activity sent email preview** — Optional per-group `notifications.saveEmailParams` (default off). When enabled, structured template arguments for outgoing emails are stored on `Notification.emailParams`; Activity shows **View email** and `GET /api/activity/notifications/[notificationId]/email` rebuilds HTML via the same template builders. Group notifications panel includes the toggle; `GET /api/activity` notification items include `hasEmailParams`.
+
 ## [0.32.0] - 2026-03-24
 
 ### Added

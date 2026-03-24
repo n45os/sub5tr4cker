@@ -71,7 +71,7 @@ export async function sendReminderForPayment(
         )
       : null;
 
-  const emailHtml = buildPaymentReminderEmailHtml({
+  const reminderTemplateParams = {
     memberName: payment.memberNickname,
     groupName: group.name,
     periodLabel: period.periodLabel,
@@ -88,7 +88,17 @@ export async function sendReminderForPayment(
     unsubscribeUrl,
     accentColor: group.service?.accentColor ?? null,
     theme: group.service?.emailTheme ?? "clean",
-  });
+  };
+
+  const emailHtml = buildPaymentReminderEmailHtml(reminderTemplateParams);
+
+  const emailParams =
+    group.notifications?.saveEmailParams === true
+      ? {
+          template: "payment_reminder" as const,
+          ...reminderTemplateParams,
+        }
+      : undefined;
 
   const keyboard = paymentConfirmationKeyboard(
     (period._id as { toString: () => string }).toString(),
@@ -122,6 +132,7 @@ export async function sendReminderForPayment(
       telegramKeyboard: keyboard,
       groupId: (group._id as { toString: () => string }).toString(),
       billingPeriodId: periodId,
+      emailParams,
     }
   );
 

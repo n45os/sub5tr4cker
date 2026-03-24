@@ -14,9 +14,11 @@ const NOTIFICATION_TYPES: NotificationType[] = [
   "payment_confirmed",
   "admin_confirmation_request",
   "price_change",
+  "price_adjustment",
   "announcement",
   "invite",
   "follow_up",
+  "member_message",
 ];
 const CHANNELS = ["email", "telegram"] as const;
 
@@ -144,6 +146,8 @@ export async function GET(request: NextRequest) {
         subject: string | null;
         preview: string;
         recipientEmail: string;
+        externalId: string | null;
+        hasEmailParams: boolean;
         groupId: string | null;
         billingPeriodId: string | null;
         deliveredAt: string | null;
@@ -186,6 +190,7 @@ export async function GET(request: NextRequest) {
         preview: n.preview,
         recipientEmail: n.recipientEmail,
         externalId: n.externalId ?? null,
+        hasEmailParams: !!n.emailParams,
         groupId: n.group?.toString() ?? null,
         billingPeriodId: n.billingPeriod?.toString() ?? null,
         deliveredAt: n.deliveredAt ? n.deliveredAt.toISOString() : null,
@@ -236,6 +241,7 @@ export async function GET(request: NextRequest) {
       preview: n.preview,
       recipientEmail: n.recipientEmail,
       externalId: n.externalId ?? null,
+      hasEmailParams: !!n.emailParams,
       groupId: n.group?.toString() ?? null,
       billingPeriodId: n.billingPeriod?.toString() ?? null,
       deliveredAt: n.deliveredAt ? n.deliveredAt.toISOString() : null,

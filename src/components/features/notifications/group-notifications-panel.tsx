@@ -13,6 +13,7 @@ interface NotificationPreferenceState {
   remindersEnabled: boolean;
   followUpsEnabled: boolean;
   priceChangeEnabled: boolean;
+  saveEmailParams: boolean;
 }
 
 interface RecentNotificationItem {
@@ -94,6 +95,12 @@ export function GroupNotificationsPanel({
               key: "priceChangeEnabled" as const,
               label: "Price change announcements",
               description: "Alerts when the subscription price changes.",
+            },
+            {
+              key: "saveEmailParams" as const,
+              label: "Save email data for activity preview",
+              description:
+                "When on, the data used to build each outgoing email is saved and you can view the exact email from the Activity log.",
             },
           ].map((item) => (
             <div

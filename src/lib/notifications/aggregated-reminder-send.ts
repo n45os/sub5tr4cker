@@ -127,7 +127,7 @@ export async function sendAggregatedReminder(
     : null;
 
   const accentColor = entries[0]?.accentColor ?? null;
-  const emailHtml = buildAggregatedPaymentReminderEmailHtml({
+  const aggregatedTemplateParams = {
     memberName,
     entries,
     distinctGroupCount,
@@ -135,7 +135,19 @@ export async function sendAggregatedReminder(
     unsubscribeUrl,
     accentColor,
     theme: entries[0]?.theme ?? "clean",
-  });
+  };
+  const emailHtml =
+    buildAggregatedPaymentReminderEmailHtml(aggregatedTemplateParams);
+
+  const saveEmailParams = payments.some(
+    (p) => p.group.notifications?.saveEmailParams === true
+  );
+  const emailParams = saveEmailParams
+    ? {
+        template: "aggregated_payment_reminder" as const,
+        ...aggregatedTemplateParams,
+      }
+    : undefined;
 
   const telegramText = buildAggregatedPaymentReminderTelegramText({
     memberName,
@@ -170,6 +182,7 @@ export async function sendAggregatedReminder(
       telegramKeyboard: keyboard,
       groupId: firstGroupId,
       billingPeriodId: firstPeriodId,
+      emailParams,
     }
   );
 

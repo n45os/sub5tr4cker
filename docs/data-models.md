@@ -91,6 +91,7 @@ A subscription group managed by an admin.
     remindersEnabled: boolean,            // default: true
     followUpsEnabled: boolean,            // default: true
     priceChangeEnabled: boolean,          // default: true
+    saveEmailParams: boolean,             // default: false; when true, persist template args on Notification for activity email preview
   },
 
   // members (embedded for performance — groups rarely exceed 20 members)
@@ -214,9 +215,11 @@ Log of all notifications sent. Useful for debugging and user history.
       | 'payment_confirmed'
       | 'admin_confirmation_request'
       | 'price_change'
+      | 'price_adjustment'
       | 'announcement'
       | 'invite'
-      | 'follow_up',
+      | 'follow_up'
+      | 'member_message',
 
   channel: 'email' | 'telegram',
   status: 'sent' | 'failed' | 'pending',
@@ -224,6 +227,7 @@ Log of all notifications sent. Useful for debugging and user history.
   // content snapshot
   subject: string | null,                // for email
   preview: string,                       // short text preview
+  emailParams: object | null,            // optional; serialized template args when group.notifications.saveEmailParams (rebuild sent email in Activity)
 
   // delivery metadata
   externalId: string | null,             // Resend message ID, Telegram message ID

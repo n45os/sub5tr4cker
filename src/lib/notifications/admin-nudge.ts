@@ -55,6 +55,11 @@ export async function sendAdminConfirmationNudge(
   const emailHtml = buildAdminFollowUpEmailHtml(templateParams);
   const telegramText = buildAdminFollowUpTelegramText(templateParams);
 
+  const emailParams =
+    group.notifications?.saveEmailParams === true
+      ? { template: "admin_follow_up" as const, ...templateParams }
+      : undefined;
+
   // when telegram is linked + enabled in profile, nudge on tg only; otherwise email (if allowed)
   const telegramPref = admin.notificationPreferences?.telegram ?? false;
   const emailPref = admin.notificationPreferences?.email ?? true;
@@ -79,6 +84,7 @@ export async function sendAdminConfirmationNudge(
       telegramText,
       groupId: group._id.toString(),
       billingPeriodId: period._id.toString(),
+      emailParams,
     }
   );
 }

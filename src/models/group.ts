@@ -52,6 +52,8 @@ export interface IGroup extends Document {
     remindersEnabled: boolean;
     followUpsEnabled: boolean;
     priceChangeEnabled: boolean;
+    /** when true, persist template params on Notification for activity email preview */
+    saveEmailParams: boolean;
   };
   members: IGroupMember[];
   announcements: {
@@ -133,6 +135,7 @@ const groupSchema = new Schema<IGroup>(
       remindersEnabled: { type: Boolean, default: true },
       followUpsEnabled: { type: Boolean, default: true },
       priceChangeEnabled: { type: Boolean, default: true },
+      saveEmailParams: { type: Boolean, default: false },
     },
     members: [groupMemberSchema],
     announcements: {

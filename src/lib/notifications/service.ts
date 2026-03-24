@@ -32,6 +32,8 @@ interface NotificationContent {
   telegramKeyboard?: InlineKeyboard;
   groupId?: string;
   billingPeriodId?: string;
+  /** when set, persisted on the email log row for activity preview (group opt-in) */
+  emailParams?: Record<string, unknown>;
 }
 
 interface NotificationResult {
@@ -100,6 +102,7 @@ export async function sendNotification(
           externalId: sendResult.externalId ?? null,
           groupId: content.groupId,
           billingPeriodId: content.billingPeriodId,
+          emailParams: content.emailParams,
         });
       }
     } else if (channelKey === "telegram") {
@@ -138,6 +141,7 @@ async function logNotification(params: {
   externalId?: string | null;
   groupId?: string;
   billingPeriodId?: string;
+  emailParams?: Record<string, unknown>;
 }): Promise<void> {
   try {
     await Notification.create({
@@ -154,6 +158,7 @@ async function logNotification(params: {
       status: params.status,
       subject: params.subject,
       preview: params.preview,
+      emailParams: params.emailParams ?? null,
       externalId: params.externalId ?? null,
       deliveredAt: params.status === "sent" ? new Date() : null,
     });
@@ -193,25 +198,6 @@ export async function sendPriceChangeAnnouncements(
   const subject = `Price update: ${groupName} (${serviceName})`;
   const oldMemberShare = estimatePerMemberShare(group, previousPrice);
   const newMemberShare = estimatePerMemberShare(group, newPrice);
-  const emailHtml = buildPriceChangeEmailHtml({
-    groupName,
-    serviceName,
-    oldPrice: previousPrice,
-    newPrice,
-    currency,
-    oldMemberShare,
-    newMemberShare,
-    nextPeriodLabel: "next billing cycle",
-    accentColor: group.service?.accentColor ?? null,
-    theme: group.service?.emailTheme ?? "clean",
-  });
-  const telegramText = buildPriceChangeTelegramText({
-    groupName,
-    serviceName,
-    oldPrice: previousPrice,
-    newPrice,
-    currency,
-  });
 
   const targets = new Map<string, PriceChangeTarget>();
 
@@ -284,6 +270,30 @@ export async function sendPriceChangeAnnouncements(
         accentColor: group.service?.accentColor ?? null,
         theme: group.service?.emailTheme ?? "clean",
       });
+      const telegramText = buildPriceChangeTelegramText({
+        groupName,
+        serviceName,
+        oldPrice: previousPrice,
+        newPrice,
+        currency,
+      });
+      const emailParams =
+        group.notifications?.saveEmailParams === true
+          ? {
+              template: "price_change" as const,
+              groupName,
+              serviceName,
+              oldPrice: previousPrice,
+              newPrice,
+              currency,
+              oldMemberShare,
+              newMemberShare,
+              nextPeriodLabel: "next billing cycle",
+              unsubscribeUrl,
+              accentColor: group.service?.accentColor ?? null,
+              theme: group.service?.emailTheme ?? "clean",
+            }
+          : undefined;
       await sendNotification(
         {
           email: target.email,
@@ -297,6 +307,7 @@ export async function sendPriceChangeAnnouncements(
           emailHtml,
           telegramText,
           groupId: groupIdStr,
+          emailParams,
         }
       );
     } catch (error) {
@@ -469,6 +480,28 @@ export async function sendMemberAddedNotifications(
         isCredit: difference > 0,
       });
 
+      const emailParams =
+        group.notifications?.saveEmailParams === true
+          ? {
+              template: "price_adjustment" as const,
+              memberName: target.memberNickname,
+              groupName,
+              periodLabel,
+              originalAmount,
+              newAmount: newShareAmount,
+              difference,
+              currency,
+              reason,
+              paymentLink: null,
+              paymentInstructions: null,
+              confirmUrl: null,
+              isCredit: difference > 0,
+              unsubscribeUrl,
+              accentColor: group.service?.accentColor ?? null,
+              theme: group.service?.emailTheme ?? "clean",
+            }
+          : undefined;
+
       await sendNotification(
         {
           email: target.email,
@@ -482,6 +515,7 @@ export async function sendMemberAddedNotifications(
           emailHtml,
           telegramText,
           groupId: groupIdStr,
+          emailParams,
         }
       );
     } catch (error) {

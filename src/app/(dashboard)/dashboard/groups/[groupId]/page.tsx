@@ -61,6 +61,7 @@ interface GroupDetail {
     remindersEnabled: boolean;
     followUpsEnabled: boolean;
     priceChangeEnabled: boolean;
+    saveEmailParams: boolean;
   };
   role: string;
   initializedAt: string | null;

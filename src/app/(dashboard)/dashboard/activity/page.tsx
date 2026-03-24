@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { auth } from "@/lib/auth";
 import {
   Activity,
   Bell,
@@ -29,6 +28,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getServerBaseUrl } from "@/lib/server-url";
 import { cn } from "@/lib/utils";
+import { ActivityEmailPreview } from "@/components/features/activity/activity-email-preview";
 
 type SentItem =
   | {
@@ -41,6 +41,7 @@ type SentItem =
       preview: string;
       recipientEmail: string;
       externalId: string | null;
+      hasEmailParams: boolean;
       groupId: string | null;
       billingPeriodId: string | null;
       deliveredAt: string | null;
@@ -299,7 +300,6 @@ interface ActivityPageProps {
 }
 
 export default async function ActivityPage({ searchParams }: ActivityPageProps) {
-  const session = await auth();
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
   const params = await searchParams;
@@ -395,6 +395,9 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps) 
                                   View group
                                 </Link>
                               )}
+                              {item.channel === "email" && item.hasEmailParams ? (
+                                <ActivityEmailPreview notificationId={item._id} />
+                              ) : null}
                             </div>
                             <p className="max-w-full truncate text-sm text-muted-foreground">
                               {item.subject ?? item.preview}

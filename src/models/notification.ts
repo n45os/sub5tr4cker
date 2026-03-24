@@ -21,6 +21,8 @@ export interface INotification extends Document {
   status: "sent" | "failed" | "pending";
   subject: string | null;
   preview: string;
+  /** serialized template args for rebuilding sent email HTML (opt-in per group) */
+  emailParams: Record<string, unknown> | null;
   externalId: string | null;
   error: string | null;
   deliveredAt: Date | null;
@@ -68,6 +70,7 @@ const notificationSchema = new Schema<INotification>(
     },
     subject: { type: String, default: null },
     preview: { type: String, required: true },
+    emailParams: { type: Schema.Types.Mixed, default: null },
     externalId: { type: String, default: null },
     error: { type: String, default: null },
     deliveredAt: { type: Date, default: null },

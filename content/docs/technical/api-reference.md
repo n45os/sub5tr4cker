@@ -49,6 +49,18 @@ Query params:
 
 Soft-deactivate group. Admin only.
 
+### `PATCH /api/groups/[groupId]/notifications`
+
+Update per-group notification toggles. Admin only. Body may include `remindersEnabled`, `followUpsEnabled`, `priceChangeEnabled`, and `saveEmailParams`. When `saveEmailParams` is `true`, template arguments for outgoing emails are stored on `Notification` documents for Activity email preview.
+
+### `GET /api/activity`
+
+Unified feed (sent notifications, audit events, upcoming previews). Notification rows include `hasEmailParams` when stored template data exists.
+
+### `GET /api/activity/notifications/[notificationId]/email`
+
+Rebuild sent email HTML from stored template params. Returns `{ data: { html } }` or `{ data: { unavailable, reason } }`.
+
 ## Members
 
 ### `POST /api/groups/[groupId]/members`

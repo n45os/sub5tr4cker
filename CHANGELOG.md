@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.31.1] - 2026-03-24
+
+### Fixed
+
+- **Dashboard “groups needing attention”** — `GET /api/groups` `unpaidCount` and `GET /api/dashboard/quick-status` now use the same open-period aggregation (all relevant billing periods, not only the latest). Workspace pulse counts only groups you **own**. Quick status clarifies open follow-ups vs payment reminders; `groupsEligibleForReminders` matches bulk notify. Response adds `groupsNeedingAttention` and `groupsEligibleForReminders`; `groupsWithPendingOverdue` is kept as an alias of `groupsNeedingAttention` for compatibility.
+
 ## [0.31.0] - 2026-03-24
 
 ### Added

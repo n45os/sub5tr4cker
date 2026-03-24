@@ -7,7 +7,8 @@ import { NotifyUnpaidButton } from "./notify-unpaid-button";
 
 interface QuickStatusData {
   totalGroups: number;
-  groupsWithPendingOverdue: number;
+  groupsNeedingAttention: number;
+  groupsEligibleForReminders: number;
   pendingCount: number;
   overdueCount: number;
   memberConfirmedCount: number;
@@ -57,7 +58,7 @@ export function AllGroupsQuickStatus() {
     );
   }
 
-  const hasUnpaid = data.pendingCount + data.overdueCount > 0;
+  const canSendPaymentReminders = data.pendingCount + data.overdueCount > 0;
 
   return (
     <AllGroupsQuickStatusCard>
@@ -68,13 +69,20 @@ export function AllGroupsQuickStatus() {
             <p className="font-mono text-lg font-semibold tabular-nums">{data.totalGroups}</p>
           </div>
           <div className="min-w-0 rounded-xl border bg-muted/40 p-3">
-            <p className="truncate text-xs text-muted-foreground">Needing attention</p>
-            <p className="font-mono text-lg font-semibold tabular-nums">{data.groupsWithPendingOverdue}</p>
+            <p className="truncate text-xs text-muted-foreground">Open follow-ups</p>
+            <p className="font-mono text-lg font-semibold tabular-nums">{data.groupsNeedingAttention}</p>
+            <p className="truncate pt-1 text-[11px] text-muted-foreground">
+              Pending, overdue, or awaiting your confirm
+            </p>
           </div>
           <div className="min-w-0 rounded-xl border bg-muted/40 p-3">
             <p className="truncate text-xs text-muted-foreground">Pending / Overdue</p>
             <p className="font-mono text-lg font-semibold tabular-nums">
               {data.pendingCount} / {data.overdueCount}
+            </p>
+            <p className="truncate pt-1 text-[11px] text-muted-foreground">
+              {data.groupsEligibleForReminders} group
+              {data.groupsEligibleForReminders === 1 ? "" : "s"} eligible for reminders
             </p>
           </div>
           {data.memberConfirmedCount > 0 ? (
@@ -84,7 +92,16 @@ export function AllGroupsQuickStatus() {
             </div>
           ) : null}
         </div>
-        <NotifyUnpaidButton disabled={!hasUnpaid} onSent={() => setRefreshKey((k) => k + 1)} />
+        <div className="grid gap-2">
+          <NotifyUnpaidButton
+            disabled={!canSendPaymentReminders}
+            onSent={() => setRefreshKey((k) => k + 1)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Payment reminders only cover pending or overdue payments (not member-claimed rows
+            waiting for your confirmation).
+          </p>
+        </div>
       </div>
     </AllGroupsQuickStatusCard>
   );

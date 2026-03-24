@@ -4,6 +4,10 @@ import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
 import { generateUniqueInviteCode } from "@/lib/invite-code";
+import {
+  aggregateOutstandingByGroupFromPeriods,
+  buildOpenOutstandingPeriodsQuery,
+} from "@/lib/dashboard/billing-snapshot";
 import { Group, BillingPeriod } from "@/models";
 import { getNextPeriodStart } from "@/lib/billing/calculator";
 import { createPeriodIfDue } from "@/lib/billing/periods";
@@ -73,44 +77,45 @@ export async function GET() {
     .lean<IGroup[]>()
     .exec();
 
-  const list = await Promise.all(
-    groups.map(async (g) => {
-      const role =
-        g.admin.toString() === userId ? "admin" : "member";
-      const memberCount = g.members.filter(
-        (m: IGroupMember) => m.isActive && !m.leftAt
-      ).length;
-      const nextBillingDate = getNextPeriodStart(g.billing.cycleDay)
-        .toISOString()
-        .slice(0, 10);
+  const now = new Date();
+  const groupIds = groups.map((g) => g._id);
+  const periods =
+    groupIds.length === 0
+      ? []
+      : await BillingPeriod.find(buildOpenOutstandingPeriodsQuery(groupIds, now))
+          .lean()
+          .exec();
 
-      const latestPeriod = await BillingPeriod.findOne({ group: g._id })
-        .sort({ periodStart: -1 })
-        .lean()
-        .exec();
-      let unpaidCount = 0;
-      if (latestPeriod?.payments) {
-        unpaidCount = latestPeriod.payments.filter((p: { status: string }) =>
-          ["pending", "member_confirmed", "overdue"].includes(p.status)
-        ).length;
-      }
+  const outstandingByGroup = aggregateOutstandingByGroupFromPeriods(periods);
 
-      return {
-        _id: g._id.toString(),
-        name: g.name,
-        service: g.service,
-        role,
-        memberCount,
-        billing: {
-          currentPrice: g.billing.currentPrice,
-          currency: g.billing.currency,
-          mode: g.billing.mode,
-        },
-        nextBillingDate,
-        unpaidCount,
-      };
-    })
-  );
+  const list = groups.map((g) => {
+    const role = g.admin.toString() === userId ? "admin" : "member";
+    const memberCount = g.members.filter(
+      (m: IGroupMember) => m.isActive && !m.leftAt
+    ).length;
+    const nextBillingDate = getNextPeriodStart(g.billing.cycleDay)
+      .toISOString()
+      .slice(0, 10);
+
+    const gid = g._id.toString();
+    const unpaidCount =
+      outstandingByGroup.get(gid)?.outstandingPaymentCount ?? 0;
+
+    return {
+      _id: gid,
+      name: g.name,
+      service: g.service,
+      role,
+      memberCount,
+      billing: {
+        currentPrice: g.billing.currentPrice,
+        currency: g.billing.currency,
+        mode: g.billing.mode,
+      },
+      nextBillingDate,
+      unpaidCount,
+    };
+  });
 
   return NextResponse.json({ data: { groups: list } });
 }

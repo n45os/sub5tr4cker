@@ -67,6 +67,8 @@ List all groups the authenticated user belongs to (as admin or member).
 }
 ```
 
+`unpaidCount` is the number of payment rows with status `pending`, `overdue`, or `member_confirmed` across **all** open billing periods for that group (`periodStart` before the current time, `isFullyPaid` false). This matches the aggregation used by `GET /api/dashboard/quick-status` for admin-owned groups.
+
 ### `POST /api/groups`
 
 Create a new subscription group. Authenticated user becomes the admin.
@@ -431,7 +433,18 @@ Admin-only endpoints for the dashboard home (quick status and bulk notify).
 
 ### `GET /api/dashboard/quick-status`
 
-Aggregate unpaid and overdue counts across all groups where the user is admin.
+Admin-only. Counts across **active** groups where the user is the admin, using the same open-period rules as `unpaidCount` on `GET /api/groups`.
+
+**Response `data`:**
+
+| Field | Meaning |
+| --- | --- |
+| `totalGroups` | Admin-owned active groups |
+| `groupsNeedingAttention` | Distinct groups with at least one outstanding payment (`pending`, `overdue`, or `member_confirmed`) |
+| `groupsEligibleForReminders` | Distinct groups with at least one `pending` or `overdue` payment (matches `POST /api/dashboard/notify-unpaid`) |
+| `pendingCount`, `overdueCount`, `memberConfirmedCount` | Payment-row totals across those groups |
+
+`groupsWithPendingOverdue` is still returned for older clients; it equals `groupsNeedingAttention` (name was misleading).
 
 ### `GET /api/dashboard/notify-unpaid`
 
@@ -586,7 +599,7 @@ is already linked.
 
 ### `GET /api/dashboard/quick-status`
 
-Authenticated. Counts for the current user’s groups (admin-focused aggregates).
+Authenticated (admin-owned groups). See the **Dashboard** section above for response fields.
 
 ### `GET /api/dashboard/notify-unpaid`
 

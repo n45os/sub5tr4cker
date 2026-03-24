@@ -112,7 +112,7 @@ Admin-only. Used by the dashboard home (quick status and bulk notify).
 
 ### `GET /api/dashboard/quick-status`
 
-Aggregate unpaid/overdue counts across admin’s groups.
+Admin-only. Returns `groupsNeedingAttention` (any open follow-up), `groupsEligibleForReminders` (pending/overdue only, matches bulk notify), plus payment-row counts. Same open-period rules as `unpaidCount` on `GET /api/groups`.
 
 ### `GET /api/dashboard/notify-unpaid`
 

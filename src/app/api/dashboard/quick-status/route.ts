@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
+import {
+  aggregateOutstandingByGroupFromPeriods,
+  buildAdminBillingSnapshot,
+  buildOpenOutstandingPeriodsQuery,
+} from "@/lib/dashboard/billing-snapshot";
 import { BillingPeriod, Group } from "@/models";
 
 // admin-only: aggregate quick status across all groups where user is admin
@@ -25,51 +30,29 @@ export async function GET() {
     .lean()
     .exec();
 
+  const adminGroupIds = groups.map((g) => g._id.toString());
+
   const groupIds = groups.map((g) => g._id);
+  const periods =
+    groupIds.length === 0
+      ? []
+      : await BillingPeriod.find(buildOpenOutstandingPeriodsQuery(groupIds, now))
+          .lean()
+          .exec();
 
-  const periods = await BillingPeriod.find({
-    group: { $in: groupIds },
-    isFullyPaid: false,
-    periodStart: { $lt: now },
-    "payments.status": { $in: ["pending", "overdue", "member_confirmed"] },
-  })
-    .lean()
-    .exec();
-
-  const totalGroups = groups.length;
-  let groupsWithPendingOverdue = 0;
-  let pendingCount = 0;
-  let overdueCount = 0;
-  let memberConfirmedCount = 0;
-
-  const groupHasUnpaid = new Set<string>();
-
-  for (const period of periods) {
-    const gid = (period.group as { toString: () => string }).toString();
-    const payments = (period.payments ?? []) as Array<{ status: string }>;
-    for (const p of payments) {
-      if (p.status === "pending") {
-        pendingCount += 1;
-        groupHasUnpaid.add(gid);
-      } else if (p.status === "overdue") {
-        overdueCount += 1;
-        groupHasUnpaid.add(gid);
-      } else if (p.status === "member_confirmed") {
-        memberConfirmedCount += 1;
-        groupHasUnpaid.add(gid);
-      }
-    }
-  }
-
-  groupsWithPendingOverdue = groupHasUnpaid.size;
+  const byGroup = aggregateOutstandingByGroupFromPeriods(periods);
+  const snapshot = buildAdminBillingSnapshot(adminGroupIds, byGroup);
 
   return NextResponse.json({
     data: {
-      totalGroups,
-      groupsWithPendingOverdue,
-      pendingCount,
-      overdueCount,
-      memberConfirmedCount,
+      totalGroups: snapshot.totalGroups,
+      groupsNeedingAttention: snapshot.groupsNeedingAttention,
+      groupsEligibleForReminders: snapshot.groupsEligibleForReminders,
+      pendingCount: snapshot.pendingCount,
+      overdueCount: snapshot.overdueCount,
+      memberConfirmedCount: snapshot.memberConfirmedCount,
+      // deprecated alias for older clients — same value as groupsNeedingAttention
+      groupsWithPendingOverdue: snapshot.groupsNeedingAttention,
     },
   });
 }

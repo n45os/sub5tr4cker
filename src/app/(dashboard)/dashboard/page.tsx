@@ -41,6 +41,12 @@ export default async function DashboardPage() {
   const cookieHeader = cookieStore.toString();
   const groups = await getGroups(cookieHeader);
   const adminGroups = groups.filter((g) => g.role === "admin");
+  const adminGroupsNeedingAttention = adminGroups.filter(
+    (g) => g.unpaidCount > 0
+  ).length;
+  const adminHealthyGroups = adminGroups.filter(
+    (g) => g.unpaidCount === 0
+  ).length;
   const totalMembers = groups.reduce((sum, group) => sum + group.memberCount, 0);
   const totalPending = groups.reduce((sum, group) => sum + group.unpaidCount, 0);
   const totalSpend = groups.reduce(
@@ -165,15 +171,23 @@ export default async function DashboardPage() {
               </p>
             </div>
             <div className="rounded-2xl border bg-muted/40 p-4">
-              <p className="text-sm text-muted-foreground">Groups needing attention</p>
+              <p className="text-sm text-muted-foreground">
+                Groups needing attention
+              </p>
               <p className="font-mono mt-2 text-2xl font-semibold tabular-nums">
-                {groups.filter((group) => group.unpaidCount > 0).length}
+                {adminGroupsNeedingAttention}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Groups you own with open billing follow-ups
               </p>
             </div>
             <div className="rounded-2xl border bg-muted/40 p-4">
               <p className="text-sm text-muted-foreground">Healthy groups</p>
               <p className="font-mono mt-2 text-2xl font-semibold tabular-nums">
-                {groups.filter((group) => group.unpaidCount === 0).length}
+                {adminHealthyGroups}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Owned groups with nothing outstanding
               </p>
             </div>
           </CardContent>

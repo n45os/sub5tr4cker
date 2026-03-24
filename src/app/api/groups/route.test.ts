@@ -11,7 +11,9 @@ vi.mock("@/lib/db/mongoose", () => ({
 
 vi.mock("@/models", () => ({
   Group: { find: vi.fn(() => ({ lean: vi.fn(() => ({ exec: vi.fn(() => []) })) })) },
-  BillingPeriod: { findOne: vi.fn(() => ({ sort: vi.fn(() => ({ lean: vi.fn(() => ({ exec: vi.fn(() => null) })) })) })) },
+  BillingPeriod: {
+    find: vi.fn(() => ({ lean: vi.fn(() => ({ exec: vi.fn(() => []) })) })),
+  },
 }));
 
 const { auth } = await import("@/lib/auth");

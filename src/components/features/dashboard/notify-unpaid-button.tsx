@@ -2,8 +2,16 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Loader2, Mail, MessageCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  Bell,
+  Layers,
+  Loader2,
+  Mail,
+  MessageCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -13,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 type SkipReason =
   | "unsubscribed_from_email"
@@ -85,6 +94,43 @@ const SKIP_LABELS: Record<SkipReason, string> = {
   no_telegram_link: "Telegram not linked",
   no_reachable_channel: "No reachable channel",
 };
+
+function memberInitials(display: string): string {
+  const t = display.trim();
+  if (!t) return "?";
+  const parts = t.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase().slice(0, 2);
+  }
+  return t.slice(0, 2).toUpperCase();
+}
+
+function NotifyStatChip({
+  icon: Icon,
+  count,
+  label,
+  sublabel,
+}: {
+  icon: typeof Mail;
+  count: number;
+  label: string;
+  sublabel?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1 rounded-lg border bg-background/80 px-3 py-2.5 shadow-sm">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Icon className="size-4 shrink-0" />
+        <span className="text-xs font-medium uppercase tracking-wide">
+          {label}
+        </span>
+      </div>
+      <p className="text-2xl font-semibold tabular-nums">{count}</p>
+      {sublabel ? (
+        <p className="text-xs text-muted-foreground leading-snug">{sublabel}</p>
+      ) : null}
+    </div>
+  );
+}
 
 function wouldReceiveForChannel(
   p: PreviewPayment,
@@ -340,17 +386,10 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
                 Notify all unpaid
               </DialogTitle>
               <DialogDescription className="text-base">
-                One combined email or Telegram per member (same address across
-                groups). Choose groups, members, and channel below. Unsubscribed
-                members will not receive email.
+                Pick channels, groups, and members. One combined reminder per
+                member. Unsubscribed members won&apos;t get email.
               </DialogDescription>
             </DialogHeader>
-
-          {preview && !previewLoading && preview.summary.totalPayments > 0 && (
-            <p className="text-sm font-medium text-foreground">
-              Choose who to notify and how, then confirm.
-            </p>
-          )}
 
           {previewLoading && (
             <div className="flex items-center gap-2 py-6 text-muted-foreground">
@@ -374,10 +413,10 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
               ) : (
                 <>
                   {/* Channel preference */}
-                  <div className="rounded-lg border bg-muted/40 p-4 space-y-2">
+                  <div className="rounded-lg border bg-muted/40 p-4 space-y-3">
                     <p className="text-sm font-medium">Delivery channel</p>
                     <div
-                      className="flex flex-wrap gap-2"
+                      className="flex flex-col gap-1 rounded-lg border bg-muted/30 p-1 sm:flex-row"
                       role="radiogroup"
                       aria-label="Channel for this send"
                     >
@@ -385,74 +424,106 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
                         [
                           {
                             value: "both" as const,
-                            label: "Both (respect preferences)",
+                            label: "Both",
+                            hint: "respect preferences",
+                            Icon: Layers,
                           },
-                          { value: "email" as const, label: "Email only" },
-                          { value: "telegram" as const, label: "Telegram only" },
+                          {
+                            value: "email" as const,
+                            label: "Email",
+                            hint: "only",
+                            Icon: Mail,
+                          },
+                          {
+                            value: "telegram" as const,
+                            label: "Telegram",
+                            hint: "only",
+                            Icon: MessageCircle,
+                          },
                         ] as const
-                      ).map(({ value, label }) => (
+                      ).map(({ value, label, hint, Icon }) => (
                         <button
                           key={value}
                           type="button"
                           role="radio"
                           aria-checked={channelPreference === value}
                           onClick={() => setChannelPreference(value)}
-                          className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                          className={cn(
+                            "flex flex-1 items-center justify-center gap-2 rounded-md px-2 py-2.5 text-sm font-medium transition-colors sm:flex-col sm:py-2",
                             channelPreference === value
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-input bg-background hover:bg-muted"
-                          }`}
+                              ? "bg-primary text-primary-foreground shadow-sm"
+                              : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                          )}
                         >
-                          {label}
+                          <Icon className="size-4 shrink-0" />
+                          <span className="flex flex-col items-center gap-0 leading-tight sm:text-center">
+                            <span>{label}</span>
+                            <span
+                              className={cn(
+                                "text-[11px] font-normal",
+                                channelPreference === value
+                                  ? "text-primary-foreground/80"
+                                  : "text-muted-foreground"
+                              )}
+                            >
+                              {hint}
+                            </span>
+                          </span>
                         </button>
                       ))}
                     </div>
                   </div>
 
                   {/* Summary from selection */}
-                  <div className="rounded-lg border bg-muted/40 p-4 space-y-2">
+                  <div className="rounded-lg border bg-muted/40 p-4 space-y-3">
                     <p className="text-sm font-medium">Summary</p>
-                    <ul className="text-sm text-muted-foreground space-y-1">
+                    <div className="grid grid-cols-2 gap-3">
                       {preview.aggregateReminders && selectedCounts.userCount > 0 ? (
                         <>
-                          <li className="flex items-center gap-2">
-                            <Mail className="size-4" />
-                            {selectedCounts.email} user
-                            {selectedCounts.email !== 1 ? "s" : ""} will receive 1
-                            email each
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <MessageCircle className="size-4" />
-                            {selectedCounts.telegram} user
-                            {selectedCounts.telegram !== 1 ? "s" : ""} will
-                            receive 1 Telegram each
-                          </li>
-                          <li>
-                            {selectedCounts.userCount} user
-                            {selectedCounts.userCount !== 1 ? "s" : ""} selected
-                            (aggregated)
-                          </li>
+                          <NotifyStatChip
+                            icon={Mail}
+                            count={selectedCounts.email}
+                            label="Email"
+                            sublabel="users · one email each"
+                          />
+                          <NotifyStatChip
+                            icon={MessageCircle}
+                            count={selectedCounts.telegram}
+                            label="Telegram"
+                            sublabel="users · one message each"
+                          />
                         </>
                       ) : (
                         <>
-                          <li className="flex items-center gap-2">
-                            <Mail className="size-4" />
-                            {selectedCounts.email} reminder
-                            {selectedCounts.email !== 1 ? "s" : ""} via email
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <MessageCircle className="size-4" />
-                            {selectedCounts.telegram} reminder
-                            {selectedCounts.telegram !== 1 ? "s" : ""} via
-                            Telegram
-                          </li>
-                          <li>
-                            {selectedCounts.total} payment
-                            {selectedCounts.total !== 1 ? "s" : ""} selected
-                          </li>
+                          <NotifyStatChip
+                            icon={Mail}
+                            count={selectedCounts.email}
+                            label="Email"
+                            sublabel="reminders"
+                          />
+                          <NotifyStatChip
+                            icon={MessageCircle}
+                            count={selectedCounts.telegram}
+                            label="Telegram"
+                            sublabel="reminders"
+                          />
                         </>
                       )}
-                    </ul>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {preview.aggregateReminders ? (
+                        <>
+                          {selectedCounts.userCount} user
+                          {selectedCounts.userCount !== 1 ? "s" : ""} selected
+                          {selectedCounts.userCount > 0 ? " (aggregated)" : ""}
+                        </>
+                      ) : (
+                        <>
+                          {selectedCounts.total} payment
+                          {selectedCounts.total !== 1 ? "s" : ""} selected
+                        </>
+                      )}
+                    </p>
                     {selectedCounts.total === 0 && !preview.aggregateReminders && (
                       <p className="text-xs text-amber-600 dark:text-amber-400">
                         Select at least one group and one member to send.
@@ -472,39 +543,49 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
                       <p className="text-sm font-medium">
                         By user (one notification per user)
                       </p>
-                      <ul className="text-sm space-y-2 max-h-40 overflow-y-auto">
+                      <ul className="text-sm space-y-2 max-h-48 overflow-y-auto">
                         {preview.byUser.map((u) => {
                           const selected = u.payments.some(
                             (p) =>
                               selectedPaymentIds.has(p.paymentId) &&
                               selectedGroupIds.has(p.groupId)
                           );
+                          const displayName = u.memberNickname || u.memberEmail;
                           return (
                             <li
                               key={u.memberEmail}
-                              className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${
-                                !selected ? "opacity-50" : ""
-                              }`}
+                              className={cn(
+                                "flex flex-wrap items-center gap-3 rounded-md border border-transparent px-1 py-1.5",
+                                !selected ? "opacity-40" : ""
+                              )}
                             >
-                              <span className="font-medium">
-                                {u.memberNickname || u.memberEmail}
-                              </span>
-                              <span className="text-muted-foreground">
-                                {u.payments.length} group
-                                {u.payments.length !== 1 ? "s" : ""} · total{" "}
-                                {u.totalAmount.toFixed(2)}
-                                {u.payments[0]?.currency ?? ""}
-                              </span>
-                              {u.sendEmail && (
-                                <span className="text-muted-foreground">
-                                  email
-                                </span>
-                              )}
-                              {u.sendTelegram && (
-                                <span className="text-muted-foreground">
-                                  Telegram
-                                </span>
-                              )}
+                              <div
+                                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold"
+                                aria-hidden
+                              >
+                                {memberInitials(displayName)}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium">{displayName}</div>
+                                <div className="text-muted-foreground text-xs sm:text-sm">
+                                  {u.payments.length} group
+                                  {u.payments.length !== 1 ? "s" : ""} · total{" "}
+                                  {u.totalAmount.toFixed(2)}
+                                  {u.payments[0]?.currency ?? ""}
+                                </div>
+                              </div>
+                              <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                                {u.sendEmail && (
+                                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                                    email
+                                  </span>
+                                )}
+                                {u.sendTelegram && (
+                                  <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                                    Telegram
+                                  </span>
+                                )}
+                              </div>
                             </li>
                           );
                         })}
@@ -515,25 +596,35 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
                   {Object.entries(preview.summary.skipReasonCounts).some(
                     ([, n]) => n > 0
                   ) && (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40 p-4 space-y-2">
-                      <p className="text-sm font-medium">Skipped (no send)</p>
-                      <ul className="text-sm text-muted-foreground space-y-1">
-                        {Object.entries(preview.summary.skipReasonCounts).map(
-                          ([reason, count]) =>
-                            count > 0 ? (
-                              <li key={reason}>
-                                {count} — {SKIP_LABELS[reason as SkipReason]}
-                              </li>
-                            ) : null
+                    <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/40">
+                      <AlertTriangle
+                        className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-500"
+                        aria-hidden
+                      />
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <p className="text-sm font-medium">Skipped (no send)</p>
+                        <ul className="text-sm text-muted-foreground space-y-1">
+                          {Object.entries(preview.summary.skipReasonCounts).map(
+                            ([reason, count]) =>
+                              count > 0 ? (
+                                <li key={reason} className="flex flex-wrap gap-x-1.5 gap-y-0.5">
+                                  <span className="font-medium tabular-nums text-foreground">
+                                    {count}
+                                  </span>
+                                  <span className="text-muted-foreground">×</span>
+                                  <span>{SKIP_LABELS[reason as SkipReason]}</span>
+                                </li>
+                              ) : null
+                          )}
+                        </ul>
+                        {preview.summary.skipReasonCounts.unsubscribed_from_email >
+                          0 && (
+                          <p className="text-xs text-muted-foreground pt-0.5">
+                            Members who unsubscribed from group emails will not
+                            receive reminders by email.
+                          </p>
                         )}
-                      </ul>
-                      {preview.summary.skipReasonCounts.unsubscribed_from_email >
-                        0 && (
-                        <p className="text-xs text-muted-foreground pt-1">
-                          Members who unsubscribed from group emails will not
-                          receive reminders by email.
-                        </p>
-                      )}
+                      </div>
                     </div>
                   )}
 
@@ -565,12 +656,10 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
                     <ul className="text-sm space-y-2 max-h-32 overflow-y-auto">
                       {preview.byGroup.map((g) => (
                         <li key={g.groupId} className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             id={`group-${g.groupId}`}
                             checked={selectedGroupIds.has(g.groupId)}
-                            onChange={() => toggleGroup(g.groupId)}
-                            className="h-4 w-4 rounded border-input"
+                            onCheckedChange={() => toggleGroup(g.groupId)}
                           />
                           <Label
                             htmlFor={`group-${g.groupId}`}
@@ -630,15 +719,13 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
                                         !eligible ? "opacity-50" : ""
                                       }`}
                                     >
-                                      <input
-                                        type="checkbox"
+                                      <Checkbox
                                         id={`pay-${p.paymentId}`}
                                         checked={checked}
                                         disabled={!eligible}
-                                        onChange={() =>
+                                        onCheckedChange={() =>
                                           eligible && togglePayment(p.paymentId)
                                         }
-                                        className="h-4 w-4 rounded border-input"
                                       />
                                       <Label
                                         htmlFor={`pay-${p.paymentId}`}
@@ -713,7 +800,7 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
           </div>
 
           {preview && !previewLoading && (
-            <DialogFooter className="mx-0 mt-0 shrink-0 flex-wrap gap-2 border-t">
+            <DialogFooter className="mx-0 mt-0 shrink-0 flex-wrap gap-2 border-t px-6 py-4">
               <Button variant="outline" onClick={() => setOpen(false)} disabled={sending}>
                 {showResult ? "Close" : "Cancel"}
               </Button>

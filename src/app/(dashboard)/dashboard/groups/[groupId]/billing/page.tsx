@@ -5,7 +5,6 @@ import { ArrowLeft } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { NoPeriodsCard } from "@/components/features/billing/no-periods-card";
 import { PaymentMatrix } from "@/components/features/billing/payment-matrix";
-import { ImportHistoryDialog } from "@/components/features/billing/import-history-dialog";
 import { auth } from "@/lib/auth";
 import { getServerBaseUrl } from "@/lib/server-url";
 
@@ -127,13 +126,6 @@ export default async function GroupBillingPage({
           <ArrowLeft className="mr-2 size-4" />
           Back to group
         </Link>
-        {isAdmin && (
-          <ImportHistoryDialog
-            groupId={groupId}
-            memberEmails={adminMembers.map((m) => m.email)}
-            currency={group.billing.currency}
-          />
-        )}
       </div>
 
       <div>
@@ -144,7 +136,7 @@ export default async function GroupBillingPage({
         </h1>
         <p className="text-sm text-muted-foreground">
           {isAdmin
-            ? "View, edit, and manage all billing periods. Generate advance periods or import history below."
+            ? "View, edit, and manage all billing periods. Use the group page for import history; create advance periods from the matrix below."
             : "Your payment status across all periods."}
         </p>
       </div>

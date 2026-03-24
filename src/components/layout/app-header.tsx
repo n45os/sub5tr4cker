@@ -3,21 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronRight } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button, buttonVariants } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-
-function getInitials(name?: string | null, email?: string | null) {
-  const source = name?.trim() || email?.trim() || "ST";
-  const parts = source.split(/\s+/).filter(Boolean);
-
-  if (parts.length >= 2) {
-    return `${parts[0]?.[0] ?? ""}${parts[1]?.[0] ?? ""}`.toUpperCase();
-  }
-
-  return source.slice(0, 2).toUpperCase();
-}
 
 function getHeaderMeta(pathname: string) {
   if (pathname === "/dashboard/groups") {
@@ -85,13 +72,23 @@ function getHeaderMeta(pathname: string) {
     };
   }
 
+  if (pathname.startsWith("/dashboard/scheduled-tasks")) {
+    return {
+      title: "Scheduled tasks",
+      description: "Queued notification delivery — cancel, retry, or bulk cancel.",
+    };
+  }
+
   return {
     title: "Overview",
     description: "Keep subscriptions, reminders, and payment follow-ups in sync.",
   };
 }
 
-function getBreadcrumbs(pathname: string) {
+function getBreadcrumbs(
+  pathname: string,
+  groups: Array<{ _id: string; name: string }>
+) {
   const parts = pathname.split("/").filter(Boolean);
   const breadcrumbs = [{ label: "Dashboard", href: "/dashboard" }];
 
@@ -105,6 +102,13 @@ function getBreadcrumbs(pathname: string) {
 
   if (parts[1] === "payments") {
     breadcrumbs.push({ label: "Payments", href: "/dashboard/payments" });
+  }
+
+  if (parts[1] === "scheduled-tasks") {
+    breadcrumbs.push({
+      label: "Scheduled tasks",
+      href: "/dashboard/scheduled-tasks",
+    });
   }
 
   if (parts[1] === "notifications") {
@@ -124,57 +128,40 @@ function getBreadcrumbs(pathname: string) {
 
   if (parts[2] === "new") {
     breadcrumbs.push({ label: "New group", href: pathname });
-  } else if (parts[2]) {
-    breadcrumbs.push({ label: "Group", href: `/dashboard/groups/${parts[2]}` });
+  } else if (parts[1] === "groups" && parts[2]) {
+    const g = groups.find((x) => x._id === parts[2]);
+    const groupLabel = g?.name?.trim() ? g.name : "Group";
+    breadcrumbs.push({
+      label: groupLabel,
+      href: `/dashboard/groups/${parts[2]}`,
+    });
   }
 
   if (parts[3] === "edit") {
     breadcrumbs.push({ label: "Edit", href: pathname });
   }
 
+  if (parts[3] === "billing") {
+    breadcrumbs.push({ label: "Billing", href: pathname });
+  }
+
   return breadcrumbs;
 }
 
 interface AppHeaderProps {
-  user: {
-    name?: string | null;
-    email?: string | null;
-    image?: string | null;
-  };
+  groups: Array<{ _id: string; name: string }>;
 }
 
-export function AppHeader({ user }: AppHeaderProps) {
+export function AppHeader({ groups }: AppHeaderProps) {
   const pathname = usePathname();
   const meta = getHeaderMeta(pathname);
-  const breadcrumbs = getBreadcrumbs(pathname);
+  const breadcrumbs = getBreadcrumbs(pathname, groups);
 
   return (
     <header className="sticky top-0 z-20 border-b bg-background/85 backdrop-blur">
       <div className="flex flex-col gap-4 px-4 py-4 lg:px-8">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <SidebarTrigger />
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard/groups/new"
-              className={cn(buttonVariants({ variant: "default" }))}
-            >
-              Create group
-            </Link>
-            <Button variant="outline" className="h-10 px-3">
-              <Avatar className="size-7">
-                <AvatarImage src={user.image ?? undefined} alt={user.name ?? "User"} />
-                <AvatarFallback>
-                  {getInitials(user.name, user.email)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="hidden text-sm sm:inline">
-                {user.email || "Signed in"}
-              </span>
-            </Button>
-          </div>
+        <div className="flex items-center gap-3">
+          <SidebarTrigger />
         </div>
 
         <div className="flex flex-col gap-2">

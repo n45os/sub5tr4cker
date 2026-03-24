@@ -33,7 +33,7 @@ interface CollapsibleNotificationsPanelProps {
 export function CollapsibleNotificationsPanel(
   props: CollapsibleNotificationsPanelProps,
 ) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>

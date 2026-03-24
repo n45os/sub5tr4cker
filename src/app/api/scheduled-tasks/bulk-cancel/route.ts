@@ -13,9 +13,6 @@ const TYPES: ScheduledTaskType[] = [
   "payment_reminder",
   "aggregated_payment_reminder",
   "admin_confirmation_request",
-  "price_change",
-  "invite",
-  "follow_up",
 ];
 
 const bodySchema = z

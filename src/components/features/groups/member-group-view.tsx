@@ -144,7 +144,9 @@ export function MemberGroupView({
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             {group.description ||
-              "No extra description yet. Use the edit view to add payment notes, account context, or membership rules."}
+              (memberToken
+                ? "No description for this group yet."
+                : "No extra description yet. Ask your admin if you need more details about this subscription.")}
           </p>
         </div>
       </div>

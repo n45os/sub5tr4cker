@@ -17,7 +17,7 @@ export function AppShell({ children, user, groups }: AppShellProps) {
     <SidebarProvider>
       <AppSidebar user={user} groups={groups} />
       <SidebarInset className="min-h-svh min-w-0 overflow-x-hidden bg-muted/30">
-        <AppHeader user={user} />
+        <AppHeader groups={groups} />
         <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden px-4 py-6 lg:px-8">{children}</main>
       </SidebarInset>
     </SidebarProvider>

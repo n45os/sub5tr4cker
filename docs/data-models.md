@@ -241,7 +241,7 @@ Queue for notification delivery. Cron (or other producers) enqueue tasks; a work
 ```typescript
 {
   _id: ObjectId,
-  type: 'payment_reminder' | 'aggregated_payment_reminder' | 'admin_confirmation_request' | 'price_change' | 'invite' | 'follow_up',
+  type: 'payment_reminder' | 'aggregated_payment_reminder' | 'admin_confirmation_request',
   status: 'pending' | 'locked' | 'completed' | 'failed' | 'cancelled',
   runAt: Date,                            // when the task is due
   lockedAt: Date | null,                  // set when a worker claims the task

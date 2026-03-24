@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Trash2 } from "lucide-react";
@@ -21,6 +22,7 @@ export function DeleteGroupButton({
   size = "sm",
   buttonVariant = "destructive",
   label = "Delete group",
+  renderTrigger,
 }: {
   groupId: string;
   groupName: string;
@@ -29,6 +31,7 @@ export function DeleteGroupButton({
   size?: "default" | "sm" | "xs";
   buttonVariant?: "destructive" | "outline";
   label?: string;
+  renderTrigger?: (props: { onClick: () => void }) => ReactNode;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -61,19 +64,28 @@ export function DeleteGroupButton({
 
   return (
     <>
-      <Button
-        type="button"
-        variant={buttonVariant}
-        size={size}
-        className={className}
-        onClick={() => {
-          setError(null);
-          setOpen(true);
-        }}
-      >
-        <Trash2 className="size-3.5" />
-        {label}
-      </Button>
+      {renderTrigger ? (
+        renderTrigger({
+          onClick: () => {
+            setError(null);
+            setOpen(true);
+          },
+        })
+      ) : (
+        <Button
+          type="button"
+          variant={buttonVariant}
+          size={size}
+          className={className}
+          onClick={() => {
+            setError(null);
+            setOpen(true);
+          }}
+        >
+          <Trash2 className="size-3.5" />
+          {label}
+        </Button>
+      )}
 
       <Dialog
         open={open}

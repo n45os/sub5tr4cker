@@ -5,7 +5,9 @@ description: REST API endpoints, auth, and response formats.
 
 # API Reference
 
-All API routes live under `/api/`. Protected routes require a valid Auth.js session. Cron routes require the `x-cron-secret` header (value from app setting `security.cronSecret` or env `CRON_SECRET`).
+All API routes live under `/api/`. Protected routes require a valid Auth.js session. Cron routes require the `x-cron-secret` header (value from app setting `security.cronSecret`).
+
+**Flows:** Automatic reminders and admin follow-ups use the **ScheduledTask** queue + worker. Manual **Notify unpaid** (`POST /api/dashboard/notify-unpaid`) sends aggregated reminders inline (same channels, different pipeline) and updates period reminder metadata. Member “I paid” converges from email confirm, self-confirm API, and Telegram. See the full diagrams in the repo `docs/api-design.md` → Flows.
 
 ## Authentication
 
@@ -37,7 +39,7 @@ Update group. Admin only.
 
 ### `GET /api/groups/[groupId]/notification-preview`
 
-Return rendered HTML preview for group notifications (currently payment reminder). Admin only.
+**Deprecated** for first-party UI. Return rendered HTML preview for payment reminder email. Admin only.
 
 Query params:
 - `type` (currently `payment_reminder`)

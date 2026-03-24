@@ -1,3 +1,7 @@
+/**
+ * @deprecated not used by the app UI — template list comes from `@/lib/plugins/templates`
+ * in client code. Kept for API parity; may be removed later.
+ */
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getNotificationTemplates } from "@/lib/plugins/templates";

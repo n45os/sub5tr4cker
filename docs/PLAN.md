@@ -46,6 +46,23 @@ This is the key innovation over a static spreadsheet:
     → Status: member_confirmed → confirmed
 ```
 
+### Notification pipeline (queued vs manual)
+
+```mermaid
+flowchart TB
+  subgraph cron [Cron and jobs]
+    ER[enqueue-reminders]
+    EF[enqueue-follow-ups]
+  end
+  ER --> Q[ScheduledTask queue]
+  EF --> Q
+  Q --> W[runNotificationTasks worker]
+  W --> C[Email and Telegram]
+  MU[POST notify-unpaid] --> C
+```
+
+Automatic reminders and admin follow-up nudges go through **ScheduledTask** + worker. The dashboard **Notify unpaid** action sends reminders **directly** (same templates, different pipeline) and updates period reminder metadata — see `docs/api-design.md` → Flows.
+
 Statuses per member per period:
 - `pending` — hasn't paid yet
 - `member_confirmed` — member says they paid, awaiting admin verification
@@ -385,7 +402,8 @@ subs-track/
 │   │   └── index.ts
 │   ├── jobs/
 │   │   ├── check-billing-periods.ts
-│   │   ├── send-reminders.ts
+│   │   ├── enqueue-reminders.ts
+│   │   ├── run-notification-tasks.ts
 │   │   ├── send-follow-ups.ts
 │   │   └── runner.ts                           # node-cron entry point
 │   └── types/

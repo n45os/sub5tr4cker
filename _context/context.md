@@ -1,5 +1,5 @@
 <!-- context-status: active -->
-<!-- last-updated: 2026-03-23 -->
+<!-- last-updated: 2026-03-24 -->
 
 # SubsTrack — Project Context
 
@@ -32,14 +32,16 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 4. Member verifies payment via member-portal deep link (`?pay=...&open=confirm`), `POST .../self-confirm`, or Telegram → `admin_confirmation_request` notifies the admin (Telegram when linked and Telegram notifications are on; otherwise email if allowed)
 5. Admin confirms in dashboard or via Telegram → status confirmed
 
+**Reminder paths:** Cron enqueues `ScheduledTask` rows (`payment_reminder`, `aggregated_payment_reminder`, `admin_confirmation_request` only). Manual dashboard **Notify unpaid** sends aggregated reminders **without** the queue (see `docs/api-design.md` Flows).
+
 ## Implemented APIs (see docs/api-design.md)
 
 - Groups: GET/POST /api/groups, GET/PATCH/DELETE /api/groups/[groupId]
 - Group notifications: PATCH /api/groups/[groupId]/notifications
 - Members: POST/PATCH/DELETE /api/groups/[groupId]/members(/[memberId])
 - Billing: GET/POST /api/groups/[groupId]/billing, PATCH period, confirm, self-confirm
-- Notifications: GET /api/notifications, GET /api/notifications/templates, GET /api/notifications/templates/[type]/preview
-- Group preview: GET /api/groups/[groupId]/notification-preview
+- Notifications: GET /api/notifications (templates list/preview APIs exist but are deprecated for first-party UI — use `docs/api-design.md`)
+- Group preview: GET /api/groups/[groupId]/notification-preview (deprecated for first-party UI)
 - Settings: GET/PATCH /api/settings, POST /api/settings/test-email, POST /api/settings/test-telegram
 - Auth: /api/auth/[...nextauth], POST /api/register
 - Telegram: POST /api/telegram/webhook, POST /api/telegram/link

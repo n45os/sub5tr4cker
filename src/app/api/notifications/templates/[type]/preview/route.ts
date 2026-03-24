@@ -1,3 +1,7 @@
+/**
+ * @deprecated not used by the app UI — previews use `@/lib/plugins/templates` directly.
+ * Kept for potential external clients; may be removed later.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getNotificationTemplatePreview } from "@/lib/plugins/templates";

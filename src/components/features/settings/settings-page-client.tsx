@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Eye, EyeOff, Loader2, Send, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Loader2, MoreHorizontal, Send, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,10 +11,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import { PluginsSettingsTab } from "./plugins-settings-tab";
 
 type SettingsCategory =
@@ -294,54 +302,62 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
                     <CardTitle>{tab.label}</CardTitle>
                     <CardDescription>{tab.description}</CardDescription>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {tab.id === "notifications" ? (
-                      <>
-                        <Button
-                          variant="outline"
-                          onClick={() => runTest("email")}
-                          disabled={testing === "email"}
-                        >
-                          {testing === "email" ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : (
-                            <Send className="size-4" />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          className={cn(
+                            buttonVariants({ variant: "outline", size: "sm" }),
+                            "gap-1.5"
                           )}
-                          Send test email
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => registerWebhook()}
-                          disabled={webhookLoading}
+                          type="button"
                         >
-                          {webhookLoading ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : null}
-                          Register webhook
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => checkWebhookStatus()}
-                          disabled={webhookInfoLoading}
-                        >
-                          {webhookInfoLoading ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : null}
-                          Check webhook status
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => runTest("telegram")}
-                          disabled={testing === "telegram"}
-                        >
-                          {testing === "telegram" ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : (
-                            <Send className="size-4" />
-                          )}
-                          Send test Telegram
-                        </Button>
-                      </>
+                          <MoreHorizontal className="size-4" />
+                          Quick actions
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem
+                            onClick={() => runTest("email")}
+                            disabled={testing === "email"}
+                          >
+                            {testing === "email" ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <Send className="size-4" />
+                            )}
+                            Send test email
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => registerWebhook()}
+                            disabled={webhookLoading}
+                          >
+                            {webhookLoading ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : null}
+                            Register webhook
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => checkWebhookStatus()}
+                            disabled={webhookInfoLoading}
+                          >
+                            {webhookInfoLoading ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : null}
+                            Check webhook status
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => runTest("telegram")}
+                            disabled={testing === "telegram"}
+                          >
+                            {testing === "telegram" ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <Send className="size-4" />
+                            )}
+                            Send test Telegram
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     ) : null}
                     <Button
                       onClick={() => saveTab(tab.id)}

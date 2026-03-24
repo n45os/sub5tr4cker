@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Loader2 } from "lucide-react";
@@ -17,12 +18,15 @@ interface InitializeNotifyButtonProps {
   groupId: string;
   memberCount: number;
   initializedAt: string | null;
+  /** custom trigger (e.g. dropdown menu item) — opens the same dialog */
+  renderTrigger?: (props: { onClick: () => void }) => ReactNode;
 }
 
 export function InitializeNotifyButton({
   groupId,
   memberCount,
   initializedAt,
+  renderTrigger,
 }: InitializeNotifyButtonProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -57,14 +61,18 @@ export function InitializeNotifyButton({
 
   return (
     <>
-      <Button
-        type="button"
-        variant={alreadyInitialized ? "outline" : "default"}
-        onClick={() => setOpen(true)}
-      >
-        <Bell className="size-4" />
-        {alreadyInitialized ? "Re-notify group" : "Initialize & Notify group"}
-      </Button>
+      {renderTrigger ? (
+        renderTrigger({ onClick: () => setOpen(true) })
+      ) : (
+        <Button
+          type="button"
+          variant={alreadyInitialized ? "outline" : "default"}
+          onClick={() => setOpen(true)}
+        >
+          <Bell className="size-4" />
+          {alreadyInitialized ? "Re-notify group" : "Initialize & Notify group"}
+        </Button>
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>

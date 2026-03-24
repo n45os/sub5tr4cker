@@ -1,12 +1,9 @@
-import mongoose, { Schema, Document, Types } from "mongoose";
+import mongoose, { Schema, Document } from "mongoose";
 
 export type ScheduledTaskType =
   | "payment_reminder"
   | "aggregated_payment_reminder"
-  | "admin_confirmation_request"
-  | "price_change"
-  | "invite"
-  | "follow_up";
+  | "admin_confirmation_request";
 
 export type ScheduledTaskStatus =
   | "pending"
@@ -59,9 +56,6 @@ const scheduledTaskSchema = new Schema<IScheduledTask>(
         "payment_reminder",
         "aggregated_payment_reminder",
         "admin_confirmation_request",
-        "price_change",
-        "invite",
-        "follow_up",
       ],
       required: true,
     },

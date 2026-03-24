@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.31.0] - 2026-03-24
+
+### Added
+
+- **Documentation** — `docs/api-design.md` now documents product flows (billing, notification queue vs manual notify, member confirm paths), cron auth note (`x-cron-secret`), and additional routes (dashboard, activity, payments, user, plugins, health, unsubscribe, invite accept, member portal Telegram link). `docs/PLAN.md` includes a notification pipeline diagram.
+
+### Changed
+
+- **Dashboard UX** — Group actions: **Edit** stays visible; **Initialize**, **Import history**, and **Delete** moved under a **⋯** menu. Admin **Subscriptions you pay for** table uses a per-row **⋯** menu (Open / Delete). Header: removed duplicate **Create group** and non-interactive avatar strip; breadcrumbs include **Scheduled tasks**, **Payments**, group name (from sidebar data), and **Billing** on the billing sub-route. Settings **Notifications** tab groups test/register/check actions under **Quick actions**. **Scheduled tasks** bulk cancel and **Reject** payment (matrix) require confirmation; Telegram **Disconnect** confirms. Notifications panel on the group page defaults **expanded**. Billing-only page no longer duplicates import (use group page).
+- **Payments summary** — Top cards show a single currency label when all rows match, or **mixed** when currencies differ (instead of hardcoded EUR).
+
+### Fixed
+
+- **Admin reject payment (HTTP)** — `POST .../billing/[periodId]/confirm` with `action: "reject"` now clears `memberConfirmedAt`, matching Telegram admin reject.
+
+### Removed
+
+- **Dead job** — Deleted unused `src/jobs/send-reminders.ts` (reminders use `enqueue-reminders` + worker).
+- **Scheduled task types** — `price_change`, `invite`, and `follow_up` removed from `ScheduledTask` schema and filters (they were never enqueued; worker could not execute them). Existing MongoDB documents with those `type` values may need a one-off migration if any exist.
+
+### Deprecated (API)
+
+- JSDoc `@deprecated` on `GET .../notification-preview`, `GET /api/notifications/templates`, and `GET /api/notifications/templates/[type]/preview` — first-party UI uses template helpers directly.
+
 ## [0.30.0] - 2026-03-23
 
 ### Added

@@ -92,8 +92,10 @@ export async function POST(
     payment.status = "waived";
     payment.adminConfirmedAt = new Date();
   } else {
+    // reject: align with telegram admin_reject — clear member claim too
     payment.status = "pending";
     payment.adminConfirmedAt = null;
+    payment.memberConfirmedAt = null;
   }
   if (parsed.data.notes !== undefined) payment.notes = parsed.data.notes;
 

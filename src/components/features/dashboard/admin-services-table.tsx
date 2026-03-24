@@ -1,6 +1,9 @@
-import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+"use client";
+
+import { useRouter } from "next/navigation";
+import { ChevronRight, MoreHorizontal } from "lucide-react";
 import { DeleteGroupButton } from "@/components/features/groups/delete-group-button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -9,7 +12,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button-variants";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -31,6 +40,8 @@ export interface AdminServiceRow {
 }
 
 export function AdminServicesTable({ groups }: { groups: AdminServiceRow[] }) {
+  const router = useRouter();
+
   if (groups.length === 0) {
     return null;
   }
@@ -116,23 +127,41 @@ export function AdminServicesTable({ groups }: { groups: AdminServiceRow[] }) {
                     {attention}
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-wrap items-center justify-end gap-1.5">
-                      <Link
-                        href={`/dashboard/groups/${group._id}`}
-                        className={cn(
-                          buttonVariants({ variant: "outline", size: "xs" }),
-                          "gap-1"
-                        )}
-                      >
-                        Open
-                        <ChevronRight className="size-3" />
-                      </Link>
-                      <DeleteGroupButton
-                        groupId={group._id}
-                        groupName={group.name}
-                        size="xs"
-                        label="Delete"
-                      />
+                    <div className="flex justify-end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          className={cn(
+                            buttonVariants({ variant: "outline", size: "icon-xs" })
+                          )}
+                          aria-label={`Actions for ${group.name}`}
+                        >
+                          <MoreHorizontal className="size-4" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem
+                            onClick={() =>
+                              router.push(`/dashboard/groups/${group._id}`)
+                            }
+                          >
+                            Open group
+                            <ChevronRight className="ml-auto size-3 opacity-60" />
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DeleteGroupButton
+                            groupId={group._id}
+                            groupName={group.name}
+                            label="Delete group"
+                            renderTrigger={({ onClick }) => (
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => onClick()}
+                              >
+                                Delete group
+                              </DropdownMenuItem>
+                            )}
+                          />
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </TableCell>
                 </TableRow>

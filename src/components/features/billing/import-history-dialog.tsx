@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { Loader2, Plus, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,8 @@ interface ImportHistoryDialogProps {
   groupId: string;
   memberEmails: string[];
   currency: string;
+  /** custom trigger (e.g. dropdown menu item) — opens the same dialog */
+  renderTrigger?: (props: { onClick: () => void }) => ReactNode;
 }
 
 function emptyPeriod(): ImportPeriodRow {
@@ -54,6 +57,7 @@ export function ImportHistoryDialog({
   groupId,
   memberEmails,
   currency,
+  renderTrigger,
 }: ImportHistoryDialogProps) {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<ImportPeriodRow[]>([emptyPeriod()]);
@@ -174,14 +178,18 @@ export function ImportHistoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button variant="outline" size="sm">
-            <Upload className="mr-2 size-4" />
-            Import history
-          </Button>
-        }
-      />
+      {renderTrigger ? (
+        renderTrigger({ onClick: () => setOpen(true) })
+      ) : (
+        <DialogTrigger
+          render={
+            <Button variant="outline" size="sm">
+              <Upload className="mr-2 size-4" />
+              Import history
+            </Button>
+          }
+        />
+      )}
       <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Import billing history</DialogTitle>

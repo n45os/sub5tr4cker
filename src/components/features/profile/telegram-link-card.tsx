@@ -4,6 +4,14 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -31,6 +39,7 @@ export function TelegramLinkCard({
     deepLink: string;
     botUsername: string;
   } | null>(null);
+  const [disconnectOpen, setDisconnectOpen] = useState(false);
 
   useEffect(() => {
     setTelegramNotifications(initialTelegramNotifications);
@@ -86,6 +95,7 @@ export function TelegramLinkCard({
       }
 
       setPendingLink(null);
+      setDisconnectOpen(false);
       router.refresh();
     } catch {
       setError("Something went wrong. Try again.");
@@ -158,15 +168,44 @@ export function TelegramLinkCard({
         <Button
           type="button"
           variant="outline"
-          onClick={handleDisconnect}
+          onClick={() => setDisconnectOpen(true)}
           disabled={loading}
         >
-          {loading ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            "Disconnect"
-          )}
+          Disconnect
         </Button>
+        <Dialog open={disconnectOpen} onOpenChange={setDisconnectOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Disconnect Telegram?</DialogTitle>
+              <DialogDescription>
+                You will stop receiving reminders and confirmation nudges on Telegram
+                until you link your account again.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDisconnectOpen(false)}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => void handleDisconnect()}
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  "Disconnect"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -212,7 +251,7 @@ export function TelegramLinkCard({
             size="sm"
             onClick={() => router.refresh()}
           >
-            I've linked my account
+            I&apos;ve linked my account
           </Button>
         </div>
       </div>

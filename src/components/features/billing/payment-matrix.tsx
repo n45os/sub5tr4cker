@@ -286,6 +286,7 @@ export function PaymentMatrix({
         updateCell(periodId, memberId, {
           status,
           adminConfirmedAt,
+          ...(action === "reject" ? { memberConfirmedAt: null } : {}),
         });
       } finally {
         setLoadingCell(null);
@@ -297,6 +298,11 @@ export function PaymentMatrix({
   // member multi-select + confirmation flow
   const [selectedPeriods, setSelectedPeriods] = useState<Set<string>>(new Set());
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [rejectDialog, setRejectDialog] = useState<{
+    periodId: string;
+    memberId: string;
+    memberNickname: string;
+  } | null>(null);
   const [confirmingPayment, setConfirmingPayment] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
 
@@ -901,7 +907,11 @@ export function PaymentMatrix({
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() =>
-                            confirmApi(period._id, mem._id, "reject")
+                            setRejectDialog({
+                              periodId: period._id,
+                              memberId: mem._id,
+                              memberNickname: payment.memberNickname,
+                            })
                           }
                           disabled={loading}
                           variant="destructive"
@@ -1091,6 +1101,55 @@ export function PaymentMatrix({
                 <Loader2 className="mr-2 size-4 animate-spin" />
               )}
               Yes, I&apos;ve paid
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!rejectDialog}
+        onOpenChange={(open) => !open && setRejectDialog(null)}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reject this payment claim?</DialogTitle>
+            <DialogDescription>
+              {rejectDialog ? (
+                <>
+                  This clears the claim for{" "}
+                  <span className="font-medium text-foreground">
+                    {rejectDialog.memberNickname}
+                  </span>{" "}
+                  and returns the line to unpaid. Use this if the payment was not
+                  received or was incorrect.
+                </>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRejectDialog(null)}
+              disabled={!!loadingCell}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={async () => {
+                if (!rejectDialog) return;
+                await confirmApi(
+                  rejectDialog.periodId,
+                  rejectDialog.memberId,
+                  "reject"
+                );
+                setRejectDialog(null);
+              }}
+              disabled={!!loadingCell}
+            >
+              Reject claim
             </Button>
           </DialogFooter>
         </DialogContent>

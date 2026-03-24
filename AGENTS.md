@@ -63,6 +63,7 @@ src/
 | `src/lib/telegram/handlers.ts` | Telegram callback handlers (payment confirmations) |
 | `src/lib/tokens.ts` | HMAC token generation/verification for email links |
 | `src/jobs/runner.ts` | node-cron scheduler entry point |
+| `src/components/features/groups/group-detail-admin-actions.tsx` | Group header: Edit + **⋯** menu (initialize, import, delete) |
 | `src/components/features/groups/delete-group-button.tsx` | Admin soft-delete group (calls `DELETE /api/groups/[groupId]`) |
 | `src/lib/tasks/worker.ts` | Executes scheduled notification tasks (skips if payment no longer unpaid) |
 | `src/app/api/scheduled-tasks/` | Admin list/cancel/retry/bulk-cancel for the task queue |
@@ -76,7 +77,7 @@ See `docs/data-models.md`. Quick summary:
 - **BillingPeriod** — one cycle per group per month, with per-member payment statuses
 - **PriceHistory** — price change log per group
 - **Notification** — delivery log for all sent messages
-- **ScheduledTask** — queue for notification delivery (pending → locked → completed/failed/cancelled); admins manage via `/dashboard/scheduled-tasks` and `/api/scheduled-tasks/*`
+- **ScheduledTask** — queue for notification delivery (pending → locked → completed/failed/cancelled); task types used in production: `payment_reminder`, `aggregated_payment_reminder`, `admin_confirmation_request` only; admins manage via `/dashboard/scheduled-tasks` and `/api/scheduled-tasks/*`
 
 ## Conventions
 
@@ -118,5 +119,5 @@ After a version bump in `package.json` and a new section in `CHANGELOG.md`, sync
 
 - Architecture plan: `docs/PLAN.md`
 - Data models: `docs/data-models.md`
-- API design: `docs/api-design.md`
+- API design: `docs/api-design.md` (includes **Flows**: billing lifecycle, queued vs manual reminders, member confirm paths)
 - Original Google Sheets scripts: `docs/legacy/` (for reference)

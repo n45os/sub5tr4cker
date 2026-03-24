@@ -1,3 +1,7 @@
+/**
+ * @deprecated not used by the dashboard — previews use `@/lib/email/templates` and
+ * `@/lib/plugins/templates` directly. Kept for potential external clients; may be removed later.
+ */
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";

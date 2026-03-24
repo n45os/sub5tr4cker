@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { AlertTriangle, CalendarDays, CreditCard, ExternalLink, Pencil, Users } from "lucide-react";
+import { AlertTriangle, CalendarDays, CreditCard, ExternalLink, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import {
@@ -11,12 +11,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ImportHistoryDialog } from "@/components/features/billing/import-history-dialog";
-import { DeleteGroupButton } from "@/components/features/groups/delete-group-button";
+import { GroupDetailAdminActions } from "@/components/features/groups/group-detail-admin-actions";
 import { NoPeriodsCard } from "@/components/features/billing/no-periods-card";
 import { PaymentMatrix } from "@/components/features/billing/payment-matrix";
 import { GroupMembersPanel } from "@/components/features/groups/group-members-panel";
-import { InitializeNotifyButton } from "@/components/features/groups/initialize-notify-button";
 import { InviteLinkCard } from "@/components/features/groups/invite-link-card";
 import { MemberGroupView } from "@/components/features/groups/member-group-view";
 import { CollapsibleNotificationsPanel } from "@/components/features/notifications/collapsible-notifications-panel";
@@ -239,32 +237,14 @@ export default async function GroupDetailPage({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <InitializeNotifyButton
-            groupId={groupId}
-            memberCount={memberCount}
-            initializedAt={group.initializedAt}
-          />
-          <ImportHistoryDialog
-            groupId={groupId}
-            memberEmails={members.map((m) => m.email)}
-            currency={group.billing.currency}
-          />
-          <Link
-            href={`/dashboard/groups/${groupId}/edit`}
-            className={cn(buttonVariants({ variant: "outline" }))}
-          >
-            <Pencil className="size-4" />
-            Edit group
-          </Link>
-          <DeleteGroupButton
-            groupId={groupId}
-            groupName={group.name}
-            buttonVariant="outline"
-            label="Delete"
-            className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive dark:hover:bg-destructive/20"
-          />
-        </div>
+        <GroupDetailAdminActions
+          groupId={groupId}
+          groupName={group.name}
+          memberCount={memberCount}
+          initializedAt={group.initializedAt}
+          memberEmails={members.map((m) => m.email)}
+          currency={group.billing.currency}
+        />
       </div>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">

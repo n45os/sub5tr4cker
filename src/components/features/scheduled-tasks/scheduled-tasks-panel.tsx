@@ -5,6 +5,14 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -60,9 +68,6 @@ const TYPE_OPTIONS = [
     label: "Aggregated payment reminder",
   },
   { value: "admin_confirmation_request", label: "Admin confirmation" },
-  { value: "price_change", label: "Price change" },
-  { value: "invite", label: "Invite" },
-  { value: "follow_up", label: "Follow up" },
 ];
 
 function formatDate(iso: string): string {
@@ -86,6 +91,7 @@ export function ScheduledTasksPanel() {
   const [bulkEmail, setBulkEmail] = useState("");
   const [bulkType, setBulkType] = useState("all");
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -172,6 +178,7 @@ export function ScheduledTasksPanel() {
       }
     } finally {
       setBulkLoading(false);
+      setBulkConfirmOpen(false);
     }
   }
 
@@ -301,16 +308,47 @@ export function ScheduledTasksPanel() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => void bulkCancel()}
+              onClick={() => setBulkConfirmOpen(true)}
               disabled={bulkLoading}
             >
-              {bulkLoading ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : null}
               Cancel matching tasks
             </Button>
           </div>
         </div>
+
+        <Dialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Cancel matching tasks?</DialogTitle>
+              <DialogDescription>
+                This cancels pending or locked scheduled tasks that match your filters
+                (group id, member email, and/or task type). Completed tasks are not
+                affected.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setBulkConfirmOpen(false)}
+                disabled={bulkLoading}
+              >
+                Back
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => void bulkCancel()}
+                disabled={bulkLoading}
+              >
+                {bulkLoading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : null}
+                Yes, cancel matching
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {error ? (
           <p role="alert" className="text-sm text-destructive">

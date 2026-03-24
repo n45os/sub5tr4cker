@@ -1,6 +1,36 @@
 # API Design
 
-All API routes live under `src/app/api/`. Protected routes require a valid Auth.js session. Cron routes require a `CRON_SECRET` header.
+All API routes live under `src/app/api/`. Protected routes require a valid Auth.js session. Cron routes require the `x-cron-secret` header; the expected value is the `security.cronSecret` runtime setting (see workspace settings).
+
+## Flows
+
+High-level pipelines implemented in code today:
+
+### Billing lifecycle
+
+```mermaid
+flowchart LR
+  createPeriod[Period created] --> pending[Pending]
+  pending --> overdue[Overdue after reconcile]
+  pending --> memberConfirmed[Member confirmed]
+  overdue --> memberConfirmed
+  memberConfirmed --> confirmed[Confirmed or waived]
+  memberConfirmed --> pendingReject[Rejected to pending]
+```
+
+### Notification delivery
+
+- **Queued**: cron `enqueue-reminders` / `enqueue-follow-ups` → Mongo `ScheduledTask` → `runNotificationTasks` → worker (`src/lib/tasks/worker.ts`) → email/Telegram.
+- **Manual reminders**: `POST /api/dashboard/notify-unpaid` sends aggregated reminders **inline** (not via the task queue), ignores grace period, and appends to each period’s `reminders[]` metadata. Use for on-demand nudges; automatic reminders use the queued path.
+- **Task types** enqueued in production: `payment_reminder`, `aggregated_payment_reminder`, `admin_confirmation_request` only.
+
+### Member “I paid” → admin confirmation nudge
+
+These converge on the same enqueue + daily idempotency (one `admin_confirmation_request` task per group+period+day):
+
+- `GET /api/confirm/[token]` (email link)
+- `POST /api/groups/.../billing/[periodId]/self-confirm` (session or member portal JWT)
+- Telegram member `confirm:` callback
 
 ## Authentication
 
@@ -84,7 +114,7 @@ payment instructions, and the values used by the dashboard edit flow.
 
 ### `GET /api/groups/[groupId]/notification-preview`
 
-Returns a rendered HTML preview for group notifications (currently payment reminder only), using the group's payment config, accent color, and theme. Admin only.
+**Deprecated** for first-party UI (the dashboard uses template helpers directly). May still be used by external clients. Returns a rendered HTML preview for payment reminder email. Admin only.
 
 **Query params:** `type` (`payment_reminder`), `theme` (optional override: `clean` | `minimal` | `bold` | `rounded` | `corporate`)
 
@@ -296,6 +326,18 @@ Re-applies **equal_split** / **variable** share rules for **this period only** (
 
 **Errors:** `400` if billing mode is `fixed_amount`.
 
+### `POST /api/groups/[groupId]/billing/advance`
+
+Create up to N **future** periods from the group’s cycle rules. Admin only.
+
+### `POST /api/groups/[groupId]/billing/backfill`
+
+Create up to N **past** periods (historical catch-up). Admin only.
+
+### `POST /api/groups/[groupId]/billing/import`
+
+Bulk-import historical periods and per-email payment rows. Admin only.
+
 ### `PATCH /api/groups/[groupId]/billing/[periodId]`
 
 Update a billing period (change price, waive a member, add notes). Admin only.
@@ -323,10 +365,12 @@ Admin confirms a member's payment. Admin only.
 ```json
 {
   "memberId": "...",
-  "action": "confirm" | "reject",
+  "action": "confirm" | "reject" | "waive",
   "notes": "Received via Revolut"
 }
 ```
+
+Reject clears the member’s claim (`memberConfirmedAt`) and returns the line to `pending`, matching Telegram admin reject behavior.
 
 ### `POST /api/groups/[groupId]/billing/[periodId]/self-confirm`
 
@@ -533,6 +577,66 @@ Send a test email to the authenticated user.
 
 Send a test Telegram message to the authenticated user if their Telegram account
 is already linked.
+
+### `GET /api/notifications/templates` and `GET /api/notifications/templates/[type]/preview`
+
+**Deprecated** for first-party UI (template list/preview uses `@/lib/plugins/templates` in-process). Authenticated; return plugin template metadata or HTML preview.
+
+## Dashboard and activity
+
+### `GET /api/dashboard/quick-status`
+
+Authenticated. Counts for the current user’s groups (admin-focused aggregates).
+
+### `GET /api/dashboard/notify-unpaid`
+
+Authenticated (admin groups). Preview of who would receive a manual unpaid reminder (`byGroup` / `byUser`, eligibility, skip reasons).
+
+### `POST /api/dashboard/notify-unpaid`
+
+Authenticated admin. Sends aggregated unpaid reminders; optional `groupIds`, `paymentIds`, `channelPreference` (`email` | `telegram` | `both`). Updates period `reminders[]` entries.
+
+### `GET /api/activity`
+
+Authenticated. Unified feed: sent notifications, audit events, and upcoming reminder/follow-up previews.
+
+### `GET /api/payments`
+
+Authenticated **group admin** only. Cross-group payment rows with filters and pagination; includes summary totals.
+
+## User profile
+
+### `GET /api/user/profile` / `PATCH /api/user/profile`
+
+Current user profile and notification preferences.
+
+### `POST /api/user/change-password`
+
+Set or change password for credentials sign-in.
+
+## Invite accept and member portal
+
+### `GET /api/invite/accept/[token]`
+
+Public. Accept invite token; links member to user; optional welcome notification; redirects to member portal.
+
+### `POST /api/member/[token]/telegram-link`
+
+Member portal JWT. Same Telegram link flow as `POST /api/telegram/link` for logged-in users.
+
+## Plugins and misc
+
+### `GET /api/plugins`
+
+List installed plugins and stored config (authenticated).
+
+### `GET /api/health`
+
+Public liveness probe. Returns `{ "status": "ok" }` (not wrapped in `{ data }` — used by Docker healthchecks).
+
+### `GET /api/unsubscribe/[token]`
+
+Public. One-click email unsubscribe for a member; signed token.
 
 ## Member Requests (Phase 2)
 

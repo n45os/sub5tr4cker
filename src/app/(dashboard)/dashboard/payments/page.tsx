@@ -155,6 +155,14 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
   const currentPage = pagination.page;
   const totalPages = pagination.totalPages;
 
+  const summaryCurrencies = new Set(payments.map((p) => p.currency));
+  const summaryCurrencyLabel =
+    summaryCurrencies.size === 0
+      ? "EUR"
+      : summaryCurrencies.size === 1
+        ? [...summaryCurrencies][0]
+        : "mixed";
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <section className="grid gap-4 md:grid-cols-3">
@@ -163,7 +171,7 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
             <CardDescription>Collected</CardDescription>
             <CardTitle className="flex items-center gap-2 text-2xl">
               <Wallet className="size-5" />
-              {summary.totalCollected.toFixed(2)} EUR
+              {summary.totalCollected.toFixed(2)} {summaryCurrencyLabel}
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
@@ -175,7 +183,7 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
             <CardDescription>Pending</CardDescription>
             <CardTitle className="flex items-center gap-2 text-2xl">
               <CreditCard className="size-5" />
-              {summary.totalPending.toFixed(2)} EUR
+              {summary.totalPending.toFixed(2)} {summaryCurrencyLabel}
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
@@ -187,7 +195,7 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
             <CardDescription>Overdue</CardDescription>
             <CardTitle className="flex items-center gap-2 text-2xl">
               <Receipt className="size-5" />
-              {summary.totalOverdue.toFixed(2)} EUR
+              {summary.totalOverdue.toFixed(2)} {summaryCurrencyLabel}
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">

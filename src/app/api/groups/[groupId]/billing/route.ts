@@ -12,6 +12,7 @@ import {
   getMemberEntry,
 } from "@/lib/authorization";
 import { calculateShares } from "@/lib/billing/calculator";
+import { getCollectionOpensAt } from "@/lib/billing/collection-window";
 import { createConfirmationToken } from "@/lib/tokens";
 
 const createPeriodSchema = z.object({
@@ -259,9 +260,15 @@ export async function POST(
     }))
   );
 
+  const collectionOpensAt = getCollectionOpensAt(
+    periodStart,
+    group.billing.paymentInAdvanceDays ?? 0
+  );
+
   const period = await BillingPeriod.create({
     group: groupId,
     periodStart,
+    collectionOpensAt,
     periodEnd,
     periodLabel,
     totalPrice,

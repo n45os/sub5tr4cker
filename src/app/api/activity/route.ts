@@ -3,6 +3,11 @@ import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
 import { AuditEvent, Group, BillingPeriod, Notification } from "@/models";
 import type { NotificationType } from "@/models";
+import {
+  collectionWindowOpenFilter,
+  getFirstReminderEligibleAt,
+  resolveCollectionOpensAt,
+} from "@/lib/billing/collection-window";
 
 const NOTIFICATION_TYPES: NotificationType[] = [
   "payment_reminder",
@@ -258,7 +263,6 @@ export async function GET(request: NextRequest) {
     sent = { items, pagination: { page, totalPages, total } };
   }
 
-  const now = new Date();
   const upcoming: Array<{
     at: string;
     type: "payment_reminder" | "admin_confirmation_request";
@@ -266,14 +270,12 @@ export async function GET(request: NextRequest) {
     groups: Array<{ groupId: string; groupName: string; periodLabel: string; recipientCount?: number }>;
   }> = [];
 
-  const groupMap = new Map(groups.map((g) => [g._id.toString(), g.name as string]));
-
   const reminderRuns = getNextReminderRunTimes(14);
   for (const runAt of reminderRuns) {
     const periods = await BillingPeriod.find({
       group: { $in: allowedGroupIds },
       isFullyPaid: false,
-      periodStart: { $lt: runAt },
+      ...collectionWindowOpenFilter(runAt),
       "payments.status": { $in: ["pending", "overdue"] },
     })
       .populate("group")
@@ -291,9 +293,15 @@ export async function GET(request: NextRequest) {
       const g = await Group.findById(group._id);
       if (!g?.isActive || g.notifications?.remindersEnabled === false) continue;
       const graceDays = g.billing.gracePeriodDays ?? 3;
-      const graceDate = new Date(period.periodStart);
-      graceDate.setDate(graceDate.getDate() + graceDays);
-      if (runAt < graceDate) continue;
+      const collectionOpensAt = resolveCollectionOpensAt({
+        periodStart: period.periodStart as Date,
+        collectionOpensAt: period.collectionOpensAt as Date | null | undefined,
+      });
+      const firstReminderAt = getFirstReminderEligibleAt(
+        collectionOpensAt,
+        graceDays
+      );
+      if (runAt < firstReminderAt) continue;
       const recipientCount = (period.payments as Array<{ status: string }>).filter(
         (p) => p.status === "pending" || p.status === "overdue"
       ).length;
@@ -324,7 +332,7 @@ export async function GET(request: NextRequest) {
     const periods = await BillingPeriod.find({
       group: { $in: allowedGroupIds },
       isFullyPaid: false,
-      periodStart: { $lt: runAt },
+      ...collectionWindowOpenFilter(runAt),
       "payments.status": "member_confirmed",
     })
       .populate("group")

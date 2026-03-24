@@ -125,6 +125,7 @@ export default async function MemberPortalPage({
       adminIncludedInSplit: group.billing.adminIncludedInSplit,
       fixedMemberAmount: group.billing.fixedMemberAmount ?? null,
       gracePeriodDays: group.billing.gracePeriodDays,
+      paymentInAdvanceDays: group.billing.paymentInAdvanceDays ?? 0,
     },
     payment: {
       platform: group.payment.platform,

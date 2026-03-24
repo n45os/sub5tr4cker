@@ -2,7 +2,8 @@ import { dbConnect } from "@/lib/db/mongoose";
 import { BillingPeriod, Group } from "@/models";
 
 /**
- * Mark pending payments as overdue when past 14 days since period start.
+ * Mark pending payments as overdue when past 14 days since period start (renewal).
+ * Unchanged by payment-in-advance: lateness is still relative to renewal, not collection open.
  * Does not send any notifications; use enqueue-reminders for that.
  */
 export async function reconcileOverduePayments(): Promise<number> {

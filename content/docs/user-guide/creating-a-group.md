@@ -27,7 +27,7 @@ The amount you pay per billing period (e.g. 18 €/month). Members’ shares are
 
 ### Billing cycle
 
-- **Billing day** — Day of the month the subscription renews (1–28). Reminders are sent after this day.
+- **Billing day** — Day of the month the subscription renews (1–28). Automated reminders are scheduled from the **collection window** (see below), not necessarily on this day.
 - **Cycle type** — Usually **Monthly**. Yearly is for annual plans.
 
 ### Billing mode
@@ -43,9 +43,13 @@ The amount you pay per billing period (e.g. 18 €/month). Members’ shares are
 - **Include me** — You are one of the people splitting the cost (e.g. 6 people including you → each pays 1/6).
 - **Exclude me** — Only members pay; you don’t pay a share (e.g. 5 members → each pays 1/5 of the total).
 
+### Payment in advance (optional)
+
+How many **days before each renewal** the billing period opens and unpaid tracking starts (0 = the window opens on the renewal day). Use this when you want members to pay before the subscription renews.
+
 ### Grace period
 
-Number of days after the billing day before the first reminder is sent (default: 3). Gives members time to pay before being reminded.
+Number of days **after the collection window opens** before the first **automated** payment reminder is sent (default: 3). Gives members time after the window opens before being nudged.
 
 ## Payment method
 

@@ -67,7 +67,7 @@ List all groups the authenticated user belongs to (as admin or member).
 }
 ```
 
-`unpaidCount` is the number of payment rows with status `pending`, `overdue`, or `member_confirmed` across **all** open billing periods for that group (`periodStart` before the current time, `isFullyPaid` false). This matches the aggregation used by `GET /api/dashboard/quick-status` for admin-owned groups.
+`unpaidCount` is the number of payment rows with status `pending`, `overdue`, or `member_confirmed` across **all** open billing periods for that group (collection window open: `collectionOpensAt` ≤ now, or legacy periods without that field where `periodStart` < now; `isFullyPaid` false). This matches the aggregation used by `GET /api/dashboard/quick-status` for admin-owned groups.
 
 ### `POST /api/groups`
 
@@ -89,7 +89,8 @@ Create a new subscription group. Authenticated user becomes the admin.
     "cycleDay": 3,
     "cycleType": "monthly",
     "adminIncludedInSplit": true,
-    "gracePeriodDays": 3
+    "gracePeriodDays": 3,
+    "paymentInAdvanceDays": 0
   },
   "payment": {
     "platform": "revolut",

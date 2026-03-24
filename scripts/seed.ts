@@ -33,6 +33,10 @@ import {
   Notification,
 } from "@/models";
 import { formatPeriodLabel, getPeriodDates } from "@/lib/billing/calculator";
+import {
+  getCollectionOpensAt,
+  getFirstReminderEligibleAt,
+} from "@/lib/billing/collection-window";
 import type { Types } from "mongoose";
 
 const DEMO_EMAIL_SUFFIX = "@demo.local";
@@ -123,6 +127,7 @@ async function main() {
       adminIncludedInSplit: true,
       fixedMemberAmount: null,
       gracePeriodDays: 3,
+      paymentInAdvanceDays: 0,
     },
     payment: {
       platform: "revolut",
@@ -206,19 +211,28 @@ async function main() {
       };
     });
 
+    const collectionOpensAtForPeriod = getCollectionOpensAt(
+      periodStart,
+      group.billing.paymentInAdvanceDays ?? 0
+    );
+
     const reminders: Array<{ sentAt: Date; channel: "email"; recipientCount: number; type: "initial" | "follow_up" }> = [];
     if (p.reminderCount > 0) {
-      const graceEnd = new Date(periodStart);
-      graceEnd.setDate(graceEnd.getDate() + 3);
+      const firstReminderEligible = getFirstReminderEligibleAt(
+        collectionOpensAtForPeriod,
+        group.billing.gracePeriodDays ?? 3
+      );
       reminders.push({
-        sentAt: new Date(graceEnd.getTime() + 24 * 60 * 60 * 1000),
+        sentAt: new Date(firstReminderEligible.getTime() + 24 * 60 * 60 * 1000),
         channel: "email",
         recipientCount: 3,
         type: "initial",
       });
       for (let r = 1; r < p.reminderCount; r++) {
         reminders.push({
-          sentAt: new Date(graceEnd.getTime() + (r + 1) * 3 * 24 * 60 * 60 * 1000),
+          sentAt: new Date(
+            firstReminderEligible.getTime() + (r + 1) * 3 * 24 * 60 * 60 * 1000
+          ),
           channel: "email",
           recipientCount: 3,
           type: "follow_up",
@@ -230,6 +244,7 @@ async function main() {
     const period = await BillingPeriod.create({
       group: group._id,
       periodStart: p.periodStart,
+      collectionOpensAt: collectionOpensAtForPeriod,
       periodEnd: p.periodEnd,
       periodLabel: p.periodLabel,
       totalPrice: 22.99,

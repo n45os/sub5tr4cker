@@ -27,7 +27,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 ## Core Flow
 
 1. Admin creates group → adds members → sets billing config
-2. Cron creates billing periods monthly (or manual for variable mode)
+2. Cron creates billing periods monthly when the collection window opens (renewal day, or earlier if the group uses payment in advance), or manual for variable mode
 3. Reminders sent via email/Telegram with payment link
 4. Member verifies payment via member-portal deep link (`?pay=...&open=confirm`), `POST .../self-confirm`, or Telegram → `admin_confirmation_request` notifies the admin (Telegram when linked and Telegram notifications are on; otherwise email if allowed)
 5. Admin confirms in dashboard or via Telegram → status confirmed

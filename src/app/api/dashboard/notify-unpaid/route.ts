@@ -12,6 +12,7 @@ import {
 } from "@/lib/notifications/aggregated-reminder-send";
 import type { SkipReason } from "@/lib/notifications/reminder-targeting";
 import type { IMemberPayment } from "@/models/billing-period";
+import { collectionWindowOpenFilter } from "@/lib/billing/collection-window";
 
 const postNotifyUnpaidSchema = z.object({
   groupIds: z.array(z.string()).optional(),
@@ -19,7 +20,7 @@ const postNotifyUnpaidSchema = z.object({
   channelPreference: z.enum(["email", "telegram", "both"]).optional(),
 });
 
-// admin-only: list unpaid reminder candidates (no grace period) and build preview or send
+// admin-only: list unpaid reminder candidates (no grace; collection window must be open) and build preview or send
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
@@ -51,7 +52,7 @@ export async function GET() {
   const periods = await BillingPeriod.find({
     group: { $in: groupIds },
     isFullyPaid: false,
-    periodStart: { $lt: now },
+    ...collectionWindowOpenFilter(now),
     "payments.status": { $in: ["pending", "overdue"] },
   })
     .populate("group")
@@ -319,7 +320,7 @@ export async function POST(req: Request) {
   const periods = await BillingPeriod.find({
     group: { $in: groupIds },
     isFullyPaid: false,
-    periodStart: { $lt: now },
+    ...collectionWindowOpenFilter(now),
     "payments.status": { $in: ["pending", "overdue"] },
   })
     .populate("group")

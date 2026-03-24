@@ -27,6 +27,8 @@ export interface IReminderEntry {
 export interface IBillingPeriod extends Document {
   group: Types.ObjectId;
   periodStart: Date;
+  /** when unpaid tracking and manual notify apply; missing on legacy rows → periodStart */
+  collectionOpensAt?: Date | null;
   periodEnd: Date;
   periodLabel: string;
   totalPrice: number;
@@ -69,6 +71,7 @@ const billingPeriodSchema = new Schema<IBillingPeriod>(
   {
     group: { type: Schema.Types.ObjectId, ref: "Group", required: true },
     periodStart: { type: Date, required: true },
+    collectionOpensAt: { type: Date, required: false },
     periodEnd: { type: Date, required: true },
     periodLabel: { type: String, required: true },
     totalPrice: { type: Number, required: true },

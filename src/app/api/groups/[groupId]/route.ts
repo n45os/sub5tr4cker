@@ -42,6 +42,7 @@ const updateGroupSchema = z
         cycleType: z.enum(["monthly", "yearly"]).optional(),
         adminIncludedInSplit: z.boolean().optional(),
         gracePeriodDays: z.number().int().min(0).max(31).optional(),
+        paymentInAdvanceDays: z.number().int().min(0).max(365).optional(),
         fixedMemberAmount: z.number().positive().optional().nullable(),
       })
       .optional(),
@@ -200,6 +201,8 @@ export async function PATCH(
       group.billing.adminIncludedInSplit = body.billing.adminIncludedInSplit;
     if (body.billing.gracePeriodDays !== undefined)
       group.billing.gracePeriodDays = body.billing.gracePeriodDays;
+    if (body.billing.paymentInAdvanceDays !== undefined)
+      group.billing.paymentInAdvanceDays = body.billing.paymentInAdvanceDays;
     if ("fixedMemberAmount" in (body.billing || {}))
       group.billing.fixedMemberAmount = body.billing.fixedMemberAmount ?? null;
   }

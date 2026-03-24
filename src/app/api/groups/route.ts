@@ -32,6 +32,7 @@ const createGroupSchema = z.object({
     cycleType: z.enum(["monthly", "yearly"]).default("monthly"),
     adminIncludedInSplit: z.boolean().default(true),
     gracePeriodDays: z.number().int().min(0).max(31).default(3),
+    paymentInAdvanceDays: z.number().int().min(0).max(365).default(0),
     fixedMemberAmount: z.number().positive().optional().nullable(),
   }),
   payment: z.object({
@@ -180,6 +181,7 @@ export async function POST(request: NextRequest) {
       adminIncludedInSplit: body.billing.adminIncludedInSplit,
       fixedMemberAmount: body.billing.fixedMemberAmount ?? null,
       gracePeriodDays: body.billing.gracePeriodDays,
+      paymentInAdvanceDays: body.billing.paymentInAdvanceDays,
     },
     payment: {
       platform: body.payment.platform,

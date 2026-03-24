@@ -58,6 +58,7 @@ src/
 | `src/models/group.ts` | Group schema — the central data model |
 | `src/models/billing-period.ts` | Billing period with per-member payment tracking |
 | `src/lib/billing/calculator.ts` | Cost splitting logic (equal, fixed, variable) |
+| `src/lib/billing/collection-window.ts` | Collection open date, grace-from-open, Mongo filter for open periods |
 | `src/lib/notifications/service.ts` | Dispatches notifications across email + Telegram |
 | `src/lib/telegram/bot.ts` | grammy bot instance and setup |
 | `src/lib/telegram/handlers.ts` | Telegram callback handlers (payment confirmations) |
@@ -73,8 +74,8 @@ src/
 See `docs/data-models.md`. Quick summary:
 
 - **User** — auth account + notification preferences + Telegram link
-- **Group** — subscription config, members (embedded), billing settings, payment method
-- **BillingPeriod** — one cycle per group per month, with per-member payment statuses
+- **Group** — subscription config, members (embedded), billing settings (`paymentInAdvanceDays`, etc.), payment method
+- **BillingPeriod** — one cycle per group per month, `collectionOpensAt` for unpaid/open-period queries, per-member payment statuses
 - **PriceHistory** — price change log per group
 - **Notification** — delivery log for all sent messages
 - **ScheduledTask** — queue for notification delivery (pending → locked → completed/failed/cancelled); task types used in production: `payment_reminder`, `aggregated_payment_reminder`, `admin_confirmation_request` only; admins manage via `/dashboard/scheduled-tasks` and `/api/scheduled-tasks/*`

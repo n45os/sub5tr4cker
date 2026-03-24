@@ -22,6 +22,7 @@ interface GroupDetailResponse {
     cycleType: "monthly" | "yearly";
     adminIncludedInSplit: boolean;
     gracePeriodDays: number;
+    paymentInAdvanceDays?: number;
     fixedMemberAmount: number | null;
   };
   payment: {
@@ -80,6 +81,7 @@ export default async function EditGroupPage({
         cycleDay: String(group.billing.cycleDay),
         cycleType: group.billing.cycleType,
         adminIncludedInSplit: group.billing.adminIncludedInSplit,
+        paymentInAdvanceDays: String(group.billing.paymentInAdvanceDays ?? 0),
         gracePeriodDays: String(group.billing.gracePeriodDays),
         fixedMemberAmount: group.billing.fixedMemberAmount
           ? String(group.billing.fixedMemberAmount)

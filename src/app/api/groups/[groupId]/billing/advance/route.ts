@@ -11,6 +11,7 @@ import {
   getPeriodDates,
 } from "@/lib/billing/calculator";
 import { createConfirmationToken } from "@/lib/tokens";
+import { getCollectionOpensAt } from "@/lib/billing/collection-window";
 
 const advanceSchema = z.object({
   monthsAhead: z.number().int().min(1).max(12),
@@ -135,9 +136,15 @@ export async function POST(
       })),
     );
 
+    const collectionOpensAt = getCollectionOpensAt(
+      start,
+      group.billing.paymentInAdvanceDays ?? 0
+    );
+
     const period = await BillingPeriod.create({
       group: groupId,
       periodStart: start,
+      collectionOpensAt,
       periodEnd: end,
       periodLabel: label,
       totalPrice: group.billing.currentPrice,

@@ -1,5 +1,6 @@
 import { dbConnect } from "@/lib/db/mongoose";
 import { BillingPeriod, Group } from "@/models";
+import { collectionWindowOpenFilter } from "@/lib/billing/collection-window";
 import { enqueueTask } from "@/lib/tasks/queue";
 
 /**
@@ -14,7 +15,7 @@ export async function enqueueAdminFollowUps(): Promise<number> {
 
   const periods = await BillingPeriod.find({
     isFullyPaid: false,
-    periodStart: { $lt: now },
+    ...collectionWindowOpenFilter(now),
   });
 
   for (const period of periods) {

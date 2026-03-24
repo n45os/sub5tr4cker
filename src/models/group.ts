@@ -39,6 +39,8 @@ export interface IGroup extends Document {
     adminIncludedInSplit: boolean;
     fixedMemberAmount: number | null;
     gracePeriodDays: number;
+    /** days before period start when collection opens (0 = on renewal day) */
+    paymentInAdvanceDays: number;
   };
   payment: {
     platform: "revolut" | "paypal" | "bank_transfer" | "stripe" | "custom";
@@ -115,6 +117,7 @@ const groupSchema = new Schema<IGroup>(
       adminIncludedInSplit: { type: Boolean, default: true },
       fixedMemberAmount: { type: Number, default: null },
       gracePeriodDays: { type: Number, default: 3 },
+      paymentInAdvanceDays: { type: Number, default: 0, min: 0, max: 365 },
     },
     payment: {
       platform: {

@@ -22,11 +22,11 @@ SubsTrack automates reminders and tracks who has paid. Here’s the full flow.
   - **Amount** they owe
   - **Status**: `pending` → `member_confirmed` → `confirmed` (or `overdue` / `waived`)
 
-Periods are created automatically by a cron job after the group’s **billing day**. You can also create or edit periods manually for variable billing.
+Periods are created automatically by a cron job when the **collection window** opens (on the billing day, or earlier if you set **payment in advance** on the group). You can also create or edit periods manually for variable billing.
 
 ## Reminders
 
-- **When** — After the **grace period** (e.g. 3 days) following the billing day. Exact time depends on the server’s cron schedule (e.g. daily at 10:00).
+- **When** — After the **grace period** (e.g. 3 days) **from when the collection window opens** (renewal day, or earlier if you use payment in advance). Exact time depends on the server’s cron schedule (e.g. daily at 10:00).
 - **Who** — Only members with status **pending** or **overdue**.
 - **Channels** — Email always (if the member has an email). Telegram if they’ve linked their account and have Telegram enabled.
 

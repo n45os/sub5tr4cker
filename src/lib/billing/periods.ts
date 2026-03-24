@@ -5,14 +5,16 @@ import {
   formatPeriodLabel,
   getPeriodDates,
 } from "@/lib/billing/calculator";
+import { getCollectionOpensAt } from "@/lib/billing/collection-window";
 import { createConfirmationToken } from "@/lib/tokens";
 
-// create the current billing period for a group if it's due (past cycle day) and doesn't exist yet
+// create the current billing period for a group if collection is open and it doesn't exist yet
 export async function createPeriodIfDue(
   group: HydratedDocument<InstanceType<typeof Group>>,
   now: Date
 ): Promise<boolean> {
   const { cycleDay } = group.billing;
+  const advance = group.billing.paymentInAdvanceDays ?? 0;
 
   const { start, end } = getPeriodDates(
     now.getFullYear(),
@@ -20,7 +22,8 @@ export async function createPeriodIfDue(
     cycleDay
   );
 
-  if (now < start) return false;
+  const collectionOpensAt = getCollectionOpensAt(start, advance);
+  if (now < collectionOpensAt) return false;
 
   const existing = await BillingPeriod.findOne({
     group: group._id,
@@ -54,6 +57,7 @@ export async function createPeriodIfDue(
   const period = await BillingPeriod.create({
     group: group._id,
     periodStart: start,
+    collectionOpensAt,
     periodEnd: end,
     periodLabel,
     totalPrice: group.billing.currentPrice,

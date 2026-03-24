@@ -31,6 +31,7 @@ export interface MemberGroupViewGroup {
     adminIncludedInSplit: boolean;
     fixedMemberAmount: number | null;
     gracePeriodDays: number;
+    paymentInAdvanceDays?: number;
   };
   payment: {
     platform: string;
@@ -303,6 +304,16 @@ export function MemberGroupView({
               </p>
             </div>
             <div className="rounded-xl border bg-muted/35 p-4">
+              <p className="text-sm text-muted-foreground">Pay in advance</p>
+              <p className="mt-2 font-medium">
+                {(group.billing.paymentInAdvanceDays ?? 0) === 0
+                  ? "Off (opens on renewal)"
+                  : `${group.billing.paymentInAdvanceDays} day${
+                      group.billing.paymentInAdvanceDays === 1 ? "" : "s"
+                    } before renewal`}
+              </p>
+            </div>
+            <div className="rounded-xl border bg-muted/35 p-4">
               <p className="text-sm text-muted-foreground">Grace period</p>
               <p className="font-mono mt-2 font-medium tabular-nums">
                 {group.billing.gracePeriodDays} day
@@ -337,8 +348,22 @@ export function MemberGroupView({
               on day {group.billing.cycleDay}.
             </div>
             <div className="rounded-xl border p-4">
-              Members are reminded after the {group.billing.gracePeriodDays}-day
-              grace window if their payment is still pending.
+              {(group.billing.paymentInAdvanceDays ?? 0) > 0 ? (
+                <>
+                  The collection window opens {group.billing.paymentInAdvanceDays}{" "}
+                  day
+                  {group.billing.paymentInAdvanceDays !== 1 ? "s" : ""} before each
+                  renewal. Automated reminders start after a{" "}
+                  {group.billing.gracePeriodDays}-day grace period from that moment if
+                  payment is still pending.
+                </>
+              ) : (
+                <>
+                  Automated reminders start after a {group.billing.gracePeriodDays}
+                  -day grace period from the renewal day (collection opens on renewal)
+                  if payment is still pending.
+                </>
+              )}
             </div>
             <div className="rounded-xl border p-4">
               {currentPeriod

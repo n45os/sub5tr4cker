@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { auth } from "@/lib/auth";
 import { dbConnect } from "@/lib/db/mongoose";
 import { Group, BillingPeriod } from "@/models";
+import { getCollectionOpensAt } from "@/lib/billing/collection-window";
 
 const importPeriodSchema = z.object({
   periodLabel: z.string().min(1).max(50),
@@ -125,9 +126,15 @@ export async function POST(
       (p) => p && (p.status === "confirmed" || p.status === "waived"),
     );
 
+    const collectionOpensAt = getCollectionOpensAt(
+      periodStart,
+      group.billing.paymentInAdvanceDays ?? 0
+    );
+
     await BillingPeriod.create({
       group: groupId,
       periodStart,
+      collectionOpensAt,
       periodEnd: parseDate(periodData.periodEnd),
       periodLabel: periodData.periodLabel,
       totalPrice: periodData.totalPrice,

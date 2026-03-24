@@ -75,7 +75,8 @@ A subscription group managed by an admin.
     cycleType: 'monthly' | 'yearly',      // default: 'monthly'
     adminIncludedInSplit: boolean,         // does the admin pay a share too?
     fixedMemberAmount: number | null,     // only for 'fixed_amount' mode
-    gracePeriodDays: number,              // days before first reminder (default: 3)
+    gracePeriodDays: number,              // days after collection opens before first automated reminder (default: 3)
+    paymentInAdvanceDays: number,         // days before each renewal when the period opens (0 = on renewal day; default: 0)
   },
 
   // payment method
@@ -138,7 +139,8 @@ One billing cycle for a group. Created automatically by the cron job or manually
 {
   _id: ObjectId,
   group: ObjectId,                        // ref: Group
-  periodStart: Date,                      // start of billing period
+  periodStart: Date,                      // start of billing period (renewal anchor)
+  collectionOpensAt: Date | undefined,    // when unpaid tracking applies; set at create from periodStart − group.paymentInAdvanceDays (legacy rows: treat as periodStart if missing)
   periodEnd: Date,                        // end of billing period
   periodLabel: string,                    // e.g., "Mar 2026"
   totalPrice: number,                     // total price for this period

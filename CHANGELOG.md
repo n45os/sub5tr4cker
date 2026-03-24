@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.32.0] - 2026-03-24
+
+### Added
+
+- **Payment in advance** — Per-group `billing.paymentInAdvanceDays` (0–365): the billing period is created and unpaid tracking opens that many days before each renewal (cycle day). Each `BillingPeriod` stores `collectionOpensAt` (denormalized at creation). Automated reminders use **grace period from collection open** (first reminder when `now >= collectionOpensAt + gracePeriodDays`). Manual **Notify unpaid**, dashboard unpaid counts, cron `enqueue-reminders`, and `enqueue-follow-ups` use the same “collection window open” rule (`$expr` on `collectionOpensAt` with legacy fallback to `periodStart`). Pending → **overdue** (`reconcile-overdue`) stays anchored to **14 days after period start** (renewal). Run `pnpm tsx scripts/backfill-collection-opens-at.ts` once on existing databases to set `collectionOpensAt` on old periods (optional; queries already fall back for missing fields).
+
+### Changed
+
+- **Grace period semantics** — Documented and implemented as days after the collection window opens (not “after billing day” only). When `paymentInAdvanceDays` is 0, collection opens on the renewal day, matching previous behavior.
+
 ## [0.31.1] - 2026-03-24
 
 ### Fixed

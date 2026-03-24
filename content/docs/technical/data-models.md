@@ -24,12 +24,12 @@ User ──┬── owns ──── Group ──── has many ──── 
 
 ## Group
 
-- **Fields**: name, description, admin (ref User), service (name, icon, url, accentColor, emailTheme), billing (mode, currentPrice, currency, cycleDay, cycleType, adminIncludedInSplit, fixedMemberAmount, gracePeriodDays), payment (platform, link, instructions, stripeAccountId), members (array of { user, email, nickname, role, joinedAt, leftAt, isActive, customAmount }), announcements (notifyOnPriceChange, extraText), telegramGroup (chatId, linkedAt), isActive, inviteCode, timestamps.
+- **Fields**: name, description, admin (ref User), service (name, icon, url, accentColor, emailTheme), billing (mode, currentPrice, currency, cycleDay, cycleType, adminIncludedInSplit, fixedMemberAmount, gracePeriodDays, paymentInAdvanceDays), payment (platform, link, instructions, stripeAccountId), members (array of { user, email, nickname, role, joinedAt, leftAt, isActive, customAmount }), announcements (notifyOnPriceChange, extraText), telegramGroup (chatId, linkedAt), isActive, inviteCode, timestamps.
 - **Indexes**: admin, members.user, members.email, inviteCode (sparse unique).
 
 ## BillingPeriod
 
-- **Fields**: group (ref), periodStart, periodEnd, periodLabel, totalPrice, currency, payments (array of { memberId, memberEmail, memberNickname, amount, status, memberConfirmedAt, adminConfirmedAt, confirmationToken, notes }), reminders (array of { sentAt, channel, recipientCount, type }), isFullyPaid, timestamps.
+- **Fields**: group (ref), periodStart, collectionOpensAt (when unpaid tracking opens; legacy rows may omit — treat as periodStart), periodEnd, periodLabel, totalPrice, currency, payments (array of { memberId, memberEmail, memberNickname, amount, status, memberConfirmedAt, adminConfirmedAt, confirmationToken, notes }), reminders (array of { sentAt, channel, recipientCount, type }), isFullyPaid, timestamps.
 - **Payment statuses**: pending, member_confirmed, confirmed, overdue, waived.
 - **Indexes**: (group, periodStart) unique, payments.status, payments.confirmationToken (sparse).
 

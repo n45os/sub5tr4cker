@@ -1,4 +1,5 @@
 import type { Types } from "mongoose";
+import { collectionWindowOpenFilter } from "@/lib/billing/collection-window";
 
 /** payment rows that still need admin or member follow-up (open periods only, see query helper) */
 export const OUTSTANDING_PAYMENT_STATUSES = [
@@ -28,7 +29,7 @@ export function buildOpenOutstandingPeriodsQuery(
   return {
     group: { $in: groupIds },
     isFullyPaid: false,
-    periodStart: { $lt: now },
+    ...collectionWindowOpenFilter(now),
     "payments.status": { $in: [...OUTSTANDING_PAYMENT_STATUSES] },
   };
 }

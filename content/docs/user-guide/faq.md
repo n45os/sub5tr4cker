@@ -72,7 +72,7 @@ SubsTrack shows the amount in the currency the admin set (e.g. EUR). You and the
 
 ### How are reminders sent?
 
-A scheduled job (cron) runs on the server (e.g. daily). It finds billing periods that are past the grace period and sends reminders by email (and Telegram if configured) to members who haven’t paid. The schedule is set by whoever runs the instance.
+A scheduled job (cron) runs on the server (e.g. daily). It finds billing periods whose collection window is open and that are past the grace period (counted from when that window opened), then sends reminders by email (and Telegram if configured) to members who haven’t paid. The schedule is set by whoever runs the instance.
 
 ### Is my data secure?
 

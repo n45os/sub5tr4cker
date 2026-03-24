@@ -27,7 +27,7 @@ List groups the authenticated user belongs to (admin or member).
 
 ### `POST /api/groups`
 
-Create a group. Body: `name`, `service`, `billing`, `payment`, `members`. `service` supports `accentColor` and `emailTheme` (`clean` | `minimal` | `bold` | `rounded` | `corporate`). Authenticated user becomes admin.
+Create a group. Body: `name`, `service`, `billing`, `payment`, `members`. `service` supports `accentColor` and `emailTheme` (`clean` | `minimal` | `bold` | `rounded` | `corporate`). `billing` includes optional `paymentInAdvanceDays` (0–365; collection opens that many days before each renewal). Authenticated user becomes admin.
 
 ### `GET /api/groups/[groupId]`
 

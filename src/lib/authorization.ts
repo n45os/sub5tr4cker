@@ -41,6 +41,7 @@ type GroupLike = {
     adminIncludedInSplit: boolean;
     fixedMemberAmount?: number | null;
     gracePeriodDays: number;
+    paymentInAdvanceDays?: number;
   };
   payment: {
     platform: string;

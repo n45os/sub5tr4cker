@@ -56,6 +56,7 @@ export interface GroupFormValues {
   cycleDay: string;
   cycleType: CycleType;
   adminIncludedInSplit: boolean;
+  paymentInAdvanceDays: string;
   gracePeriodDays: string;
   fixedMemberAmount: string;
   paymentPlatform: PaymentPlatform;
@@ -83,6 +84,7 @@ const defaultValues: GroupFormValues = {
   cycleDay: "1",
   cycleType: "monthly",
   adminIncludedInSplit: true,
+  paymentInAdvanceDays: "0",
   gracePeriodDays: "3",
   fixedMemberAmount: "",
   paymentPlatform: "revolut",
@@ -203,6 +205,7 @@ export function GroupForm({
     const currentPrice = Number(form.currentPrice);
     const cycleDay = Number(form.cycleDay);
     const gracePeriodDays = Number(form.gracePeriodDays);
+    const paymentInAdvanceDays = Number(form.paymentInAdvanceDays);
 
     if (!form.name.trim() || !form.serviceName.trim()) {
       return "Group name and service name are required.";
@@ -218,6 +221,14 @@ export function GroupForm({
 
     if (!Number.isInteger(gracePeriodDays) || gracePeriodDays < 0 || gracePeriodDays > 31) {
       return "Grace period must be a whole number between 0 and 31.";
+    }
+
+    if (
+      !Number.isInteger(paymentInAdvanceDays) ||
+      paymentInAdvanceDays < 0 ||
+      paymentInAdvanceDays > 365
+    ) {
+      return "Payment in advance must be a whole number between 0 and 365.";
     }
 
     if (form.billingMode === "fixed_amount") {
@@ -259,6 +270,7 @@ export function GroupForm({
         cycleDay: Number(form.cycleDay),
         cycleType: form.cycleType,
         adminIncludedInSplit: form.adminIncludedInSplit,
+        paymentInAdvanceDays: Number(form.paymentInAdvanceDays),
         gracePeriodDays: Number(form.gracePeriodDays),
         fixedMemberAmount:
           form.billingMode === "fixed_amount"
@@ -613,7 +625,29 @@ export function GroupForm({
               </div>
 
               <div className="grid gap-2">
-                <FieldLabel htmlFor="grace-period-days" hint="Days after the cycle end before the first payment reminder is sent.">
+                <FieldLabel
+                  htmlFor="payment-in-advance-days"
+                  hint="Create the billing period and open unpaid tracking this many days before each renewal (cycle day). 0 means the window opens on the renewal day."
+                >
+                  Payment in advance (days)
+                </FieldLabel>
+                <Input
+                  id="payment-in-advance-days"
+                  type="number"
+                  min="0"
+                  max="365"
+                  value={form.paymentInAdvanceDays}
+                  onChange={(event) =>
+                    updateField("paymentInAdvanceDays", event.target.value)
+                  }
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <FieldLabel
+                  htmlFor="grace-period-days"
+                  hint="Days after the collection window opens before the first automated payment reminder is sent."
+                >
                   Grace period days
                 </FieldLabel>
                 <Input

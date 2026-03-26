@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { isPublicAppUrl, normalizeAppUrl } from "@/lib/public-app-url";
 import { getSetting } from "@/lib/settings/service";
 import { db, isStorageId, type StorageGroup } from "@/lib/storage";
 import { sendNotification } from "@/lib/notifications/service";
@@ -26,12 +27,6 @@ function buildBillingSummary(group: StorageGroup): string {
     return `${billing.fixedMemberAmount} ${billing.currency} per member per ${cycle}`;
   }
   return `${price} per ${cycle} (variable)`;
-}
-
-function isPublicAppUrl(appUrl: string | null): boolean {
-  if (!appUrl || !appUrl.trim()) return false;
-  const u = appUrl.trim().toLowerCase();
-  return !u.startsWith("http://localhost") && !u.startsWith("https://localhost");
 }
 
 export async function POST(
@@ -77,7 +72,7 @@ export async function POST(
 
   const appUrl = await getSetting("general.appUrl");
   const isPublic = isPublicAppUrl(appUrl);
-  const normalizedAppUrl = appUrl?.trim() || null;
+  const normalizedAppUrl = normalizeAppUrl(appUrl);
   const appBaseUrl = normalizedAppUrl || new URL(request.url).origin;
 
   let telegramBotUsername: string | null = null;
@@ -150,7 +145,9 @@ export async function POST(
       groupIdStr,
       14
     );
-    const acceptInviteUrl = `${appBaseUrl.replace(/\/$/, "")}/api/invite/accept/${acceptInviteToken}`;
+    const acceptInviteUrl = isPublic
+      ? `${appBaseUrl.replace(/\/$/, "")}/api/invite/accept/${acceptInviteToken}`
+      : null;
 
     const params = {
       memberName: member.nickname,

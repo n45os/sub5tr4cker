@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Link2, Copy, Loader2, Trash2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/dialog";
 
 interface InviteLinkState {
+  inviteLinkAvailable: boolean;
+  inviteLinkAvailabilityReason: string | null;
   inviteLinkEnabled: boolean;
   inviteCode: string | null;
   inviteUrl: string | null;
@@ -40,7 +42,7 @@ export function InviteLinkCard({ groupId }: InviteLinkCardProps) {
   const [destroyOpen, setDestroyOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function fetchState() {
+  const fetchState = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -58,11 +60,11 @@ export function InviteLinkCard({ groupId }: InviteLinkCardProps) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [groupId]);
 
   useEffect(() => {
-    fetchState();
-  }, [groupId]);
+    void fetchState();
+  }, [fetchState]);
 
   async function handleGenerate() {
     setActionLoading("generate");
@@ -161,6 +163,10 @@ export function InviteLinkCard({ groupId }: InviteLinkCardProps) {
   }
 
   const hasLink = !!state?.inviteCode;
+  const isAvailable = state?.inviteLinkAvailable ?? true;
+  const unavailableReason =
+    state?.inviteLinkAvailabilityReason ??
+    "Web invite links are unavailable right now.";
   const enabled = state?.inviteLinkEnabled ?? false;
 
   return (
@@ -172,7 +178,7 @@ export function InviteLinkCard({ groupId }: InviteLinkCardProps) {
             Invite link
           </CardTitle>
           <CardDescription>
-            Share a link so others can join without you adding them. You can lock or revoke it anytime.
+            Share a link so others can join without you adding them. When the app only runs locally, use Telegram invite links from the member list instead.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -182,7 +188,15 @@ export function InviteLinkCard({ groupId }: InviteLinkCardProps) {
             </p>
           ) : null}
 
-          {!hasLink ? (
+          {!isAvailable ? (
+            <div className="space-y-3 rounded-lg border border-dashed p-4">
+              <p className="text-sm font-medium">Web invite links unavailable</p>
+              <p className="text-sm text-muted-foreground">{unavailableReason}</p>
+              <p className="text-xs text-muted-foreground">
+                Use the member row action to copy a Telegram deep link that you can send directly.
+              </p>
+            </div>
+          ) : !hasLink ? (
             <Button
               onClick={handleGenerate}
               disabled={!!actionLoading}

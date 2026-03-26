@@ -58,7 +58,7 @@ Switch: `SUB5TR4CKER_MODE=local` (set by `s54r start`).
 - Group preview: GET /api/groups/[groupId]/notification-preview (deprecated for first-party UI)
 - Settings: GET/PATCH /api/settings, POST /api/settings/test-email, POST /api/settings/test-telegram
 - Auth: /api/auth/[...nextauth], POST /api/register
-- Telegram: POST /api/telegram/webhook, POST /api/telegram/link
+- Telegram: POST /api/telegram/webhook, POST /api/telegram/link, GET /api/groups/[groupId]/members/[memberId]/telegram-invite (admin copyable member deep link)
 - Dashboard: GET /api/dashboard/quick-status (aligned `unpaidCount` rules with GET /api/groups; `groupsNeedingAttention` / `groupsEligibleForReminders`), GET/POST /api/dashboard/notify-unpaid (POST accepts optional groupIds, paymentIds, channelPreference; always groups by member email for one combined message per user; cron aggregation uses the notifications.aggregateReminders setting)
 - Scheduled tasks (admin): GET /api/scheduled-tasks, PATCH /api/scheduled-tasks/[taskId], POST /api/scheduled-tasks/bulk-cancel
 - Cron: POST /api/cron/billing, reminders, follow-ups, notification-tasks (x-cron-secret)

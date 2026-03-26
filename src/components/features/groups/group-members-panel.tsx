@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, Loader2, Mail, Pencil, UserMinus, UserPlus } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Loader2, Mail, Pencil, Send, UserMinus, UserPlus } from "lucide-react";
 import { PaymentStatusBadge } from "@/components/features/billing/payment-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -132,6 +132,8 @@ export function GroupMembersPanel({
   const [notifyMembersLoading, setNotifyMembersLoading] = useState(false);
   const [inviteSending, setInviteSending] = useState(false);
   const [resendingMemberId, setResendingMemberId] = useState<string | null>(null);
+  const [telegramInviteMemberId, setTelegramInviteMemberId] = useState<string | null>(null);
+  const [copiedTelegramMemberId, setCopiedTelegramMemberId] = useState<string | null>(null);
   const [editMember, setEditMember] = useState<{
     _id: string;
     nickname: string;
@@ -176,6 +178,32 @@ export function GroupMembersPanel({
       setError("Failed to send invite. Try again.");
     } finally {
       setResendingMemberId(null);
+    }
+  }
+
+  async function handleCopyTelegramInvite(memberId: string) {
+    setTelegramInviteMemberId(memberId);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/groups/${groupId}/members/${memberId}/telegram-invite`
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error?.message ?? "Failed to generate Telegram invite link.");
+        return;
+      }
+      await navigator.clipboard.writeText(json.data.deepLink);
+      setCopiedTelegramMemberId(memberId);
+      setTimeout(() => {
+        setCopiedTelegramMemberId((current) =>
+          current === memberId ? null : current
+        );
+      }, 2000);
+    } catch {
+      setError("Failed to copy Telegram invite link. Try again.");
+    } finally {
+      setTelegramInviteMemberId(null);
     }
   }
 
@@ -1170,19 +1198,42 @@ export function GroupMembersPanel({
                                 Invite pending
                               </Badge>
                               {isAdmin && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 text-xs"
-                                  onClick={() => handleResendInvite(member._id)}
-                                  disabled={resendingMemberId === member._id}
-                                >
-                                  {resendingMemberId === member._id ? (
-                                    <Loader2 className="size-3.5 animate-spin" />
-                                  ) : (
-                                    "Resend invite"
-                                  )}
-                                </Button>
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs"
+                                    onClick={() => handleResendInvite(member._id)}
+                                    disabled={resendingMemberId === member._id}
+                                  >
+                                    {resendingMemberId === member._id ? (
+                                      <Loader2 className="size-3.5 animate-spin" />
+                                    ) : (
+                                      "Resend invite"
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs"
+                                    onClick={() => handleCopyTelegramInvite(member._id)}
+                                    disabled={telegramInviteMemberId === member._id}
+                                  >
+                                    {telegramInviteMemberId === member._id ? (
+                                      <Loader2 className="size-3.5 animate-spin" />
+                                    ) : copiedTelegramMemberId === member._id ? (
+                                      <>
+                                        <Check className="size-3.5" />
+                                        Copied Telegram link
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Send className="size-3.5" />
+                                        Copy Telegram link
+                                      </>
+                                    )}
+                                  </Button>
+                                </>
                               )}
                             </div>
                           ) : member.acceptedAt ? (

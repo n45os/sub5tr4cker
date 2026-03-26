@@ -13,6 +13,7 @@ import {
   getUnsubscribeUrl,
 } from "@/lib/tokens";
 import { getSetting } from "@/lib/settings/service";
+import { isPublicAppUrl, normalizeAppUrl } from "@/lib/public-app-url";
 import { db, isStorageId, type StorageGroup, type StorageGroupMember } from "@/lib/storage";
 
 function buildBillingSummary(group: StorageGroup): string {
@@ -26,12 +27,6 @@ function buildBillingSummary(group: StorageGroup): string {
     return `${billing.fixedMemberAmount} ${billing.currency} per member per ${cycle}`;
   }
   return `${price} per ${cycle} (variable)`;
-}
-
-function isPublicAppUrl(appUrl: string | null): boolean {
-  if (!appUrl || !appUrl.trim()) return false;
-  const u = appUrl.trim().toLowerCase();
-  return !u.startsWith("http://localhost") && !u.startsWith("https://localhost");
 }
 
 export async function POST(
@@ -94,7 +89,7 @@ export async function POST(
 
   const appUrl = await getSetting("general.appUrl");
   const isPublic = isPublicAppUrl(appUrl);
-  const normalizedAppUrl = appUrl?.trim() || null;
+  const normalizedAppUrl = normalizeAppUrl(appUrl);
   const appBaseUrl = normalizedAppUrl || new URL(request.url).origin;
 
   let telegramBotUsername: string | null = null;
@@ -137,7 +132,9 @@ export async function POST(
     telegramInviteLink = `https://t.me/${telegramBotUsername}?start=invite_${inviteToken}`;
   }
   const acceptInviteToken = await createInviteAcceptToken(member.id, groupIdStr, 14);
-  const acceptInviteUrl = `${appBaseUrl.replace(/\/$/, "")}/api/invite/accept/${acceptInviteToken}`;
+  const acceptInviteUrl = isPublic
+    ? `${appBaseUrl.replace(/\/$/, "")}/api/invite/accept/${acceptInviteToken}`
+    : null;
 
   const params = {
     memberName: member.nickname,

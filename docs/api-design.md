@@ -191,6 +191,8 @@ Get current invite-link status and URL. Admin only.
 ```json
 {
   "data": {
+    "inviteLinkAvailable": true,
+    "inviteLinkAvailabilityReason": null,
     "inviteLinkEnabled": true,
     "inviteCode": "abc12XYZ",
     "inviteUrl": "https://app.example.com/invite/abc12XYZ"
@@ -200,9 +202,13 @@ Get current invite-link status and URL. Admin only.
 
 When no link exists, `inviteCode` and `inviteUrl` are `null`, and `inviteLinkEnabled` is `false`.
 
+When the app URL is missing or points to a local/private host, `inviteLinkAvailable` is `false`, `inviteUrl` is `null`, and `inviteLinkAvailabilityReason` explains that admins should use Telegram invite links instead.
+
 ### `POST /api/groups/[groupId]/invite-link`
 
 Generate or rotate the invite code and enable the link. Admin only. Returns the new invite URL.
+
+If the app does not have a public URL, returns `409` with code `INVITE_LINK_UNAVAILABLE`.
 
 ### `PATCH /api/groups/[groupId]/invite-link`
 
@@ -217,9 +223,28 @@ Toggle whether registration via the link is allowed. Admin only.
 
 Set `enabled: false` to lock registration (link stays valid but no one can join until re-enabled). Set `enabled: true` to allow joining again.
 
+If `enabled: true` is requested without a public app URL, returns `409` with code `INVITE_LINK_UNAVAILABLE`.
+
 ### `DELETE /api/groups/[groupId]/invite-link`
 
 Revoke the invite link (clear code and disable). Admin only. The previous link stops working.
+
+### `GET /api/groups/[groupId]/members/[memberId]/telegram-invite`
+
+Admin only. Returns a member-specific Telegram deep link in the form `https://t.me/<bot>?start=invite_<token>` so the admin can send it directly.
+
+**Response:**
+```json
+{
+  "data": {
+    "botUsername": "SubsTrackBot",
+    "deepLink": "https://t.me/SubsTrackBot?start=invite_xxxxx",
+    "expiresInDays": 7
+  }
+}
+```
+
+**Errors:** `SERVICE_UNAVAILABLE` when Telegram is not configured.
 
 ### `GET /api/invite/[inviteCode]`
 

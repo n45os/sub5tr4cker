@@ -49,6 +49,30 @@ Query params:
 
 Soft-deactivate group. Admin only.
 
+### `GET /api/groups/[groupId]/invite-link`
+
+Get current invite-link status and URL. Admin only.
+
+**Response:** `{ "data": { "inviteLinkAvailable", "inviteLinkAvailabilityReason", "inviteLinkEnabled", "inviteCode", "inviteUrl" } }`
+
+If the app URL is missing or points to a local/private host, `inviteLinkAvailable` is `false`, `inviteUrl` is `null`, and the response explains that Telegram invite links should be used instead.
+
+### `POST /api/groups/[groupId]/invite-link`
+
+Generate or rotate the invite code and enable the link. Admin only.
+
+Returns `409` with `INVITE_LINK_UNAVAILABLE` when the app does not have a public URL.
+
+### `PATCH /api/groups/[groupId]/invite-link`
+
+Toggle whether registration via the invite link is allowed. Admin only. Body: `{ "enabled": true | false }`.
+
+Enabling the link without a public app URL returns `409` with `INVITE_LINK_UNAVAILABLE`.
+
+### `DELETE /api/groups/[groupId]/invite-link`
+
+Revoke the invite link (clear code and disable). Admin only.
+
 ### `PATCH /api/groups/[groupId]/notifications`
 
 Update per-group notification toggles. Admin only. Body may include `remindersEnabled`, `followUpsEnabled`, `priceChangeEnabled`, and `saveEmailParams`. When `saveEmailParams` is `true`, template arguments for outgoing emails are stored on `Notification` documents for Activity email preview.
@@ -74,6 +98,16 @@ Update member. Admin only.
 ### `DELETE /api/groups/[groupId]/members/[memberId]`
 
 Remove member (soft). Admin only.
+
+### `POST /api/groups/[groupId]/members/[memberId]/send-invite`
+
+Send or resend the standard member invite notification. Admin only. In local/private deployments, invite emails omit web accept links unless the app has a public URL and fall back to Telegram onboarding when available.
+
+### `GET /api/groups/[groupId]/members/[memberId]/telegram-invite`
+
+Generate a member-specific Telegram deep link that the admin can copy and send directly.
+
+**Response:** `{ "data": { "botUsername", "deepLink", "expiresInDays" } }`
 
 ## Billing
 

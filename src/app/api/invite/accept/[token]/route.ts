@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isPublicAppUrl, normalizeAppUrl } from "@/lib/public-app-url";
 import { getSetting } from "@/lib/settings/service";
 import {
   verifyInviteAcceptToken,
@@ -24,12 +25,6 @@ function buildBillingSummary(group: StorageGroup): string {
     return `${billing.fixedMemberAmount} ${billing.currency} per member per ${cycle}`;
   }
   return `${price} per ${cycle} (variable)`;
-}
-
-function isPublicAppUrl(appUrl: string | null): boolean {
-  if (!appUrl || !appUrl.trim()) return false;
-  const u = appUrl.trim().toLowerCase();
-  return !u.startsWith("http://localhost") && !u.startsWith("https://localhost");
 }
 
 function buildHtml(title: string, message: string, appUrl: string): string {
@@ -64,7 +59,7 @@ export async function GET(
   const fallbackAppUrl = new URL(request.url).origin;
   try {
     const { token } = await context.params;
-    const appUrl = (await getSetting("general.appUrl")) || fallbackAppUrl;
+    const appUrl = normalizeAppUrl(await getSetting("general.appUrl")) || fallbackAppUrl;
 
     const payload = await verifyInviteAcceptToken(token);
     if (!payload) {
@@ -189,7 +184,7 @@ export async function GET(
             paymentLink: group.payment.link ?? null,
             paymentInstructions: group.payment.instructions ?? null,
             isPublic: isPublicAppUrl(appUrl),
-            appUrl: appUrl?.trim() || null,
+            appUrl: normalizeAppUrl(appUrl),
             telegramBotUsername,
             telegramInviteLink,
             unsubscribeUrl,

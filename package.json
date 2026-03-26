@@ -1,6 +1,6 @@
 {
   "name": "sub5tr4cker",
-  "version": "0.35.1",
+  "version": "0.36.0",
   "private": true,
   "bin": {
     "s54r": "./dist/cli/index.js",

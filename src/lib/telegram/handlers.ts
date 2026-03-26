@@ -8,6 +8,7 @@ import {
   getUnsubscribeUrl,
 } from "@/lib/tokens";
 import { getSetting } from "@/lib/settings/service";
+import { isPublicAppUrl, normalizeAppUrl } from "@/lib/public-app-url";
 import { enqueueTask } from "@/lib/tasks/queue";
 import { runNotificationTasks } from "@/jobs/run-notification-tasks";
 import { sendNotification } from "@/lib/notifications/service";
@@ -25,12 +26,6 @@ function buildBillingSummary(group: StorageGroup): string {
     return `${billing.fixedMemberAmount} ${billing.currency} per member per ${cycle}`;
   }
   return `${price} per ${cycle} (variable)`;
-}
-
-function isPublicAppUrl(appUrl: string | null): boolean {
-  if (!appUrl || !appUrl.trim()) return false;
-  const value = appUrl.trim().toLowerCase();
-  return !value.startsWith("http://localhost") && !value.startsWith("https://localhost");
 }
 
 // register all bot handlers
@@ -369,7 +364,7 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
     !wasAccepted && (await store.tryClaimWelcomeEmailSentAt(user.id, now));
   if (shouldSendWelcomeEmail) {
     const appUrlSetting = await getSetting("general.appUrl");
-    const baseUrl = (appUrlSetting?.trim() || "http://localhost:3054").replace(
+    const baseUrl = (normalizeAppUrl(appUrlSetting) || "http://localhost:3054").replace(
       /\/$/,
       ""
     );
@@ -394,7 +389,7 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
       paymentLink: group.payment.link ?? null,
       paymentInstructions: group.payment.instructions ?? null,
       isPublic: isPublicAppUrl(appUrlSetting),
-      appUrl: appUrlSetting?.trim() || null,
+      appUrl: normalizeAppUrl(appUrlSetting),
       telegramBotUsername: null,
       telegramInviteLink: null,
       unsubscribeUrl,

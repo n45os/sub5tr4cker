@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getSetting } from "@/lib/settings/service";
 import { generateUniqueInviteCode } from "@/lib/invite-code";
+import { getInviteLinkAvailability } from "@/lib/public-app-url";
 import { z } from "zod";
 import { db, isStorageId, type StorageGroup } from "@/lib/storage";
 
@@ -69,15 +70,18 @@ export async function GET(
   }
 
   const appUrl = await getAppUrl(request);
+  const availability = getInviteLinkAvailability(appUrl);
   const inviteLinkEnabled = group.inviteLinkEnabled ?? false;
   const inviteCode = group.inviteCode ?? null;
   const inviteUrl =
-    inviteCode && inviteLinkEnabled
+    availability.available && inviteCode && inviteLinkEnabled
       ? `${appUrl}/invite/${inviteCode}`
       : null;
 
   return NextResponse.json({
     data: {
+      inviteLinkAvailable: availability.available,
+      inviteLinkAvailabilityReason: availability.reason,
       inviteLinkEnabled,
       inviteCode,
       inviteUrl,
@@ -114,6 +118,20 @@ export async function POST(
     );
   }
 
+  const appUrl = await getAppUrl(request);
+  const availability = getInviteLinkAvailability(appUrl);
+  if (!availability.available) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "INVITE_LINK_UNAVAILABLE",
+          message: availability.reason ?? "Web invite links are unavailable.",
+        },
+      },
+      { status: 409 }
+    );
+  }
+
   const code = await generateUniqueInviteCode(async (c) => {
     const store = await db();
     const existing = await store.findGroupByInviteCode(c);
@@ -126,11 +144,12 @@ export async function POST(
     inviteLinkEnabled: true,
   });
 
-  const appUrl = await getAppUrl(request);
   const inviteUrl = `${appUrl}/invite/${code}`;
 
   return NextResponse.json({
     data: {
+      inviteLinkAvailable: true,
+      inviteLinkAvailabilityReason: null,
       inviteCode: code,
       inviteLinkEnabled: true,
       inviteUrl,
@@ -181,19 +200,34 @@ export async function PATCH(
     );
   }
 
+  const appUrl = await getAppUrl(request);
+  const availability = getInviteLinkAvailability(appUrl);
+  if (parsed.data.enabled && !availability.available) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "INVITE_LINK_UNAVAILABLE",
+          message: availability.reason ?? "Web invite links are unavailable.",
+        },
+      },
+      { status: 409 }
+    );
+  }
+
   const store = await db();
   const updated = await store.updateGroup(groupId, {
     inviteLinkEnabled: parsed.data.enabled,
   });
 
-  const appUrl = await getAppUrl(request);
   const inviteUrl =
-    updated.inviteCode && updated.inviteLinkEnabled
+    availability.available && updated.inviteCode && updated.inviteLinkEnabled
       ? `${appUrl}/invite/${updated.inviteCode}`
       : null;
 
   return NextResponse.json({
     data: {
+      inviteLinkAvailable: availability.available,
+      inviteLinkAvailabilityReason: availability.reason,
       inviteLinkEnabled: updated.inviteLinkEnabled,
       inviteCode: updated.inviteCode,
       inviteUrl,
@@ -202,7 +236,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ groupId: string }> }
 ) {
   const session = await auth();
@@ -230,6 +264,8 @@ export async function DELETE(
     );
   }
 
+  const appUrl = await getAppUrl(request);
+  const availability = getInviteLinkAvailability(appUrl);
   const store = await db();
   await store.updateGroup(groupId, {
     inviteCode: null,
@@ -237,6 +273,12 @@ export async function DELETE(
   });
 
   return NextResponse.json({
-    data: { inviteCode: null, inviteLinkEnabled: false, inviteUrl: null },
+    data: {
+      inviteLinkAvailable: availability.available,
+      inviteLinkAvailabilityReason: availability.reason,
+      inviteCode: null,
+      inviteLinkEnabled: false,
+      inviteUrl: null,
+    },
   });
 }

@@ -29,6 +29,8 @@ Members do **not** need a SubsTrack account to receive reminders. They get an em
 
 If they sign up later, they can link their account and use Telegram and the dashboard.
 
+If your SubsTrack app only runs on a local/private URL, regular web invite links are disabled because other people cannot open `localhost` links from their own devices. In that setup, use the member row action to copy a Telegram invite link and send it directly.
+
 ## Editing a member
 
 You can change:
@@ -59,6 +61,11 @@ Use **custom amount** when:
 
 The member’s reminder will show their custom amount instead of the calculated one.
 
-## Inviting members (future)
+## Inviting members
 
-Planned: invite by email with a magic link so they can create an account, see their history, and connect Telegram. For now, you add their email and they receive reminders without an account.
+For pending members, use one of these:
+
+- **Resend invite** — Sends the standard email/notification invite again
+- **Copy Telegram link** — Copies a member-specific `t.me/...start=invite_<token>` link you can send directly
+
+Telegram invite links are especially useful when the app is hosted locally or behind a private network.

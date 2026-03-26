@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.36.0] - 2026-03-26
+
+### Added
+
+- **Admin Telegram invite links** — Pending members now expose a copyable `t.me/...start=invite_<token>` deep link in the members table, and admins can fetch the same link via `GET /api/groups/[groupId]/members/[memberId]/telegram-invite`.
+
+### Changed
+
+- **Local invite UX** — Web self-join invite links are now treated as unavailable when `general.appUrl` is missing or points to a local/private host (`localhost`, loopback, or LAN/private IPs). The group invite-link card explains why and points admins to Telegram invite links instead.
+- **Invite notifications** — Member invite emails keep Telegram onboarding available in local/private deployments, but stop embedding unusable web accept links unless the app has a public URL.
+
 ## [0.35.1] - 2026-03-26
 
 ### Fixed

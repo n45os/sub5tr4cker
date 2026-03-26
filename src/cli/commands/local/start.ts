@@ -1,7 +1,9 @@
 import * as p from "@clack/prompts";
+import path from "path";
 import { spawn } from "child_process";
 import { readConfig, getDbPath } from "@/lib/config/manager";
 import { existsSync } from "fs";
+import { getPackageRoot } from "@/cli/lib/pkg-root";
 
 export async function runStartCommand(options: { port?: number } = {}): Promise<void> {
   const config = readConfig();
@@ -11,12 +13,13 @@ export async function runStartCommand(options: { port?: number } = {}): Promise<
   }
 
   const port = options.port ?? config.port ?? 3054;
+  const pkgRoot = getPackageRoot();
+  const standaloneServer = path.join(pkgRoot, ".next", "standalone", "server.js");
+  const buildId = path.join(pkgRoot, ".next", "BUILD_ID");
 
-  // check that the build exists
-  const buildDir = new URL("../../../../.next", import.meta.url).pathname;
-  if (!existsSync(buildDir)) {
-    p.log.warn("No Next.js build found. Building now (this may take a minute)...");
-    await build();
+  if (!existsSync(buildId)) {
+    p.log.error("No Next.js build found. Run 's54r init' first, or 'pnpm build'.");
+    process.exit(1);
   }
 
   p.intro(`  sub5tr4cker — starting on http://localhost:${port}  `);
@@ -30,42 +33,47 @@ export async function runStartCommand(options: { port?: number } = {}): Promise<
     SUB5TR4CKER_DATA_PATH: getDbPath(),
     SUB5TR4CKER_AUTH_TOKEN: config.authToken ?? "",
     PORT: String(port),
+    HOSTNAME: "localhost",
     NEXTAUTH_URL: `http://localhost:${port}`,
   };
 
-  // start next.js in production mode (foreground, Ctrl+C to stop)
-  const child = spawn("node", [".next/standalone/server.js"], {
-    env,
-    stdio: "inherit",
-    cwd: process.cwd(),
-  });
+  // prefer standalone server (works after global install / npx)
+  // fall back to `next start` for dev clones where static assets weren't copied
+  let child: ReturnType<typeof spawn>;
 
-  // also try dev mode if standalone build doesn't exist
-  child.on("error", () => {
-    p.log.warn("Standalone server not found, trying next start...");
-    const dev = spawn(
-      "node_modules/.bin/next",
-      ["start", "--port", String(port)],
-      { env, stdio: "inherit", cwd: process.cwd() }
-    );
-    dev.on("error", (e) => {
-      p.log.error(`Failed to start server: ${e.message}`);
-      process.exit(1);
+  if (existsSync(standaloneServer)) {
+    child = spawn("node", [standaloneServer], {
+      env,
+      stdio: "inherit",
+      cwd: path.join(pkgRoot, ".next", "standalone"),
     });
-    process.on("SIGINT", () => { dev.kill("SIGINT"); process.exit(0); });
-    process.on("SIGTERM", () => { dev.kill("SIGTERM"); process.exit(0); });
+  } else {
+    const nextBin = path.join(pkgRoot, "node_modules", ".bin", "next");
+    child = spawn(nextBin, ["start", "--port", String(port)], {
+      env,
+      stdio: "inherit",
+      cwd: pkgRoot,
+    });
+  }
+
+  child.on("error", (e) => {
+    p.log.error(`Failed to start server: ${e.message}`);
+    process.exit(1);
   });
 
-  // start Telegram long-polling if configured (in a separate background process
-  // so it doesn't block the web server startup)
+  // start Telegram long-polling if configured
   if (config.notifications.channels.telegram?.botToken) {
     p.log.info("Starting Telegram long-polling...");
     const { startPolling } = await import("@/lib/telegram/polling");
-    // run polling in parallel — errors are non-fatal
     startPolling().catch((e) => {
       p.log.warn(`Telegram polling error: ${e instanceof Error ? e.message : String(e)}`);
     });
   }
+
+  // best-effort open in the default browser after startup
+  setTimeout(() => {
+    void openBrowser(`http://localhost:${port}`);
+  }, 1500);
 
   process.on("SIGINT", () => { child.kill("SIGINT"); process.exit(0); });
   process.on("SIGTERM", () => { child.kill("SIGTERM"); process.exit(0); });
@@ -81,10 +89,20 @@ export async function runStartCommand(options: { port?: number } = {}): Promise<
   });
 }
 
-async function build(): Promise<void> {
-  const { execSync } = await import("child_process");
-  execSync("node_modules/.bin/next build", {
-    stdio: "inherit",
-    env: { ...process.env, SUB5TR4CKER_MODE: "local" },
+
+async function openBrowser(url: string): Promise<void> {
+  const platform = process.platform;
+  const command =
+    platform === "darwin"
+      ? "open"
+      : platform === "win32"
+        ? "start"
+        : "xdg-open";
+
+  const child = spawn(command, [url], {
+    detached: true,
+    stdio: "ignore",
+    shell: platform === "win32",
   });
+  child.unref();
 }

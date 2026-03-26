@@ -1,16 +1,18 @@
 import * as p from "@clack/prompts";
 import crypto from "crypto";
+import path from "path";
+import { execSync } from "child_process";
 import { writeConfig, readConfig, getDataDir, getConfigPath } from "@/lib/config/manager";
 import { sub5tr4ckerConfigSchema, type Sub5tr4ckerConfig } from "@/lib/config/schema";
-import { existsSync } from "fs";
+import { existsSync, cpSync, mkdirSync } from "fs";
+import { getPackageRoot } from "@/cli/lib/pkg-root";
 
 function getLocalCommandHint(command: string): string {
-  // in a repo clone, prefer the package script
-  if (existsSync("package.json")) {
+  const pkgRoot = getPackageRoot();
+  // if running from a dev clone (cwd matches package root), use the pnpm script
+  if (process.cwd() === pkgRoot) {
     return `pnpm s54r ${command}`;
   }
-
-  // published/global install path
   return `s54r ${command}`;
 }
 
@@ -127,6 +129,29 @@ export async function runInitCommand(): Promise<void> {
   writeConfig(config);
   s.stop("Configuration saved.");
 
+  // build the Next.js app so `start` is instant
+  const pkgRoot = getPackageRoot();
+  const standaloneServer = path.join(pkgRoot, ".next", "standalone", "server.js");
+
+  if (!existsSync(standaloneServer)) {
+    const bs = p.spinner();
+    bs.start("Building the dashboard (this may take a minute)...");
+    try {
+      const nextBin = path.join(pkgRoot, "node_modules", ".bin", "next");
+      execSync(`"${nextBin}" build`, {
+        stdio: "pipe",
+        env: { ...process.env, SUB5TR4CKER_MODE: "local" },
+        cwd: pkgRoot,
+      });
+      // copy static assets into standalone so the server can serve them
+      copyStandaloneAssets(pkgRoot);
+      bs.stop("Dashboard built.");
+    } catch (e) {
+      bs.stop("Build failed — you can retry later with 'pnpm build'.");
+      p.log.warn(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   // summary
   p.note(
     [
@@ -149,4 +174,20 @@ export async function runInitCommand(): Promise<void> {
   );
 
   p.outro(`Ready. Run '${getLocalCommandHint("start")}' to open the dashboard.`);
+}
+
+/** copy .next/static and public/ into standalone so the server serves them */
+function copyStandaloneAssets(pkgRoot: string): void {
+  const staticSrc = path.join(pkgRoot, ".next", "static");
+  const staticDst = path.join(pkgRoot, ".next", "standalone", ".next", "static");
+  if (existsSync(staticSrc)) {
+    mkdirSync(path.dirname(staticDst), { recursive: true });
+    cpSync(staticSrc, staticDst, { recursive: true });
+  }
+
+  const publicSrc = path.join(pkgRoot, "public");
+  const publicDst = path.join(pkgRoot, ".next", "standalone", "public");
+  if (existsSync(publicSrc)) {
+    cpSync(publicSrc, publicDst, { recursive: true });
+  }
 }

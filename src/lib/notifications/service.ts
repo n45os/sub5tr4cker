@@ -7,11 +7,13 @@ import {
   buildPriceChangeTelegramText,
 } from "@/lib/email/templates/price-change";
 import { InlineKeyboard } from "grammy";
-import { dbConnect } from "@/lib/db/mongoose";
+import {
+  db,
+  type CreateNotificationInput,
+  type StorageGroup,
+  type StorageNotificationType,
+} from "@/lib/storage";
 import { createUnsubscribeToken, getUnsubscribeUrl } from "@/lib/tokens";
-import { Notification, NotificationType, User } from "@/models";
-import type { IGroup } from "@/models";
-import { Types } from "mongoose";
 import { getChannels, getBuiltInChannelIds } from "@/lib/plugins/channels";
 
 interface NotificationTarget {
@@ -25,7 +27,7 @@ interface NotificationTarget {
 }
 
 interface NotificationContent {
-  type: NotificationType;
+  type: StorageNotificationType;
   subject: string;
   emailHtml: string;
   telegramText: string;
@@ -41,7 +43,7 @@ interface NotificationResult {
   telegram: { sent: boolean; messageId?: number };
 }
 
-function estimatePerMemberShare(group: IGroup, totalPrice: number): number | null {
+function estimatePerMemberShare(group: StorageGroup, totalPrice: number): number | null {
   const activeMemberCount = group.members.filter(
     (member) => member.isActive && !member.leftAt
   ).length;
@@ -55,8 +57,6 @@ export async function sendNotification(
   target: NotificationTarget,
   content: NotificationContent
 ): Promise<NotificationResult> {
-  await dbConnect();
-
   const result: NotificationResult = {
     email: { sent: false },
     telegram: { sent: false },
@@ -134,7 +134,7 @@ async function logNotification(params: {
   recipientEmail: string;
   recipientId?: string | null;
   channel: "email" | "telegram";
-  type: NotificationType;
+  type: StorageNotificationType;
   subject: string | null;
   preview: string;
   status: "sent" | "failed";
@@ -144,15 +144,12 @@ async function logNotification(params: {
   emailParams?: Record<string, unknown>;
 }): Promise<void> {
   try {
-    await Notification.create({
-      recipient: params.recipientId
-        ? new Types.ObjectId(params.recipientId)
-        : null,
+    const store = await db();
+    const input: CreateNotificationInput = {
+      recipientId: params.recipientId ?? null,
       recipientEmail: params.recipientEmail,
-      group: params.groupId ? new Types.ObjectId(params.groupId) : null,
-      billingPeriod: params.billingPeriodId
-        ? new Types.ObjectId(params.billingPeriodId)
-        : null,
+      groupId: params.groupId ?? null,
+      billingPeriodId: params.billingPeriodId ?? null,
       type: params.type,
       channel: params.channel,
       status: params.status,
@@ -161,7 +158,8 @@ async function logNotification(params: {
       emailParams: params.emailParams ?? null,
       externalId: params.externalId ?? null,
       deliveredAt: params.status === "sent" ? new Date() : null,
-    });
+    };
+    await store.logNotification(input);
   } catch (error) {
     // don't let logging failures break the notification flow
     console.error("failed to log notification:", error);
@@ -181,7 +179,7 @@ type PriceChangeTarget = {
 
 // send price-change announcements to admin and all active members when group price is updated
 export async function sendPriceChangeAnnouncements(
-  group: IGroup,
+  group: StorageGroup,
   params: {
     previousPrice: number;
     newPrice: number;
@@ -190,8 +188,7 @@ export async function sendPriceChangeAnnouncements(
   }
 ): Promise<void> {
   if (!group.announcements?.notifyOnPriceChange) return;
-
-  await dbConnect();
+  const store = await db();
 
   const { previousPrice, newPrice, currency, serviceName } = params;
   const groupName = group.name;
@@ -201,12 +198,12 @@ export async function sendPriceChangeAnnouncements(
 
   const targets = new Map<string, PriceChangeTarget>();
 
-  const admin = await User.findById(group.admin);
+  const admin = await store.getUser(group.adminId);
   if (admin) {
     targets.set(admin.email.toLowerCase(), {
       email: admin.email,
       telegramChatId: admin.telegram?.chatId ?? null,
-      userId: admin._id.toString(),
+      userId: admin.id,
       preferences: {
         email: admin.notificationPreferences?.email ?? true,
         telegram: admin.notificationPreferences?.telegram ?? false,
@@ -214,25 +211,25 @@ export async function sendPriceChangeAnnouncements(
     });
   }
 
-  const groupIdStr = group._id.toString();
+  const groupIdStr = group.id;
   for (const member of group.members) {
     if (!member.isActive || member.leftAt) continue;
     const key = member.email.toLowerCase();
     if (targets.has(key)) continue;
 
     const sendEmail = !member.unsubscribedFromEmail;
-    if (member.user) {
-      const user = await User.findById(member.user);
+    if (member.userId) {
+      const user = await store.getUser(member.userId);
       if (user) {
         targets.set(key, {
           email: user.email,
           telegramChatId: user.telegram?.chatId ?? null,
-          userId: user._id.toString(),
+          userId: user.id,
           preferences: {
             email: sendEmail && (user.notificationPreferences?.email ?? true),
             telegram: user.notificationPreferences?.telegram ?? false,
           },
-          memberId: member._id.toString(),
+          memberId: member.id,
           unsubscribedFromEmail: member.unsubscribedFromEmail,
         });
         continue;
@@ -244,7 +241,7 @@ export async function sendPriceChangeAnnouncements(
       telegramChatId: null,
       userId: null,
       preferences: { email: sendEmail, telegram: false },
-      memberId: member._id.toString(),
+      memberId: member.id,
       unsubscribedFromEmail: member.unsubscribedFromEmail,
     });
   }
@@ -335,7 +332,7 @@ export interface MemberAddedCreditEntry {
 
 // notify existing members when a new member is added (new share amount, optional credit)
 export async function sendMemberAddedNotifications(
-  group: IGroup,
+  group: StorageGroup,
   params: {
     newMemberId: string;
     newMemberNickname: string;
@@ -345,7 +342,7 @@ export async function sendMemberAddedNotifications(
     creditSummary: MemberAddedCreditEntry[];
   }
 ): Promise<void> {
-  await dbConnect();
+  const store = await db();
 
   const {
     newMemberId,
@@ -356,7 +353,7 @@ export async function sendMemberAddedNotifications(
     creditSummary,
   } = params;
   const groupName = group.name;
-  const groupIdStr = group._id.toString();
+  const groupIdStr = group.id;
   const isRemoval = changeType === "removed";
   const creditByMemberId = new Map(
     creditSummary.map((c) => [c.memberId, c])
@@ -364,44 +361,44 @@ export async function sendMemberAddedNotifications(
 
   const targets = new Map<string, PriceChangeTarget & { memberNickname: string }>();
 
-  const admin = await User.findById(group.admin);
+  const admin = await store.getUser(group.adminId);
   if (admin) {
     const adminMember = group.members.find(
-      (m) => m.user?.toString() === admin._id.toString()
+      (m) => m.userId === admin.id
     );
     const nickname = adminMember?.nickname ?? admin.name ?? "Admin";
     targets.set(admin.email.toLowerCase(), {
       email: admin.email,
       telegramChatId: admin.telegram?.chatId ?? null,
-      userId: admin._id.toString(),
+      userId: admin.id,
       preferences: {
         email: admin.notificationPreferences?.email ?? true,
         telegram: admin.notificationPreferences?.telegram ?? false,
       },
-      memberId: adminMember?._id?.toString(),
+      memberId: adminMember?.id,
       memberNickname: nickname,
     });
   }
 
   for (const member of group.members) {
     if (!member.isActive || member.leftAt) continue;
-    if (member._id.toString() === newMemberId) continue;
+    if (member.id === newMemberId) continue;
     const key = member.email.toLowerCase();
     if (targets.has(key)) continue;
 
     const sendEmail = !member.unsubscribedFromEmail;
-    if (member.user) {
-      const user = await User.findById(member.user);
+    if (member.userId) {
+      const user = await store.getUser(member.userId);
       if (user) {
         targets.set(key, {
           email: user.email,
           telegramChatId: user.telegram?.chatId ?? null,
-          userId: user._id.toString(),
+          userId: user.id,
           preferences: {
             email: sendEmail && (user.notificationPreferences?.email ?? true),
             telegram: user.notificationPreferences?.telegram ?? false,
           },
-          memberId: member._id.toString(),
+          memberId: member.id,
           unsubscribedFromEmail: member.unsubscribedFromEmail,
           memberNickname: member.nickname,
         });
@@ -414,7 +411,7 @@ export async function sendMemberAddedNotifications(
       telegramChatId: null,
       userId: null,
       preferences: { email: sendEmail, telegram: false },
-      memberId: member._id.toString(),
+      memberId: member.id,
       unsubscribedFromEmail: member.unsubscribedFromEmail,
       memberNickname: member.nickname,
     });

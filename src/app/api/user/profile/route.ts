@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { User } from "@/models";
+import { db, type StorageUser } from "@/lib/storage";
 
 export async function GET() {
   const session = await auth();
@@ -13,10 +12,8 @@ export async function GET() {
     );
   }
 
-  await dbConnect();
-  const user = await User.findById(session.user.id)
-    .select("email name image telegram notificationPreferences")
-    .lean();
+  const store = await db();
+  const user = await store.getUser(session.user.id);
 
   if (!user) {
     return NextResponse.json(
@@ -84,11 +81,19 @@ export async function PATCH(request: NextRequest) {
   }
 
   const { email, notificationPreferences } = parsed.data;
-  await dbConnect();
+  const store = await db();
+
+  const existing = await store.getUser(session.user.id);
+  if (!existing) {
+    return NextResponse.json(
+      { error: { code: "NOT_FOUND", message: "User not found" } },
+      { status: 404 }
+    );
+  }
 
   if (email !== undefined) {
-    const existing = await User.findOne({ email }).lean();
-    if (existing && existing._id.toString() !== session.user.id) {
+    const conflict = await store.getUserByEmail(email);
+    if (conflict && conflict.id !== session.user.id) {
       return NextResponse.json(
         {
           error: {
@@ -101,26 +106,7 @@ export async function PATCH(request: NextRequest) {
     }
   }
 
-  const update: Record<string, unknown> = {};
-  if (email !== undefined) {
-    update.email = email;
-    update.emailVerified = null;
-  }
-  if (notificationPreferences !== undefined) {
-    if (notificationPreferences.email !== undefined) {
-      update["notificationPreferences.email"] = notificationPreferences.email;
-    }
-    if (notificationPreferences.telegram !== undefined) {
-      update["notificationPreferences.telegram"] =
-        notificationPreferences.telegram;
-    }
-    if (notificationPreferences.reminderFrequency !== undefined) {
-      update["notificationPreferences.reminderFrequency"] =
-        notificationPreferences.reminderFrequency;
-    }
-  }
-
-  if (Object.keys(update).length === 0) {
+  if (email === undefined && notificationPreferences === undefined) {
     return NextResponse.json(
       {
         error: {
@@ -132,18 +118,19 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  const user = await User.findByIdAndUpdate(
-    session.user.id,
-    { $set: update },
-    { returnDocument: "after" }
-  ).lean();
-
-  if (!user) {
-    return NextResponse.json(
-      { error: { code: "NOT_FOUND", message: "User not found" } },
-      { status: 404 }
-    );
+  const patch: Partial<Omit<StorageUser, "id" | "createdAt">> = {};
+  if (email !== undefined) {
+    patch.email = email;
+    patch.emailVerified = null;
   }
+  if (notificationPreferences !== undefined) {
+    patch.notificationPreferences = {
+      ...existing.notificationPreferences,
+      ...notificationPreferences,
+    };
+  }
+
+  const user = await store.updateUser(session.user.id, patch);
 
   return NextResponse.json({
     data: {

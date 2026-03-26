@@ -363,10 +363,6 @@ var init_manager = __esm({
 });
 
 // src/lib/db/mongoose.ts
-var mongoose_exports = {};
-__export(mongoose_exports, {
-  dbConnect: () => dbConnect
-});
 function getCache() {
   if (!global.mongooseCache) {
     global.mongooseCache = { conn: null, promise: null };
@@ -924,6 +920,2342 @@ var init_definitions = __esm({
   }
 });
 
+// src/lib/billing/collection-window.ts
+function collectionWindowOpenFilter(now2) {
+  return {
+    $expr: {
+      $lte: [{ $ifNull: ["$collectionOpensAt", "$periodStart"] }, now2]
+    }
+  };
+}
+function getFirstReminderEligibleAt(collectionOpensAt, gracePeriodDays) {
+  const d = new Date(collectionOpensAt);
+  d.setDate(d.getDate() + gracePeriodDays);
+  return d;
+}
+function resolveCollectionOpensAt(period) {
+  return period.collectionOpensAt ?? period.periodStart;
+}
+var init_collection_window = __esm({
+  "src/lib/billing/collection-window.ts"() {
+    "use strict";
+  }
+});
+
+// src/lib/storage/mongoose-adapter.ts
+var mongoose_adapter_exports = {};
+__export(mongoose_adapter_exports, {
+  MongooseAdapter: () => MongooseAdapter
+});
+function toId(v) {
+  if (v instanceof import_mongoose10.Types.ObjectId) return v.toString();
+  if (typeof v === "string") return v;
+  return String(v);
+}
+function toIdOrNull(v) {
+  if (!v) return null;
+  return toId(v);
+}
+function userToStorage(u) {
+  return {
+    id: toId(u._id),
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    emailVerified: u.emailVerified,
+    image: u.image,
+    hashedPassword: u.hashedPassword,
+    telegram: u.telegram ? {
+      chatId: u.telegram.chatId,
+      username: u.telegram.username,
+      linkedAt: u.telegram.linkedAt
+    } : null,
+    telegramLinkCode: u.telegramLinkCode ? { code: u.telegramLinkCode.code, expiresAt: u.telegramLinkCode.expiresAt } : null,
+    notificationPreferences: {
+      email: u.notificationPreferences?.email ?? true,
+      telegram: u.notificationPreferences?.telegram ?? false,
+      reminderFrequency: u.notificationPreferences?.reminderFrequency ?? "every_3_days"
+    },
+    welcomeEmailSentAt: u.welcomeEmailSentAt,
+    createdAt: u.createdAt,
+    updatedAt: u.updatedAt
+  };
+}
+function memberToStorage(m) {
+  return {
+    id: toId(m._id),
+    userId: toIdOrNull(m.user),
+    email: m.email,
+    nickname: m.nickname,
+    role: m.role,
+    joinedAt: m.joinedAt,
+    leftAt: m.leftAt,
+    isActive: m.isActive,
+    customAmount: m.customAmount,
+    acceptedAt: m.acceptedAt,
+    unsubscribedFromEmail: m.unsubscribedFromEmail,
+    billingStartsAt: m.billingStartsAt
+  };
+}
+function groupToStorage(g) {
+  return {
+    id: toId(g._id),
+    name: g.name,
+    description: g.description,
+    adminId: toId(g.admin),
+    service: {
+      name: g.service.name,
+      icon: g.service.icon,
+      url: g.service.url,
+      accentColor: g.service.accentColor,
+      emailTheme: g.service.emailTheme
+    },
+    billing: {
+      mode: g.billing.mode,
+      currentPrice: g.billing.currentPrice,
+      currency: g.billing.currency,
+      cycleDay: g.billing.cycleDay,
+      cycleType: g.billing.cycleType,
+      adminIncludedInSplit: g.billing.adminIncludedInSplit,
+      fixedMemberAmount: g.billing.fixedMemberAmount,
+      gracePeriodDays: g.billing.gracePeriodDays,
+      paymentInAdvanceDays: g.billing.paymentInAdvanceDays
+    },
+    payment: {
+      platform: g.payment.platform,
+      link: g.payment.link,
+      instructions: g.payment.instructions,
+      stripeAccountId: g.payment.stripeAccountId
+    },
+    notifications: {
+      remindersEnabled: g.notifications.remindersEnabled,
+      followUpsEnabled: g.notifications.followUpsEnabled,
+      priceChangeEnabled: g.notifications.priceChangeEnabled,
+      saveEmailParams: g.notifications.saveEmailParams
+    },
+    members: g.members.map(memberToStorage),
+    announcements: {
+      notifyOnPriceChange: g.announcements?.notifyOnPriceChange ?? true,
+      extraText: g.announcements?.extraText ?? null
+    },
+    telegramGroup: {
+      chatId: g.telegramGroup?.chatId ?? null,
+      linkedAt: g.telegramGroup?.linkedAt ?? null
+    },
+    isActive: g.isActive,
+    inviteCode: g.inviteCode,
+    inviteLinkEnabled: g.inviteLinkEnabled,
+    initializedAt: g.initializedAt,
+    createdAt: g.createdAt,
+    updatedAt: g.updatedAt
+  };
+}
+function paymentToStorage(p7) {
+  return {
+    id: toId(p7._id),
+    memberId: toId(p7.memberId),
+    memberEmail: p7.memberEmail,
+    memberNickname: p7.memberNickname,
+    amount: p7.amount,
+    adjustedAmount: p7.adjustedAmount,
+    adjustmentReason: p7.adjustmentReason,
+    status: p7.status,
+    memberConfirmedAt: p7.memberConfirmedAt,
+    adminConfirmedAt: p7.adminConfirmedAt,
+    confirmationToken: p7.confirmationToken,
+    notes: p7.notes
+  };
+}
+function periodToStorage(p7) {
+  return {
+    id: toId(p7._id),
+    groupId: toId(p7.group),
+    periodStart: p7.periodStart,
+    collectionOpensAt: p7.collectionOpensAt ?? null,
+    periodEnd: p7.periodEnd,
+    periodLabel: p7.periodLabel,
+    totalPrice: p7.totalPrice,
+    currency: p7.currency,
+    priceNote: p7.priceNote,
+    payments: p7.payments.map(paymentToStorage),
+    reminders: p7.reminders.map((r) => ({
+      sentAt: r.sentAt,
+      channel: r.channel,
+      recipientCount: r.recipientCount,
+      type: r.type
+    })),
+    isFullyPaid: p7.isFullyPaid,
+    createdAt: p7.createdAt,
+    updatedAt: p7.updatedAt
+  };
+}
+function notificationToStorage(n) {
+  return {
+    id: toId(n._id),
+    recipientId: toIdOrNull(n.recipient),
+    recipientEmail: n.recipientEmail,
+    groupId: toIdOrNull(n.group),
+    billingPeriodId: toIdOrNull(n.billingPeriod),
+    type: n.type,
+    channel: n.channel,
+    status: n.status,
+    subject: n.subject,
+    preview: n.preview,
+    emailParams: n.emailParams ?? null,
+    externalId: n.externalId,
+    error: n.error,
+    deliveredAt: n.deliveredAt,
+    createdAt: n.createdAt
+  };
+}
+function auditEventToStorage(event) {
+  return {
+    id: toId(event._id),
+    actorId: toId(event.actor),
+    actorName: event.actorName,
+    action: event.action,
+    groupId: toIdOrNull(event.group),
+    billingPeriodId: toIdOrNull(event.billingPeriod),
+    targetMemberId: toIdOrNull(event.targetMember),
+    metadata: event.metadata ?? {},
+    createdAt: event.createdAt
+  };
+}
+function taskToStorage(t) {
+  return {
+    id: toId(t._id),
+    type: t.type,
+    status: t.status,
+    runAt: t.runAt,
+    lockedAt: t.lockedAt,
+    lockedBy: t.lockedBy,
+    attempts: t.attempts,
+    maxAttempts: t.maxAttempts,
+    lastError: t.lastError,
+    completedAt: t.completedAt,
+    cancelledAt: t.cancelledAt ?? null,
+    idempotencyKey: t.idempotencyKey,
+    payload: t.payload,
+    createdAt: t.createdAt,
+    updatedAt: t.updatedAt
+  };
+}
+function priceHistoryToStorage(p7) {
+  return {
+    id: toId(p7._id),
+    groupId: toId(p7.group),
+    price: p7.price,
+    previousPrice: p7.previousPrice,
+    currency: p7.currency,
+    effectiveFrom: p7.effectiveFrom,
+    note: p7.note,
+    membersNotified: p7.membersNotified,
+    createdBy: toId(p7.createdBy),
+    createdAt: p7.createdAt
+  };
+}
+var import_mongoose10, DEFAULT_LOCK_TTL_MS, DEFAULT_BATCH_SIZE, MongooseAdapter;
+var init_mongoose_adapter = __esm({
+  "src/lib/storage/mongoose-adapter.ts"() {
+    "use strict";
+    import_mongoose10 = require("mongoose");
+    init_mongoose();
+    init_models();
+    init_definitions();
+    init_collection_window();
+    DEFAULT_LOCK_TTL_MS = 5 * 60 * 1e3;
+    DEFAULT_BATCH_SIZE = 50;
+    MongooseAdapter = class {
+      async initialize() {
+        await dbConnect();
+      }
+      async close() {
+      }
+      // ── users ──────────────────────────────────────────────────────────────────
+      async getUser(id) {
+        await dbConnect();
+        const u = await User.findById(id).lean();
+        return u ? userToStorage(u) : null;
+      }
+      async getUserByEmail(email) {
+        await dbConnect();
+        const u = await User.findOne({ email: email.toLowerCase().trim() }).lean();
+        return u ? userToStorage(u) : null;
+      }
+      async getUserByTelegramChatId(chatId) {
+        await dbConnect();
+        const u = await User.findOne({ "telegram.chatId": chatId }).lean();
+        return u ? userToStorage(u) : null;
+      }
+      async updateUser(id, data) {
+        await dbConnect();
+        const updated = await User.findByIdAndUpdate(id, { $set: data }, { new: true }).lean();
+        if (!updated) throw new Error(`user not found: ${id}`);
+        return userToStorage(updated);
+      }
+      async createUser(data) {
+        await dbConnect();
+        const u = await User.create({
+          name: data.name.trim(),
+          email: data.email.toLowerCase().trim(),
+          role: data.role,
+          hashedPassword: data.hashedPassword,
+          notificationPreferences: data.notificationPreferences
+        });
+        const lean = await User.findById(u._id).lean();
+        if (!lean) throw new Error("user create failed");
+        return userToStorage(lean);
+      }
+      async countUsers() {
+        await dbConnect();
+        return User.countDocuments();
+      }
+      async getAdminUserCount() {
+        await dbConnect();
+        return User.countDocuments({ role: "admin" });
+      }
+      async promoteOldestUserToAdmin() {
+        await dbConnect();
+        const oldest = await User.findOne().sort({ createdAt: 1 }).select("_id").lean();
+        if (!oldest?._id) return;
+        await User.updateOne({ _id: oldest._id }, { $set: { role: "admin" } });
+      }
+      async linkTelegramAccountWithLinkCode(params) {
+        await dbConnect();
+        const { code, chatId, username, now: now2 } = params;
+        const user = await User.findOneAndUpdate(
+          {
+            "telegramLinkCode.code": code,
+            "telegramLinkCode.expiresAt": { $gt: now2 }
+          },
+          {
+            $set: {
+              telegram: { chatId, username, linkedAt: now2 },
+              "notificationPreferences.telegram": true
+            },
+            $unset: { telegramLinkCode: "" }
+          },
+          { new: true }
+        ).lean();
+        return user ? userToStorage(user) : null;
+      }
+      async tryClaimWelcomeEmailSentAt(userId, at) {
+        await dbConnect();
+        const prev = await User.findOneAndUpdate(
+          { _id: userId, welcomeEmailSentAt: null },
+          { $set: { welcomeEmailSentAt: at } },
+          { new: false }
+        ).lean();
+        return prev != null;
+      }
+      // ── groups ─────────────────────────────────────────────────────────────────
+      async createGroup(data) {
+        await dbConnect();
+        const members = data.members.map((m) => ({
+          user: m.userId ? new import_mongoose10.Types.ObjectId(m.userId) : null,
+          email: m.email,
+          nickname: m.nickname,
+          role: m.role,
+          joinedAt: m.joinedAt,
+          leftAt: m.leftAt,
+          isActive: m.isActive,
+          customAmount: m.customAmount,
+          acceptedAt: m.acceptedAt,
+          unsubscribedFromEmail: m.unsubscribedFromEmail,
+          billingStartsAt: m.billingStartsAt
+        }));
+        const g = await Group.create({
+          name: data.name,
+          description: data.description,
+          admin: new import_mongoose10.Types.ObjectId(data.adminId),
+          service: data.service,
+          billing: data.billing,
+          payment: data.payment,
+          notifications: data.notifications,
+          members,
+          announcements: data.announcements,
+          telegramGroup: data.telegramGroup,
+          isActive: data.isActive,
+          inviteCode: data.inviteCode,
+          inviteLinkEnabled: data.inviteLinkEnabled,
+          initializedAt: data.initializedAt
+        });
+        return groupToStorage(g);
+      }
+      async getGroup(id) {
+        await dbConnect();
+        const g = await Group.findById(id).lean();
+        return g ? groupToStorage(g) : null;
+      }
+      async getGroupWithMemberUsers(id) {
+        await dbConnect();
+        const g = await Group.findById(id).populate({
+          path: "members.user",
+          model: "User",
+          select: "telegram notificationPreferences"
+        }).lean();
+        if (!g) return null;
+        const base = groupToStorage(g);
+        const memberUsers = /* @__PURE__ */ new Map();
+        for (const m of g.members) {
+          const memberId = toId(m._id);
+          if (m.user && typeof m.user === "object" && "notificationPreferences" in m.user) {
+            const u = m.user;
+            memberUsers.set(memberId, {
+              telegram: u.telegram ? { chatId: u.telegram.chatId, username: u.telegram.username, linkedAt: u.telegram.linkedAt } : null,
+              notificationPreferences: {
+                email: u.notificationPreferences?.email ?? true,
+                telegram: u.notificationPreferences?.telegram ?? false,
+                reminderFrequency: u.notificationPreferences?.reminderFrequency ?? "every_3_days"
+              }
+            });
+          } else {
+            memberUsers.set(memberId, null);
+          }
+        }
+        return { ...base, memberUsers };
+      }
+      async listGroupsForUser(userId, email) {
+        await dbConnect();
+        const groups = await Group.find({
+          isActive: true,
+          $or: [
+            { admin: userId },
+            { "members.user": userId },
+            { "members.email": email, "members.isActive": true }
+          ]
+        }).lean();
+        return groups.map(groupToStorage);
+      }
+      async listAllActiveGroups() {
+        await dbConnect();
+        const groups = await Group.find({ isActive: true }).lean();
+        return groups.map(groupToStorage);
+      }
+      async updateGroup(id, data) {
+        await dbConnect();
+        const setFields = {};
+        if (data.name !== void 0) setFields.name = data.name;
+        if (data.description !== void 0) setFields.description = data.description;
+        if (data.service !== void 0) setFields.service = data.service;
+        if (data.billing !== void 0) setFields.billing = data.billing;
+        if (data.payment !== void 0) setFields.payment = data.payment;
+        if (data.notifications !== void 0) setFields.notifications = data.notifications;
+        if (data.announcements !== void 0) setFields.announcements = data.announcements;
+        if (data.telegramGroup !== void 0) setFields.telegramGroup = data.telegramGroup;
+        if (data.isActive !== void 0) setFields.isActive = data.isActive;
+        if (data.inviteCode !== void 0) setFields.inviteCode = data.inviteCode;
+        if (data.inviteLinkEnabled !== void 0) setFields.inviteLinkEnabled = data.inviteLinkEnabled;
+        if (data.initializedAt !== void 0) setFields.initializedAt = data.initializedAt;
+        if (data.members !== void 0) {
+          setFields.members = data.members.map((m) => ({
+            _id: m.id ? new import_mongoose10.Types.ObjectId(m.id) : void 0,
+            user: m.userId ? new import_mongoose10.Types.ObjectId(m.userId) : null,
+            email: m.email,
+            nickname: m.nickname,
+            role: m.role,
+            joinedAt: m.joinedAt,
+            leftAt: m.leftAt,
+            isActive: m.isActive,
+            customAmount: m.customAmount,
+            acceptedAt: m.acceptedAt,
+            unsubscribedFromEmail: m.unsubscribedFromEmail,
+            billingStartsAt: m.billingStartsAt
+          }));
+        }
+        const updated = await Group.findByIdAndUpdate(id, { $set: setFields }, { new: true }).lean();
+        if (!updated) throw new Error(`group not found: ${id}`);
+        return groupToStorage(updated);
+      }
+      async softDeleteGroup(id) {
+        await dbConnect();
+        await Group.findByIdAndUpdate(id, { $set: { isActive: false } });
+      }
+      async findGroupByInviteCode(code) {
+        await dbConnect();
+        const g = await Group.findOne({ inviteCode: code }).lean();
+        return g ? groupToStorage(g) : null;
+      }
+      async findActiveGroupForMemberInvitation(params) {
+        await dbConnect();
+        const { groupId, memberId } = params;
+        if (groupId) {
+          const g = await Group.findOne({ _id: groupId, isActive: true }).lean();
+          if (!g) return null;
+          const storage = groupToStorage(g);
+          const m = storage.members.find(
+            (mm) => mm.id === memberId && mm.isActive && !mm.leftAt
+          );
+          return m ? storage : null;
+        }
+        if (import_mongoose10.Types.ObjectId.isValid(memberId)) {
+          const g = await Group.findOne({
+            isActive: true,
+            "members._id": new import_mongoose10.Types.ObjectId(memberId)
+          }).lean();
+          return g ? groupToStorage(g) : null;
+        }
+        return null;
+      }
+      // ── billing periods ────────────────────────────────────────────────────────
+      async createBillingPeriod(data) {
+        await dbConnect();
+        const payments = data.payments.map((p7) => ({
+          memberId: new import_mongoose10.Types.ObjectId(p7.memberId),
+          memberEmail: p7.memberEmail,
+          memberNickname: p7.memberNickname,
+          amount: p7.amount,
+          adjustedAmount: p7.adjustedAmount,
+          adjustmentReason: p7.adjustmentReason,
+          status: p7.status,
+          memberConfirmedAt: p7.memberConfirmedAt,
+          adminConfirmedAt: p7.adminConfirmedAt,
+          confirmationToken: p7.confirmationToken,
+          notes: p7.notes
+        }));
+        const period = await BillingPeriod.create({
+          group: new import_mongoose10.Types.ObjectId(data.groupId),
+          periodStart: data.periodStart,
+          collectionOpensAt: data.collectionOpensAt,
+          periodEnd: data.periodEnd,
+          periodLabel: data.periodLabel,
+          totalPrice: data.totalPrice,
+          currency: data.currency,
+          priceNote: data.priceNote,
+          payments,
+          reminders: data.reminders,
+          isFullyPaid: data.isFullyPaid
+        });
+        return periodToStorage(period);
+      }
+      async getBillingPeriod(id, groupId) {
+        await dbConnect();
+        const p7 = await BillingPeriod.findOne({ _id: id, group: groupId }).lean();
+        return p7 ? periodToStorage(p7) : null;
+      }
+      async getBillingPeriodByStart(groupId, periodStart) {
+        await dbConnect();
+        const p7 = await BillingPeriod.findOne({ group: groupId, periodStart }).lean();
+        return p7 ? periodToStorage(p7) : null;
+      }
+      async getBillingPeriodById(id) {
+        await dbConnect();
+        const p7 = await BillingPeriod.findById(id).lean();
+        return p7 ? periodToStorage(p7) : null;
+      }
+      async getOpenBillingPeriods(filter) {
+        await dbConnect();
+        const query = {
+          ...collectionWindowOpenFilter(filter.asOf)
+        };
+        if (filter.unpaidOnly) query.isFullyPaid = false;
+        if (filter.groupIds && filter.groupIds.length > 0) {
+          query.group = { $in: filter.groupIds.map((id) => new import_mongoose10.Types.ObjectId(id)) };
+        }
+        const periods = await BillingPeriod.find(query).lean();
+        return periods.map(periodToStorage);
+      }
+      async getPeriodsForGroup(groupId) {
+        await dbConnect();
+        const periods = await BillingPeriod.find({ group: groupId }).sort({ periodStart: -1 }).lean();
+        return periods.map(periodToStorage);
+      }
+      async listUnpaidPeriodsWithStartBefore(asOf) {
+        await dbConnect();
+        const periods = await BillingPeriod.find({
+          isFullyPaid: false,
+          periodStart: { $lt: asOf }
+        }).lean();
+        return periods.map(periodToStorage);
+      }
+      async getFuturePeriods(groupId, afterDate) {
+        await dbConnect();
+        const periods = await BillingPeriod.find({
+          group: groupId,
+          periodStart: { $gt: afterDate }
+        }).sort({ periodStart: 1 }).lean();
+        return periods.map(periodToStorage);
+      }
+      async updateBillingPeriod(id, data) {
+        await dbConnect();
+        const setFields = {};
+        if (data.periodStart !== void 0) setFields.periodStart = data.periodStart;
+        if (data.collectionOpensAt !== void 0) setFields.collectionOpensAt = data.collectionOpensAt;
+        if (data.periodEnd !== void 0) setFields.periodEnd = data.periodEnd;
+        if (data.periodLabel !== void 0) setFields.periodLabel = data.periodLabel;
+        if (data.totalPrice !== void 0) setFields.totalPrice = data.totalPrice;
+        if (data.currency !== void 0) setFields.currency = data.currency;
+        if (data.priceNote !== void 0) setFields.priceNote = data.priceNote;
+        if (data.isFullyPaid !== void 0) setFields.isFullyPaid = data.isFullyPaid;
+        if (data.reminders !== void 0) setFields.reminders = data.reminders;
+        if (data.payments !== void 0) {
+          setFields.payments = data.payments.map((p7) => ({
+            _id: p7.id ? new import_mongoose10.Types.ObjectId(p7.id) : void 0,
+            memberId: new import_mongoose10.Types.ObjectId(p7.memberId),
+            memberEmail: p7.memberEmail,
+            memberNickname: p7.memberNickname,
+            amount: p7.amount,
+            adjustedAmount: p7.adjustedAmount,
+            adjustmentReason: p7.adjustmentReason,
+            status: p7.status,
+            memberConfirmedAt: p7.memberConfirmedAt,
+            adminConfirmedAt: p7.adminConfirmedAt,
+            confirmationToken: p7.confirmationToken,
+            notes: p7.notes
+          }));
+        }
+        const updated = await BillingPeriod.findByIdAndUpdate(id, { $set: setFields }, { new: true }).lean();
+        if (!updated) throw new Error(`billing period not found: ${id}`);
+        return periodToStorage(updated);
+      }
+      async deleteBillingPeriod(id, groupId) {
+        await dbConnect();
+        await BillingPeriod.findOneAndDelete({ _id: id, group: groupId });
+      }
+      async updatePaymentStatus(periodId, memberId, update) {
+        await dbConnect();
+        const period = await BillingPeriod.findById(periodId);
+        if (!period) throw new Error(`billing period not found: ${periodId}`);
+        const payment = period.payments.find(
+          (p7) => p7.memberId.toString() === memberId
+        );
+        if (!payment) throw new Error(`payment not found for member ${memberId} in period ${periodId}`);
+        if (update.status !== void 0) payment.status = update.status;
+        if (update.memberConfirmedAt !== void 0) payment.memberConfirmedAt = update.memberConfirmedAt;
+        if (update.adminConfirmedAt !== void 0) payment.adminConfirmedAt = update.adminConfirmedAt;
+        if (update.confirmationToken !== void 0) payment.confirmationToken = update.confirmationToken;
+        if (update.notes !== void 0) payment.notes = update.notes;
+        if (update.adjustedAmount !== void 0) payment.adjustedAmount = update.adjustedAmount;
+        if (update.adjustmentReason !== void 0) payment.adjustmentReason = update.adjustmentReason;
+        period.isFullyPaid = period.payments.every(
+          (p7) => p7.status === "confirmed" || p7.status === "waived"
+        );
+        await period.save();
+        return periodToStorage(period);
+      }
+      async getBillingPeriodByConfirmationToken(token) {
+        await dbConnect();
+        const period = await BillingPeriod.findOne({
+          "payments.confirmationToken": token
+        });
+        if (!period) return null;
+        const paymentIndex = period.payments.findIndex(
+          (p7) => p7.confirmationToken === token
+        );
+        if (paymentIndex === -1) return null;
+        return { period: periodToStorage(period), paymentIndex };
+      }
+      // ── notifications ──────────────────────────────────────────────────────────
+      async logNotification(data) {
+        await dbConnect();
+        const n = await Notification.create({
+          recipient: data.recipientId ? new import_mongoose10.Types.ObjectId(data.recipientId) : null,
+          recipientEmail: data.recipientEmail,
+          group: data.groupId ? new import_mongoose10.Types.ObjectId(data.groupId) : null,
+          billingPeriod: data.billingPeriodId ? new import_mongoose10.Types.ObjectId(data.billingPeriodId) : null,
+          type: data.type,
+          channel: data.channel,
+          status: data.status,
+          subject: data.subject ?? null,
+          preview: data.preview,
+          emailParams: data.emailParams ?? null,
+          externalId: data.externalId ?? null,
+          error: data.error ?? null,
+          deliveredAt: data.deliveredAt ?? null
+        });
+        return notificationToStorage(n);
+      }
+      async getNotificationsForGroup(groupId, limit = 50) {
+        await dbConnect();
+        const ns = await Notification.find({ group: groupId }).sort({ createdAt: -1 }).limit(limit).lean();
+        return ns.map(notificationToStorage);
+      }
+      async getNotificationById(id) {
+        await dbConnect();
+        const n = await Notification.findById(id).lean();
+        return n ? notificationToStorage(n) : null;
+      }
+      async listNotifications(options) {
+        await dbConnect();
+        const { groupIds, type, channel, limit, offset } = options;
+        if (!groupIds.length) {
+          return { notifications: [], total: 0 };
+        }
+        const filter = {
+          group: { $in: groupIds.map((gid) => new import_mongoose10.Types.ObjectId(gid)) }
+        };
+        if (type) filter.type = type;
+        if (channel) filter.channel = channel;
+        let query = Notification.find(filter).sort({ createdAt: -1 });
+        if (offset !== void 0) query = query.skip(offset);
+        if (limit !== void 0) query = query.limit(limit);
+        const [total, rows] = await Promise.all([
+          Notification.countDocuments(filter),
+          query.lean()
+        ]);
+        return { total, notifications: rows.map(notificationToStorage) };
+      }
+      async logAudit(data) {
+        await dbConnect();
+        const event = await AuditEvent.create({
+          actor: new import_mongoose10.Types.ObjectId(data.actorId),
+          actorName: data.actorName,
+          action: data.action,
+          group: data.groupId ? new import_mongoose10.Types.ObjectId(data.groupId) : void 0,
+          billingPeriod: data.billingPeriodId ? new import_mongoose10.Types.ObjectId(data.billingPeriodId) : void 0,
+          targetMember: data.targetMemberId ? data.targetMemberId : void 0,
+          metadata: data.metadata ?? {}
+        });
+        return auditEventToStorage(event.toObject());
+      }
+      async listAuditEvents(options = {}) {
+        await dbConnect();
+        const filter = {};
+        if (options.groupIds?.length) {
+          filter.group = { $in: options.groupIds.map((id) => new import_mongoose10.Types.ObjectId(id)) };
+        }
+        const unbounded = options.unbounded === true;
+        const limit = unbounded ? void 0 : options.limit ?? 50;
+        const offset = unbounded ? void 0 : options.offset ?? 0;
+        let findQuery = AuditEvent.find(filter).sort({ createdAt: -1 });
+        if (offset !== void 0) findQuery = findQuery.skip(offset);
+        if (limit !== void 0) findQuery = findQuery.limit(limit);
+        const [total, rows] = await Promise.all([
+          AuditEvent.countDocuments(filter),
+          findQuery.lean()
+        ]);
+        return {
+          total,
+          events: rows.map(
+            (row) => auditEventToStorage(row)
+          )
+        };
+      }
+      // ── scheduled tasks ────────────────────────────────────────────────────────
+      async enqueueTask(data) {
+        await dbConnect();
+        const existing = await ScheduledTask.findOne({ idempotencyKey: data.idempotencyKey });
+        if (existing) return null;
+        const t = await ScheduledTask.create({
+          type: data.type,
+          status: "pending",
+          runAt: data.runAt,
+          payload: data.payload,
+          idempotencyKey: data.idempotencyKey,
+          maxAttempts: data.maxAttempts ?? 5
+        });
+        return taskToStorage(t);
+      }
+      async claimTasks(workerId, options = {}) {
+        await dbConnect();
+        const limit = options.limit ?? DEFAULT_BATCH_SIZE;
+        const lockTtlMs = options.lockTtlMs ?? DEFAULT_LOCK_TTL_MS;
+        const now2 = /* @__PURE__ */ new Date();
+        const staleThreshold = new Date(now2.getTime() - lockTtlMs);
+        if (options.recoverStaleLocks) {
+          await ScheduledTask.updateMany(
+            { status: "locked", lockedAt: { $lt: staleThreshold } },
+            { $set: { status: "pending", lockedAt: null, lockedBy: null } }
+          );
+        }
+        const tasks = [];
+        const cursor = ScheduledTask.find({ status: "pending", runAt: { $lte: now2 } }).sort({ runAt: 1 }).limit(limit).cursor();
+        for await (const task of cursor) {
+          const updated = await ScheduledTask.findOneAndUpdate(
+            { _id: task._id, status: "pending" },
+            { $set: { status: "locked", lockedAt: now2, lockedBy: workerId } },
+            { returnDocument: "after" }
+          );
+          if (updated) tasks.push(taskToStorage(updated));
+        }
+        return tasks;
+      }
+      async completeTask(taskId) {
+        await dbConnect();
+        await ScheduledTask.findByIdAndUpdate(taskId, {
+          $set: { status: "completed", completedAt: /* @__PURE__ */ new Date(), lockedAt: null, lockedBy: null }
+        });
+      }
+      async failTask(taskId, error, attempts, maxAttempts) {
+        await dbConnect();
+        if (attempts >= maxAttempts) {
+          await ScheduledTask.findByIdAndUpdate(taskId, {
+            $set: { status: "failed", lastError: error, attempts, lockedAt: null, lockedBy: null }
+          });
+          return;
+        }
+        const backoffMs = Math.min(2 ** attempts * 60 * 1e3, 24 * 60 * 60 * 1e3);
+        await ScheduledTask.findByIdAndUpdate(taskId, {
+          $set: {
+            status: "pending",
+            runAt: new Date(Date.now() + backoffMs),
+            lastError: error,
+            attempts,
+            lockedAt: null,
+            lockedBy: null
+          }
+        });
+      }
+      async releaseTask(taskId) {
+        await dbConnect();
+        await ScheduledTask.findByIdAndUpdate(taskId, {
+          $set: { status: "pending", lockedAt: null, lockedBy: null }
+        });
+      }
+      async cancelTask(taskId) {
+        await dbConnect();
+        await ScheduledTask.findByIdAndUpdate(taskId, {
+          $set: {
+            status: "cancelled",
+            cancelledAt: /* @__PURE__ */ new Date(),
+            lockedAt: null,
+            lockedBy: null
+          }
+        });
+      }
+      async getTaskById(taskId) {
+        await dbConnect();
+        const t = await ScheduledTask.findById(taskId).lean();
+        return t ? taskToStorage(t) : null;
+      }
+      async retryFailedTask(taskId) {
+        await dbConnect();
+        await ScheduledTask.findByIdAndUpdate(taskId, {
+          $set: {
+            status: "pending",
+            runAt: /* @__PURE__ */ new Date(),
+            attempts: 0,
+            lastError: null,
+            lockedAt: null,
+            lockedBy: null,
+            completedAt: null
+          }
+        });
+      }
+      async bulkCancelPendingTasksForAdmin(filter) {
+        await dbConnect();
+        if (filter.adminGroupIds.length === 0) return 0;
+        const visibility = {
+          $or: [
+            { "payload.groupId": { $in: filter.adminGroupIds } },
+            { "payload.payments.groupId": { $in: filter.adminGroupIds } }
+          ]
+        };
+        const and = [visibility];
+        if (filter.groupId) {
+          and.push({
+            $or: [
+              { "payload.groupId": filter.groupId },
+              { "payload.payments.groupId": filter.groupId }
+            ]
+          });
+        }
+        if (filter.memberEmail) {
+          const trimmed = filter.memberEmail.trim();
+          const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          and.push({
+            "payload.memberEmail": { $regex: new RegExp(`^${escaped}$`, "i") }
+          });
+        }
+        if (filter.type) {
+          and.push({ type: filter.type });
+        }
+        const q = {
+          status: { $in: ["pending", "locked"] },
+          $and: and
+        };
+        const result = await ScheduledTask.updateMany(q, {
+          $set: {
+            status: "cancelled",
+            cancelledAt: /* @__PURE__ */ new Date(),
+            lockedAt: null,
+            lockedBy: null
+          }
+        });
+        return result.modifiedCount;
+      }
+      async getTaskCounts() {
+        await dbConnect();
+        const [pending, locked, completed, failed, cancelled] = await Promise.all([
+          ScheduledTask.countDocuments({ status: "pending" }),
+          ScheduledTask.countDocuments({ status: "locked" }),
+          ScheduledTask.countDocuments({ status: "completed" }),
+          ScheduledTask.countDocuments({ status: "failed" }),
+          ScheduledTask.countDocuments({ status: "cancelled" })
+        ]);
+        return { pending, locked, completed, failed, cancelled };
+      }
+      async listTasks(options = {}) {
+        await dbConnect();
+        const query = {};
+        if (options.status) query.status = options.status;
+        if (options.type) query.type = options.type;
+        if (options.groupId) query["payload.groupId"] = options.groupId;
+        if (options.anyGroupIdIn?.length) {
+          query.$or = [
+            { "payload.groupId": { $in: options.anyGroupIdIn } },
+            { "payload.payments.groupId": { $in: options.anyGroupIdIn } }
+          ];
+        }
+        const limit = options.limit ?? 50;
+        const offset = options.offset ?? 0;
+        const [tasks, total] = await Promise.all([
+          ScheduledTask.find(query).sort({ runAt: -1 }).skip(offset).limit(limit).lean(),
+          ScheduledTask.countDocuments(query)
+        ]);
+        return { tasks: tasks.map(taskToStorage), total };
+      }
+      // ── price history ──────────────────────────────────────────────────────────
+      async createPriceHistory(data) {
+        await dbConnect();
+        const p7 = await PriceHistory.create({
+          group: new import_mongoose10.Types.ObjectId(data.groupId),
+          price: data.price,
+          previousPrice: data.previousPrice,
+          currency: data.currency,
+          effectiveFrom: data.effectiveFrom,
+          note: data.note ?? null,
+          membersNotified: data.membersNotified ?? false,
+          createdBy: new import_mongoose10.Types.ObjectId(data.createdBy)
+        });
+        return priceHistoryToStorage(p7);
+      }
+      async getPriceHistoryForGroup(groupId) {
+        await dbConnect();
+        const records = await PriceHistory.find({ group: groupId }).sort({ effectiveFrom: -1 }).lean();
+        return records.map(priceHistoryToStorage);
+      }
+      // ── app settings (MongoDB only) ─────────────────────────────────────────────
+      appSettingToStorage(row) {
+        return {
+          key: row.key,
+          value: row.value,
+          category: row.category,
+          isSecret: row.isSecret,
+          label: row.label,
+          description: row.description
+        };
+      }
+      async ensureAppSettingsSeeded() {
+        await dbConnect();
+        for (const definition of settingsDefinitions) {
+          const existing = await Settings.findOne({ key: definition.key }).lean();
+          if (existing) continue;
+          const envValue = process.env[definition.envVar];
+          const value = envValue ?? definition.defaultValue ?? null;
+          await Settings.create({
+            key: definition.key,
+            value,
+            category: definition.category,
+            isSecret: definition.isSecret,
+            label: definition.label,
+            description: definition.description
+          });
+        }
+      }
+      async getAppSettingRow(key) {
+        await dbConnect();
+        const record = await Settings.findOne({ key }).lean();
+        return record ? this.appSettingToStorage(record) : null;
+      }
+      async listAppSettingRows(category) {
+        await dbConnect();
+        const query = category ? { category } : {};
+        const records = await Settings.find(query).sort({ category: 1, key: 1 }).lean();
+        return records.map((r) => this.appSettingToStorage(r));
+      }
+      async upsertAppSettingRow(input) {
+        await dbConnect();
+        await Settings.findOneAndUpdate(
+          { key: input.key },
+          {
+            key: input.key,
+            value: input.value,
+            category: input.category,
+            isSecret: input.isSecret,
+            label: input.label,
+            description: input.description
+          },
+          { upsert: true, new: true }
+        );
+      }
+      // ── data portability ───────────────────────────────────────────────────────
+      async exportAll() {
+        await dbConnect();
+        const [groups, billingPeriods, notifications, priceHistory] = await Promise.all([
+          Group.find({}).lean(),
+          BillingPeriod.find({}).lean(),
+          Notification.find({}).lean(),
+          PriceHistory.find({}).lean()
+        ]);
+        return {
+          version: "1.0.0",
+          exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          source: { mode: "advanced", appVersion: process.env.npm_package_version ?? "unknown" },
+          data: {
+            groups: groups.map(groupToStorage),
+            billingPeriods: billingPeriods.map(periodToStorage),
+            notifications: notifications.map(notificationToStorage),
+            priceHistory: priceHistory.map(priceHistoryToStorage)
+          }
+        };
+      }
+      async importAll(bundle) {
+        await dbConnect();
+        const errors = [];
+        let groups = 0;
+        let billingPeriods = 0;
+        let notifications = 0;
+        let priceHistory = 0;
+        for (const g of bundle.data.groups) {
+          try {
+            await Group.findByIdAndUpdate(
+              g.id,
+              {
+                $setOnInsert: {
+                  _id: g.id,
+                  name: g.name,
+                  description: g.description,
+                  admin: new import_mongoose10.Types.ObjectId(g.adminId),
+                  service: g.service,
+                  billing: g.billing,
+                  payment: g.payment,
+                  notifications: g.notifications,
+                  members: g.members.map((m) => ({
+                    _id: m.id,
+                    user: m.userId ? new import_mongoose10.Types.ObjectId(m.userId) : null,
+                    email: m.email,
+                    nickname: m.nickname,
+                    role: m.role,
+                    joinedAt: m.joinedAt,
+                    leftAt: m.leftAt,
+                    isActive: m.isActive,
+                    customAmount: m.customAmount,
+                    acceptedAt: m.acceptedAt,
+                    unsubscribedFromEmail: m.unsubscribedFromEmail,
+                    billingStartsAt: m.billingStartsAt
+                  })),
+                  announcements: g.announcements,
+                  telegramGroup: g.telegramGroup,
+                  isActive: g.isActive,
+                  inviteCode: g.inviteCode,
+                  inviteLinkEnabled: g.inviteLinkEnabled,
+                  initializedAt: g.initializedAt,
+                  createdAt: g.createdAt
+                }
+              },
+              { upsert: true }
+            );
+            groups++;
+          } catch (e) {
+            errors.push(`group ${g.id}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+        for (const p7 of bundle.data.billingPeriods) {
+          try {
+            await BillingPeriod.findByIdAndUpdate(
+              p7.id,
+              {
+                $setOnInsert: {
+                  _id: p7.id,
+                  group: new import_mongoose10.Types.ObjectId(p7.groupId),
+                  periodStart: p7.periodStart,
+                  collectionOpensAt: p7.collectionOpensAt,
+                  periodEnd: p7.periodEnd,
+                  periodLabel: p7.periodLabel,
+                  totalPrice: p7.totalPrice,
+                  currency: p7.currency,
+                  priceNote: p7.priceNote,
+                  payments: p7.payments.map((pay) => ({
+                    _id: pay.id,
+                    memberId: new import_mongoose10.Types.ObjectId(pay.memberId),
+                    memberEmail: pay.memberEmail,
+                    memberNickname: pay.memberNickname,
+                    amount: pay.amount,
+                    adjustedAmount: pay.adjustedAmount,
+                    adjustmentReason: pay.adjustmentReason,
+                    status: pay.status,
+                    memberConfirmedAt: pay.memberConfirmedAt,
+                    adminConfirmedAt: pay.adminConfirmedAt,
+                    confirmationToken: pay.confirmationToken,
+                    notes: pay.notes
+                  })),
+                  reminders: p7.reminders,
+                  isFullyPaid: p7.isFullyPaid,
+                  createdAt: p7.createdAt
+                }
+              },
+              { upsert: true }
+            );
+            billingPeriods++;
+          } catch (e) {
+            errors.push(`period ${p7.id}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+        for (const n of bundle.data.notifications) {
+          try {
+            await Notification.findByIdAndUpdate(
+              n.id,
+              {
+                $setOnInsert: {
+                  _id: n.id,
+                  recipient: n.recipientId ? new import_mongoose10.Types.ObjectId(n.recipientId) : null,
+                  recipientEmail: n.recipientEmail,
+                  group: n.groupId ? new import_mongoose10.Types.ObjectId(n.groupId) : null,
+                  billingPeriod: n.billingPeriodId ? new import_mongoose10.Types.ObjectId(n.billingPeriodId) : null,
+                  type: n.type,
+                  channel: n.channel,
+                  status: n.status,
+                  subject: n.subject,
+                  preview: n.preview,
+                  emailParams: n.emailParams,
+                  externalId: n.externalId,
+                  error: n.error,
+                  deliveredAt: n.deliveredAt,
+                  createdAt: n.createdAt
+                }
+              },
+              { upsert: true }
+            );
+            notifications++;
+          } catch (e) {
+            errors.push(`notification ${n.id}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+        for (const ph of bundle.data.priceHistory) {
+          try {
+            await PriceHistory.findByIdAndUpdate(
+              ph.id,
+              {
+                $setOnInsert: {
+                  _id: ph.id,
+                  group: new import_mongoose10.Types.ObjectId(ph.groupId),
+                  price: ph.price,
+                  previousPrice: ph.previousPrice,
+                  currency: ph.currency,
+                  effectiveFrom: ph.effectiveFrom,
+                  note: ph.note,
+                  membersNotified: ph.membersNotified,
+                  createdBy: new import_mongoose10.Types.ObjectId(ph.createdBy),
+                  createdAt: ph.createdAt
+                }
+              },
+              { upsert: true }
+            );
+            priceHistory++;
+          } catch (e) {
+            errors.push(`priceHistory ${ph.id}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+        return { groups, billingPeriods, notifications, priceHistory, errors };
+      }
+    };
+  }
+});
+
+// src/lib/storage/api.ts
+function isStorageId(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+function toApiShape(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => toApiShape(item));
+  }
+  if (value && typeof value === "object" && !(value instanceof Date) && !(value instanceof Map)) {
+    const record = value;
+    const entries = Object.entries(record).map(([key, entryValue]) => [
+      key === "id" ? "_id" : key,
+      toApiShape(entryValue)
+    ]);
+    return Object.fromEntries(entries);
+  }
+  return value;
+}
+var init_api = __esm({
+  "src/lib/storage/api.ts"() {
+    "use strict";
+  }
+});
+
+// src/lib/storage/types.ts
+var init_types = __esm({
+  "src/lib/storage/types.ts"() {
+    "use strict";
+  }
+});
+
+// src/lib/auth/local.ts
+var LOCAL_ADMIN_USER_ID;
+var init_local = __esm({
+  "src/lib/auth/local.ts"() {
+    "use strict";
+    init_manager();
+    LOCAL_ADMIN_USER_ID = "local-admin";
+  }
+});
+
+// src/lib/storage/sqlite-adapter.ts
+var sqlite_adapter_exports = {};
+__export(sqlite_adapter_exports, {
+  SqliteAdapter: () => SqliteAdapter
+});
+function now() {
+  return (/* @__PURE__ */ new Date()).toISOString();
+}
+function taskVisibleToAdminGroups(task, adminGroupIds) {
+  const payload = task.payload;
+  if (payload.groupId && adminGroupIds.has(payload.groupId)) return true;
+  if (payload.payments?.length) {
+    return payload.payments.some((p7) => p7.groupId && adminGroupIds.has(p7.groupId));
+  }
+  return false;
+}
+function parseRow(row) {
+  return JSON.parse(row.data);
+}
+function parseDates(obj, dateKeys) {
+  const out = { ...obj };
+  for (const key of dateKeys) {
+    if (typeof out[key] === "string") {
+      out[key] = new Date(out[key]);
+    } else if (out[key] === null || out[key] === void 0) {
+      out[key] = null;
+    }
+  }
+  return out;
+}
+function hydrateGroup(data) {
+  const g = parseDates(data, ["initializedAt", "createdAt", "updatedAt"]);
+  if (Array.isArray(g.members)) {
+    g.members = g.members.map(
+      (m) => parseDates(m, ["joinedAt", "leftAt", "acceptedAt", "billingStartsAt"])
+    );
+  }
+  if (g.telegramGroup) {
+    g.telegramGroup = parseDates(g.telegramGroup, ["linkedAt"]);
+  }
+  return g;
+}
+function hydratePeriod(data) {
+  const p7 = parseDates(data, ["periodStart", "collectionOpensAt", "periodEnd", "createdAt", "updatedAt"]);
+  if (Array.isArray(p7.payments)) {
+    p7.payments = p7.payments.map(
+      (pay) => parseDates(pay, ["memberConfirmedAt", "adminConfirmedAt"])
+    );
+  }
+  if (Array.isArray(p7.reminders)) {
+    p7.reminders = p7.reminders.map(
+      (r) => parseDates(r, ["sentAt"])
+    );
+  }
+  return p7;
+}
+function hydrateTask(data) {
+  return parseDates(data, ["runAt", "lockedAt", "completedAt", "cancelledAt", "createdAt", "updatedAt"]);
+}
+function hydrateNotification(data) {
+  return parseDates(data, ["deliveredAt", "createdAt"]);
+}
+function hydrateAuditEvent(data) {
+  return parseDates(data, ["createdAt"]);
+}
+function hydratePriceHistory(data) {
+  return parseDates(data, ["effectiveFrom", "createdAt"]);
+}
+function hydrateUser(data) {
+  const u = parseDates(data, ["emailVerified", "welcomeEmailSentAt", "createdAt", "updatedAt"]);
+  if (u.telegram) {
+    u.telegram = parseDates(u.telegram, ["linkedAt"]);
+  }
+  if (u.telegramLinkCode) {
+    u.telegramLinkCode = parseDates(u.telegramLinkCode, ["expiresAt"]);
+  }
+  return u;
+}
+var import_better_sqlite3, import_nanoid, SCHEMA_SQL, DEFAULT_LOCK_TTL_MS2, SqliteAdapter;
+var init_sqlite_adapter = __esm({
+  "src/lib/storage/sqlite-adapter.ts"() {
+    "use strict";
+    import_better_sqlite3 = __toESM(require("better-sqlite3"));
+    import_nanoid = require("nanoid");
+    init_manager();
+    init_local();
+    SCHEMA_SQL = `
+  CREATE TABLE IF NOT EXISTS groups (
+    id TEXT PRIMARY KEY,
+    admin_id TEXT NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    invite_code TEXT UNIQUE,
+    data JSON NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_groups_admin ON groups(admin_id);
+  CREATE INDEX IF NOT EXISTS idx_groups_active ON groups(is_active);
+
+  CREATE TABLE IF NOT EXISTS billing_periods (
+    id TEXT PRIMARY KEY,
+    group_id TEXT NOT NULL REFERENCES groups(id),
+    period_start TEXT NOT NULL,
+    collection_opens_at TEXT,
+    is_fully_paid INTEGER NOT NULL DEFAULT 0,
+    data JSON NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_bp_group_start ON billing_periods(group_id, period_start);
+  CREATE INDEX IF NOT EXISTS idx_bp_group ON billing_periods(group_id);
+  CREATE INDEX IF NOT EXISTS idx_bp_unpaid ON billing_periods(is_fully_paid);
+
+  CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    group_id TEXT,
+    data JSON NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_notif_group ON notifications(group_id);
+  CREATE INDEX IF NOT EXISTS idx_notif_created ON notifications(created_at);
+
+  CREATE TABLE IF NOT EXISTS audit_events (
+    id TEXT PRIMARY KEY,
+    group_id TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    data JSON NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_audit_group ON audit_events(group_id);
+  CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_events(created_at);
+
+  CREATE TABLE IF NOT EXISTS scheduled_tasks (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    run_at TEXT NOT NULL,
+    idempotency_key TEXT UNIQUE,
+    locked_at TEXT,
+    locked_by TEXT,
+    data JSON NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_tasks_status_run ON scheduled_tasks(status, run_at);
+  CREATE INDEX IF NOT EXISTS idx_tasks_locked ON scheduled_tasks(locked_at);
+
+  CREATE TABLE IF NOT EXISTS price_history (
+    id TEXT PRIMARY KEY,
+    group_id TEXT NOT NULL REFERENCES groups(id),
+    data JSON NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_ph_group ON price_history(group_id);
+
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    telegram_chat_id INTEGER UNIQUE,
+    data JSON NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+`;
+    DEFAULT_LOCK_TTL_MS2 = 5 * 60 * 1e3;
+    SqliteAdapter = class {
+      constructor(dbPath) {
+        this.dbPath = dbPath;
+      }
+      async initialize() {
+        if (this.db) return;
+        const fs9 = await import("fs");
+        const path11 = await import("path");
+        const dir = path11.dirname(this.dbPath);
+        if (!fs9.existsSync(dir)) {
+          fs9.mkdirSync(dir, { recursive: true });
+        }
+        this.db = new import_better_sqlite3.default(this.dbPath);
+        this.db.pragma("journal_mode = WAL");
+        this.db.pragma("foreign_keys = ON");
+        this.db.exec(SCHEMA_SQL);
+        this.seedLocalAdmin();
+      }
+      // ensure the local admin user row exists (reads email/name from config)
+      seedLocalAdmin() {
+        try {
+          const config = readConfig();
+          if (!config) return;
+          const existing = this.db.prepare("SELECT id FROM users WHERE id = ?").get(LOCAL_ADMIN_USER_ID);
+          const ts = /* @__PURE__ */ new Date();
+          const user = {
+            id: LOCAL_ADMIN_USER_ID,
+            name: config.adminName ?? "Admin",
+            email: config.adminEmail ?? "admin@localhost",
+            role: "admin",
+            emailVerified: null,
+            image: null,
+            hashedPassword: null,
+            telegram: null,
+            telegramLinkCode: null,
+            notificationPreferences: {
+              email: !!config.notifications?.channels?.email,
+              telegram: !!config.notifications?.channels?.telegram,
+              reminderFrequency: "once"
+            },
+            welcomeEmailSentAt: null,
+            createdAt: existing ? ts : ts,
+            updatedAt: ts
+          };
+          this.upsertUser(user);
+        } catch {
+        }
+      }
+      async close() {
+        this.db?.close();
+        this.db = void 0;
+      }
+      ensureOpen() {
+        if (!this.db) throw new Error("SqliteAdapter not initialized \u2014 call initialize() first");
+      }
+      // ── users ──────────────────────────────────────────────────────────────────
+      async getUser(id) {
+        this.ensureOpen();
+        const row = this.db.prepare("SELECT data FROM users WHERE id = ?").get(id);
+        if (!row) return null;
+        return hydrateUser(parseRow(row));
+      }
+      async getUserByEmail(email) {
+        this.ensureOpen();
+        const row = this.db.prepare("SELECT data FROM users WHERE email = ?").get(email.toLowerCase().trim());
+        if (!row) return null;
+        return hydrateUser(parseRow(row));
+      }
+      async getUserByTelegramChatId(chatId) {
+        this.ensureOpen();
+        const row = this.db.prepare("SELECT data FROM users WHERE telegram_chat_id = ?").get(chatId);
+        if (!row) return null;
+        return hydrateUser(parseRow(row));
+      }
+      async updateUser(id, data) {
+        this.ensureOpen();
+        const existing = await this.getUser(id);
+        if (!existing) throw new Error(`user not found: ${id}`);
+        const merged = { ...existing, ...data, updatedAt: /* @__PURE__ */ new Date() };
+        this.db.prepare(
+          "UPDATE users SET email = ?, telegram_chat_id = ?, data = ?, updated_at = ? WHERE id = ?"
+        ).run(
+          merged.email.toLowerCase(),
+          merged.telegram?.chatId ?? null,
+          JSON.stringify(merged),
+          now(),
+          id
+        );
+        return merged;
+      }
+      async createUser(data) {
+        this.ensureOpen();
+        const id = (0, import_nanoid.nanoid)();
+        const ts = now();
+        const user = {
+          id,
+          name: data.name.trim(),
+          email: data.email.toLowerCase().trim(),
+          role: data.role,
+          emailVerified: null,
+          image: null,
+          hashedPassword: data.hashedPassword,
+          telegram: null,
+          telegramLinkCode: null,
+          notificationPreferences: data.notificationPreferences,
+          welcomeEmailSentAt: null,
+          createdAt: new Date(ts),
+          updatedAt: new Date(ts)
+        };
+        this.db.prepare(`
+      INSERT INTO users (id, email, telegram_chat_id, data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, user.email, null, JSON.stringify(user), ts, ts);
+        return user;
+      }
+      async countUsers() {
+        this.ensureOpen();
+        const row = this.db.prepare("SELECT COUNT(*) AS c FROM users").get();
+        return row.c;
+      }
+      async getAdminUserCount() {
+        this.ensureOpen();
+        const rows = this.db.prepare("SELECT data FROM users").all();
+        return rows.filter((r) => hydrateUser(parseRow(r)).role === "admin").length;
+      }
+      async promoteOldestUserToAdmin() {
+        this.ensureOpen();
+        const row = this.db.prepare(
+          "SELECT id, data FROM users ORDER BY created_at ASC LIMIT 1"
+        ).get();
+        if (!row) return;
+        const u = hydrateUser(parseRow(row));
+        if (u.role === "admin") return;
+        await this.updateUser(u.id, { role: "admin" });
+      }
+      async linkTelegramAccountWithLinkCode(params) {
+        this.ensureOpen();
+        const { code, chatId, username, now: now2 } = params;
+        const row = this.db.prepare(
+          "SELECT id, data FROM users WHERE json_extract(data, '$.telegramLinkCode.code') = ?"
+        ).get(code);
+        if (!row) return null;
+        const u = hydrateUser(parseRow(row));
+        if (!u.telegramLinkCode || u.telegramLinkCode.code !== code || u.telegramLinkCode.expiresAt <= now2) {
+          return null;
+        }
+        return await this.updateUser(u.id, {
+          telegram: { chatId, username, linkedAt: now2 },
+          telegramLinkCode: null,
+          notificationPreferences: { ...u.notificationPreferences, telegram: true }
+        });
+      }
+      async tryClaimWelcomeEmailSentAt(userId, at) {
+        this.ensureOpen();
+        const u = await this.getUser(userId);
+        if (!u || u.welcomeEmailSentAt) return false;
+        await this.updateUser(userId, { welcomeEmailSentAt: at });
+        return true;
+      }
+      // local mode: upsert the single admin user
+      upsertUser(user) {
+        this.ensureOpen();
+        this.db.prepare(`
+      INSERT INTO users (id, email, telegram_chat_id, data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        email = excluded.email,
+        telegram_chat_id = excluded.telegram_chat_id,
+        data = excluded.data,
+        updated_at = excluded.updated_at
+    `).run(
+          user.id,
+          user.email.toLowerCase(),
+          user.telegram?.chatId ?? null,
+          JSON.stringify(user),
+          user.createdAt.toISOString(),
+          now()
+        );
+      }
+      // ── groups ─────────────────────────────────────────────────────────────────
+      async createGroup(data) {
+        this.ensureOpen();
+        const id = (0, import_nanoid.nanoid)();
+        const ts = now();
+        const group = {
+          id,
+          ...data,
+          createdAt: new Date(ts),
+          updatedAt: new Date(ts)
+        };
+        this.db.prepare(`
+      INSERT INTO groups (id, admin_id, is_active, invite_code, data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(id, data.adminId, data.isActive ? 1 : 0, data.inviteCode ?? null, JSON.stringify(group), ts, ts);
+        return group;
+      }
+      async getGroup(id) {
+        this.ensureOpen();
+        const row = this.db.prepare("SELECT data FROM groups WHERE id = ?").get(id);
+        if (!row) return null;
+        return hydrateGroup(parseRow(row));
+      }
+      async getGroupWithMemberUsers(id) {
+        this.ensureOpen();
+        const group = await this.getGroup(id);
+        if (!group) return null;
+        const memberUsers = /* @__PURE__ */ new Map();
+        for (const member of group.members) {
+          if (member.userId) {
+            const user = await this.getUser(member.userId);
+            if (user) {
+              memberUsers.set(member.id, {
+                telegram: user.telegram,
+                notificationPreferences: user.notificationPreferences
+              });
+              continue;
+            }
+          }
+          memberUsers.set(member.id, null);
+        }
+        return { ...group, memberUsers };
+      }
+      async listGroupsForUser(userId, email) {
+        this.ensureOpen();
+        const rows = this.db.prepare("SELECT data FROM groups WHERE is_active = 1").all();
+        const groups = rows.map((r) => hydrateGroup(parseRow(r)));
+        return groups.filter((g) => {
+          if (g.adminId === userId) return true;
+          return g.members.some(
+            (m) => m.isActive && (m.userId === userId || m.email.toLowerCase() === email.toLowerCase())
+          );
+        });
+      }
+      async listAllActiveGroups() {
+        this.ensureOpen();
+        const rows = this.db.prepare("SELECT data FROM groups WHERE is_active = 1").all();
+        return rows.map((r) => hydrateGroup(parseRow(r)));
+      }
+      async updateGroup(id, data) {
+        this.ensureOpen();
+        const existing = await this.getGroup(id);
+        if (!existing) throw new Error(`group not found: ${id}`);
+        const merged = { ...existing, ...data, updatedAt: /* @__PURE__ */ new Date() };
+        const ts = now();
+        this.db.prepare(`
+      UPDATE groups SET admin_id = ?, is_active = ?, invite_code = ?, data = ?, updated_at = ?
+      WHERE id = ?
+    `).run(merged.adminId, merged.isActive ? 1 : 0, merged.inviteCode ?? null, JSON.stringify(merged), ts, id);
+        return merged;
+      }
+      async softDeleteGroup(id) {
+        this.ensureOpen();
+        const existing = await this.getGroup(id);
+        if (!existing) return;
+        await this.updateGroup(id, { isActive: false });
+      }
+      async findGroupByInviteCode(code) {
+        this.ensureOpen();
+        const row = this.db.prepare("SELECT data FROM groups WHERE invite_code = ?").get(code);
+        if (!row) return null;
+        return hydrateGroup(parseRow(row));
+      }
+      async findActiveGroupForMemberInvitation(params) {
+        this.ensureOpen();
+        const { groupId, memberId } = params;
+        if (groupId) {
+          const g = await this.getGroup(groupId);
+          if (!g?.isActive) return null;
+          const m = g.members.find(
+            (mm) => mm.id === memberId && mm.isActive && !mm.leftAt
+          );
+          return m ? g : null;
+        }
+        const rows = this.db.prepare("SELECT data FROM groups WHERE is_active = 1").all();
+        for (const row of rows) {
+          const g = hydrateGroup(parseRow(row));
+          const m = g.members.find(
+            (mm) => mm.id === memberId && mm.isActive && !mm.leftAt
+          );
+          if (m) return g;
+        }
+        return null;
+      }
+      // ── billing periods ────────────────────────────────────────────────────────
+      async createBillingPeriod(data) {
+        this.ensureOpen();
+        const id = (0, import_nanoid.nanoid)();
+        const ts = now();
+        const period = {
+          id,
+          ...data,
+          createdAt: new Date(ts),
+          updatedAt: new Date(ts)
+        };
+        this.db.prepare(`
+      INSERT INTO billing_periods (id, group_id, period_start, collection_opens_at, is_fully_paid, data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+          id,
+          data.groupId,
+          data.periodStart.toISOString(),
+          data.collectionOpensAt?.toISOString() ?? null,
+          data.isFullyPaid ? 1 : 0,
+          JSON.stringify(period),
+          ts,
+          ts
+        );
+        return period;
+      }
+      async getBillingPeriod(id, groupId) {
+        this.ensureOpen();
+        const row = this.db.prepare(
+          "SELECT data FROM billing_periods WHERE id = ? AND group_id = ?"
+        ).get(id, groupId);
+        if (!row) return null;
+        return hydratePeriod(parseRow(row));
+      }
+      async getBillingPeriodByStart(groupId, periodStart) {
+        this.ensureOpen();
+        const row = this.db.prepare(
+          "SELECT data FROM billing_periods WHERE group_id = ? AND period_start = ?"
+        ).get(groupId, periodStart.toISOString());
+        if (!row) return null;
+        return hydratePeriod(parseRow(row));
+      }
+      async getBillingPeriodById(id) {
+        this.ensureOpen();
+        const row = this.db.prepare("SELECT data FROM billing_periods WHERE id = ?").get(id);
+        if (!row) return null;
+        return hydratePeriod(parseRow(row));
+      }
+      async getOpenBillingPeriods(filter) {
+        this.ensureOpen();
+        const asOf = filter.asOf.toISOString();
+        let sql = `
+      SELECT data FROM billing_periods
+      WHERE COALESCE(collection_opens_at, period_start) <= ?
+    `;
+        const params = [asOf];
+        if (filter.unpaidOnly) {
+          sql += " AND is_fully_paid = 0";
+        }
+        if (filter.groupIds && filter.groupIds.length > 0) {
+          sql += ` AND group_id IN (${filter.groupIds.map(() => "?").join(",")})`;
+          params.push(...filter.groupIds);
+        }
+        const rows = this.db.prepare(sql).all(...params);
+        return rows.map((r) => hydratePeriod(parseRow(r)));
+      }
+      async getPeriodsForGroup(groupId) {
+        this.ensureOpen();
+        const rows = this.db.prepare(
+          "SELECT data FROM billing_periods WHERE group_id = ? ORDER BY period_start DESC"
+        ).all(groupId);
+        return rows.map((r) => hydratePeriod(parseRow(r)));
+      }
+      async listUnpaidPeriodsWithStartBefore(asOf) {
+        this.ensureOpen();
+        const rows = this.db.prepare(`
+      SELECT data FROM billing_periods
+      WHERE is_fully_paid = 0 AND period_start < ?
+    `).all(asOf.toISOString());
+        return rows.map((r) => hydratePeriod(parseRow(r)));
+      }
+      async getFuturePeriods(groupId, afterDate) {
+        this.ensureOpen();
+        const rows = this.db.prepare(
+          "SELECT data FROM billing_periods WHERE group_id = ? AND period_start > ? ORDER BY period_start ASC"
+        ).all(groupId, afterDate.toISOString());
+        return rows.map((r) => hydratePeriod(parseRow(r)));
+      }
+      async updateBillingPeriod(id, data) {
+        this.ensureOpen();
+        const existing = await this.db.prepare(
+          "SELECT data, group_id FROM billing_periods WHERE id = ?"
+        ).get(id);
+        if (!existing) throw new Error(`billing period not found: ${id}`);
+        const current = hydratePeriod(parseRow(existing));
+        const merged = { ...current, ...data, updatedAt: /* @__PURE__ */ new Date() };
+        const ts = now();
+        this.db.prepare(`
+      UPDATE billing_periods
+      SET collection_opens_at = ?, is_fully_paid = ?, data = ?, updated_at = ?
+      WHERE id = ?
+    `).run(
+          merged.collectionOpensAt?.toISOString() ?? null,
+          merged.isFullyPaid ? 1 : 0,
+          JSON.stringify(merged),
+          ts,
+          id
+        );
+        return merged;
+      }
+      async deleteBillingPeriod(id, groupId) {
+        this.ensureOpen();
+        this.db.prepare("DELETE FROM billing_periods WHERE id = ? AND group_id = ?").run(id, groupId);
+      }
+      async updatePaymentStatus(periodId, memberId, update) {
+        this.ensureOpen();
+        const row = this.db.prepare(
+          "SELECT data, group_id FROM billing_periods WHERE id = ?"
+        ).get(periodId);
+        if (!row) throw new Error(`billing period not found: ${periodId}`);
+        const period = hydratePeriod(parseRow(row));
+        const payment = period.payments.find((p7) => p7.memberId === memberId);
+        if (!payment) throw new Error(`payment not found for member ${memberId} in period ${periodId}`);
+        if (update.status !== void 0) payment.status = update.status;
+        if (update.memberConfirmedAt !== void 0) payment.memberConfirmedAt = update.memberConfirmedAt;
+        if (update.adminConfirmedAt !== void 0) payment.adminConfirmedAt = update.adminConfirmedAt;
+        if (update.confirmationToken !== void 0) payment.confirmationToken = update.confirmationToken;
+        if (update.notes !== void 0) payment.notes = update.notes;
+        if (update.adjustedAmount !== void 0) payment.adjustedAmount = update.adjustedAmount;
+        if (update.adjustmentReason !== void 0) payment.adjustmentReason = update.adjustmentReason;
+        period.isFullyPaid = period.payments.every(
+          (p7) => p7.status === "confirmed" || p7.status === "waived"
+        );
+        period.updatedAt = /* @__PURE__ */ new Date();
+        const ts = now();
+        this.db.prepare(`
+      UPDATE billing_periods SET is_fully_paid = ?, data = ?, updated_at = ? WHERE id = ?
+    `).run(period.isFullyPaid ? 1 : 0, JSON.stringify(period), ts, periodId);
+        return period;
+      }
+      async getBillingPeriodByConfirmationToken(token) {
+        this.ensureOpen();
+        const rows = this.db.prepare("SELECT data FROM billing_periods").all();
+        for (const r of rows) {
+          const period = hydratePeriod(parseRow(r));
+          const idx = period.payments.findIndex((p7) => p7.confirmationToken === token);
+          if (idx !== -1) return { period, paymentIndex: idx };
+        }
+        return null;
+      }
+      // ── notifications ──────────────────────────────────────────────────────────
+      async logNotification(data) {
+        this.ensureOpen();
+        const id = (0, import_nanoid.nanoid)();
+        const ts = now();
+        const notif = {
+          id,
+          recipientId: data.recipientId ?? null,
+          recipientEmail: data.recipientEmail,
+          groupId: data.groupId ?? null,
+          billingPeriodId: data.billingPeriodId ?? null,
+          type: data.type,
+          channel: data.channel,
+          status: data.status,
+          subject: data.subject ?? null,
+          preview: data.preview,
+          emailParams: data.emailParams ?? null,
+          externalId: data.externalId ?? null,
+          error: data.error ?? null,
+          deliveredAt: data.deliveredAt ?? null,
+          createdAt: new Date(ts)
+        };
+        this.db.prepare(`
+      INSERT INTO notifications (id, group_id, data, created_at)
+      VALUES (?, ?, ?, ?)
+    `).run(id, data.groupId ?? null, JSON.stringify(notif), ts);
+        return notif;
+      }
+      async getNotificationsForGroup(groupId, limit = 50) {
+        this.ensureOpen();
+        const rows = this.db.prepare(
+          "SELECT data FROM notifications WHERE group_id = ? ORDER BY created_at DESC LIMIT ?"
+        ).all(groupId, limit);
+        return rows.map((r) => hydrateNotification(parseRow(r)));
+      }
+      async getNotificationById(id) {
+        this.ensureOpen();
+        const row = this.db.prepare("SELECT data FROM notifications WHERE id = ?").get(id);
+        if (!row) return null;
+        return hydrateNotification(parseRow(row));
+      }
+      async listNotifications(options) {
+        this.ensureOpen();
+        const { groupIds, type, channel, limit, offset } = options;
+        if (!groupIds.length) {
+          return { notifications: [], total: 0 };
+        }
+        const inList = groupIds.map(() => "?").join(", ");
+        let sqlWhere = `WHERE group_id IN (${inList})`;
+        const params = [...groupIds];
+        if (type) {
+          sqlWhere += ` AND json_extract(data, '$.type') = ?`;
+          params.push(type);
+        }
+        if (channel) {
+          sqlWhere += ` AND json_extract(data, '$.channel') = ?`;
+          params.push(channel);
+        }
+        const totalRow = this.db.prepare(`SELECT COUNT(*) as total FROM notifications ${sqlWhere}`).get(...params);
+        let sql = `SELECT data FROM notifications ${sqlWhere} ORDER BY created_at DESC`;
+        const listParams = [...params];
+        if (limit !== void 0) {
+          sql += " LIMIT ?";
+          listParams.push(limit);
+          if (offset !== void 0) {
+            sql += " OFFSET ?";
+            listParams.push(offset);
+          }
+        } else if (offset !== void 0) {
+          sql += " LIMIT -1 OFFSET ?";
+          listParams.push(offset);
+        }
+        const rows = this.db.prepare(sql).all(...listParams);
+        return {
+          total: totalRow.total,
+          notifications: rows.map((r) => hydrateNotification(parseRow(r)))
+        };
+      }
+      async logAudit(data) {
+        this.ensureOpen();
+        const id = (0, import_nanoid.nanoid)();
+        const ts = now();
+        const event = {
+          id,
+          actorId: data.actorId,
+          actorName: data.actorName,
+          action: data.action,
+          groupId: data.groupId ?? null,
+          billingPeriodId: data.billingPeriodId ?? null,
+          targetMemberId: data.targetMemberId ?? null,
+          metadata: data.metadata ?? {},
+          createdAt: new Date(ts)
+        };
+        this.db.prepare(`
+      INSERT INTO audit_events (id, group_id, created_at, data)
+      VALUES (?, ?, ?, ?)
+    `).run(id, event.groupId, ts, JSON.stringify(event));
+        return event;
+      }
+      async listAuditEvents(options = {}) {
+        this.ensureOpen();
+        const unbounded = options.unbounded === true;
+        const limit = unbounded ? void 0 : options.limit ?? 50;
+        const offset = unbounded ? void 0 : options.offset ?? 0;
+        const groupIds = options.groupIds ?? [];
+        const where = groupIds.length ? `WHERE group_id IN (${groupIds.map(() => "?").join(", ")})` : "";
+        const totalRow = this.db.prepare(`SELECT COUNT(*) as total FROM audit_events ${where}`).get(...groupIds);
+        let listSql = `SELECT data FROM audit_events ${where} ORDER BY created_at DESC`;
+        const listParams = [...groupIds];
+        if (limit !== void 0) {
+          listSql += " LIMIT ?";
+          listParams.push(limit);
+          if (offset !== void 0) {
+            listSql += " OFFSET ?";
+            listParams.push(offset);
+          }
+        } else if (offset !== void 0) {
+          listSql += " LIMIT -1 OFFSET ?";
+          listParams.push(offset);
+        }
+        const rows = this.db.prepare(listSql).all(...listParams);
+        return {
+          total: totalRow.total,
+          events: rows.map((row) => hydrateAuditEvent(parseRow(row)))
+        };
+      }
+      // ── scheduled tasks ────────────────────────────────────────────────────────
+      async enqueueTask(data) {
+        this.ensureOpen();
+        const existing = this.db.prepare(
+          "SELECT id FROM scheduled_tasks WHERE idempotency_key = ?"
+        ).get(data.idempotencyKey);
+        if (existing) return null;
+        const id = (0, import_nanoid.nanoid)();
+        const ts = now();
+        const task = {
+          id,
+          type: data.type,
+          status: "pending",
+          runAt: data.runAt,
+          lockedAt: null,
+          lockedBy: null,
+          attempts: 0,
+          maxAttempts: data.maxAttempts ?? 5,
+          lastError: null,
+          completedAt: null,
+          cancelledAt: null,
+          idempotencyKey: data.idempotencyKey,
+          payload: data.payload,
+          createdAt: new Date(ts),
+          updatedAt: new Date(ts)
+        };
+        this.db.prepare(`
+      INSERT INTO scheduled_tasks (id, type, status, run_at, idempotency_key, locked_at, locked_by, data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, data.type, "pending", data.runAt.toISOString(), data.idempotencyKey, null, null, JSON.stringify(task), ts, ts);
+        return task;
+      }
+      async claimTasks(workerId, options = {}) {
+        this.ensureOpen();
+        const limit = options.limit ?? 50;
+        const lockTtlMs = options.lockTtlMs ?? DEFAULT_LOCK_TTL_MS2;
+        const nowTs = now();
+        const staleThreshold = new Date(Date.now() - lockTtlMs).toISOString();
+        if (options.recoverStaleLocks) {
+          const stale = this.db.prepare(
+            "SELECT id, data FROM scheduled_tasks WHERE status = 'locked' AND locked_at < ?"
+          ).all(staleThreshold);
+          const releaseStmt = this.db.prepare(
+            "UPDATE scheduled_tasks SET status = 'pending', locked_at = NULL, locked_by = NULL, data = ?, updated_at = ? WHERE id = ?"
+          );
+          for (const s of stale) {
+            const t = hydrateTask(parseRow(s));
+            t.status = "pending";
+            t.lockedAt = null;
+            t.lockedBy = null;
+            t.updatedAt = /* @__PURE__ */ new Date();
+            releaseStmt.run(JSON.stringify(t), nowTs, s.id);
+          }
+        }
+        const candidates = this.db.prepare(`
+      SELECT id, data FROM scheduled_tasks
+      WHERE status = 'pending' AND run_at <= ?
+      ORDER BY run_at ASC
+      LIMIT ?
+    `).all(nowTs, limit);
+        const claimed = [];
+        const claimStmt = this.db.prepare(`
+      UPDATE scheduled_tasks
+      SET status = 'locked', locked_at = ?, locked_by = ?, data = ?, updated_at = ?
+      WHERE id = ? AND status = 'pending'
+    `);
+        for (const c of candidates) {
+          const t = hydrateTask(parseRow(c));
+          t.status = "locked";
+          t.lockedAt = new Date(nowTs);
+          t.lockedBy = workerId;
+          t.updatedAt = /* @__PURE__ */ new Date();
+          const result = claimStmt.run(nowTs, workerId, JSON.stringify(t), nowTs, c.id);
+          if (result.changes > 0) claimed.push(t);
+        }
+        return claimed;
+      }
+      async completeTask(taskId) {
+        this.ensureOpen();
+        const row = this.db.prepare("SELECT data FROM scheduled_tasks WHERE id = ?").get(taskId);
+        if (!row) return;
+        const t = hydrateTask(parseRow(row));
+        t.status = "completed";
+        t.completedAt = /* @__PURE__ */ new Date();
+        t.lockedAt = null;
+        t.lockedBy = null;
+        t.updatedAt = /* @__PURE__ */ new Date();
+        const ts = now();
+        this.db.prepare("UPDATE scheduled_tasks SET status = 'completed', locked_at = NULL, locked_by = NULL, data = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(t), ts, taskId);
+      }
+      async failTask(taskId, error, attempts, maxAttempts) {
+        this.ensureOpen();
+        const row = this.db.prepare("SELECT data FROM scheduled_tasks WHERE id = ?").get(taskId);
+        if (!row) return;
+        const t = hydrateTask(parseRow(row));
+        t.attempts = attempts;
+        t.lastError = error;
+        t.lockedAt = null;
+        t.lockedBy = null;
+        t.updatedAt = /* @__PURE__ */ new Date();
+        const ts = now();
+        if (attempts >= maxAttempts) {
+          t.status = "failed";
+        } else {
+          const backoffMs = Math.min(2 ** attempts * 60 * 1e3, 24 * 60 * 60 * 1e3);
+          t.status = "pending";
+          t.runAt = new Date(Date.now() + backoffMs);
+        }
+        this.db.prepare(
+          "UPDATE scheduled_tasks SET status = ?, run_at = ?, locked_at = NULL, locked_by = NULL, data = ?, updated_at = ? WHERE id = ?"
+        ).run(t.status, t.runAt.toISOString(), JSON.stringify(t), ts, taskId);
+      }
+      async releaseTask(taskId) {
+        this.ensureOpen();
+        const row = this.db.prepare("SELECT data FROM scheduled_tasks WHERE id = ?").get(taskId);
+        if (!row) return;
+        const t = hydrateTask(parseRow(row));
+        t.status = "pending";
+        t.lockedAt = null;
+        t.lockedBy = null;
+        t.updatedAt = /* @__PURE__ */ new Date();
+        const ts = now();
+        this.db.prepare("UPDATE scheduled_tasks SET status = 'pending', locked_at = NULL, locked_by = NULL, data = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(t), ts, taskId);
+      }
+      async cancelTask(taskId) {
+        this.ensureOpen();
+        const row = this.db.prepare("SELECT data FROM scheduled_tasks WHERE id = ?").get(taskId);
+        if (!row) return;
+        const t = hydrateTask(parseRow(row));
+        t.status = "cancelled";
+        t.cancelledAt = /* @__PURE__ */ new Date();
+        t.lockedAt = null;
+        t.lockedBy = null;
+        t.updatedAt = /* @__PURE__ */ new Date();
+        const ts = now();
+        this.db.prepare("UPDATE scheduled_tasks SET status = 'cancelled', data = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(t), ts, taskId);
+      }
+      async getTaskById(taskId) {
+        this.ensureOpen();
+        const row = this.db.prepare("SELECT data FROM scheduled_tasks WHERE id = ?").get(taskId);
+        if (!row) return null;
+        return hydrateTask(parseRow(row));
+      }
+      async retryFailedTask(taskId) {
+        this.ensureOpen();
+        const row = this.db.prepare("SELECT data FROM scheduled_tasks WHERE id = ?").get(taskId);
+        if (!row) return;
+        const t = hydrateTask(parseRow(row));
+        t.status = "pending";
+        t.runAt = /* @__PURE__ */ new Date();
+        t.attempts = 0;
+        t.lastError = null;
+        t.lockedAt = null;
+        t.lockedBy = null;
+        t.completedAt = null;
+        t.updatedAt = /* @__PURE__ */ new Date();
+        const ts = now();
+        this.db.prepare(
+          "UPDATE scheduled_tasks SET status = 'pending', run_at = ?, data = ?, updated_at = ? WHERE id = ?"
+        ).run(t.runAt.toISOString(), JSON.stringify(t), ts, taskId);
+      }
+      async bulkCancelPendingTasksForAdmin(filter) {
+        this.ensureOpen();
+        if (filter.adminGroupIds.length === 0) return 0;
+        const adminSet = new Set(filter.adminGroupIds);
+        const rows = this.db.prepare(
+          `SELECT data FROM scheduled_tasks WHERE status IN ('pending', 'locked')`
+        ).all();
+        let n = 0;
+        const ts = now();
+        for (const row of rows) {
+          const t = hydrateTask(parseRow(row));
+          if (!taskVisibleToAdminGroups(t, adminSet)) continue;
+          if (filter.groupId) {
+            const touches = t.payload.groupId === filter.groupId || t.payload.payments?.some((p7) => p7.groupId === filter.groupId);
+            if (!touches) continue;
+          }
+          if (filter.memberEmail) {
+            const want = filter.memberEmail.trim().toLowerCase();
+            const email = String(t.payload.memberEmail ?? "").toLowerCase();
+            if (email !== want) continue;
+          }
+          if (filter.type && t.type !== filter.type) continue;
+          t.status = "cancelled";
+          t.cancelledAt = /* @__PURE__ */ new Date();
+          t.lockedAt = null;
+          t.lockedBy = null;
+          t.updatedAt = /* @__PURE__ */ new Date();
+          this.db.prepare("UPDATE scheduled_tasks SET status = 'cancelled', data = ?, updated_at = ? WHERE id = ?").run(
+            JSON.stringify(t),
+            ts,
+            t.id
+          );
+          n++;
+        }
+        return n;
+      }
+      async getTaskCounts() {
+        this.ensureOpen();
+        const rows = this.db.prepare(
+          "SELECT status, COUNT(*) as count FROM scheduled_tasks GROUP BY status"
+        ).all();
+        const counts = { pending: 0, locked: 0, completed: 0, failed: 0, cancelled: 0 };
+        for (const row of rows) {
+          if (row.status in counts) counts[row.status] = row.count;
+        }
+        return counts;
+      }
+      async listTasks(options = {}) {
+        this.ensureOpen();
+        const conditions = [];
+        const params = [];
+        if (options.status) {
+          conditions.push("status = ?");
+          params.push(options.status);
+        }
+        if (options.type) {
+          conditions.push("type = ?");
+          params.push(options.type);
+        }
+        if (options.groupId) {
+          conditions.push("json_extract(data, '$.payload.groupId') = ?");
+          params.push(options.groupId);
+        }
+        const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+        const rows = this.db.prepare(
+          `SELECT data FROM scheduled_tasks ${where} ORDER BY run_at DESC`
+        ).all(...params);
+        let tasks = rows.map((r) => hydrateTask(parseRow(r)));
+        if (options.anyGroupIdIn?.length) {
+          const adminSet = new Set(options.anyGroupIdIn);
+          tasks = tasks.filter((t) => taskVisibleToAdminGroups(t, adminSet));
+        }
+        const total = tasks.length;
+        const limit = options.limit ?? 50;
+        const offset = options.offset ?? 0;
+        tasks = tasks.slice(offset, offset + limit);
+        return { tasks, total };
+      }
+      // ── price history ──────────────────────────────────────────────────────────
+      async createPriceHistory(data) {
+        this.ensureOpen();
+        const id = (0, import_nanoid.nanoid)();
+        const ts = now();
+        const ph = {
+          id,
+          groupId: data.groupId,
+          price: data.price,
+          previousPrice: data.previousPrice,
+          currency: data.currency,
+          effectiveFrom: data.effectiveFrom,
+          note: data.note ?? null,
+          membersNotified: data.membersNotified ?? false,
+          createdBy: data.createdBy,
+          createdAt: new Date(ts)
+        };
+        this.db.prepare(`
+      INSERT INTO price_history (id, group_id, data, created_at) VALUES (?, ?, ?, ?)
+    `).run(id, data.groupId, JSON.stringify(ph), ts);
+        return ph;
+      }
+      async getPriceHistoryForGroup(groupId) {
+        this.ensureOpen();
+        const rows = this.db.prepare(
+          "SELECT data FROM price_history WHERE group_id = ? ORDER BY created_at DESC"
+        ).all(groupId);
+        return rows.map((r) => hydratePriceHistory(parseRow(r)));
+      }
+      // ── app settings (not persisted in SQLite; local mode uses config.json) ─────
+      async ensureAppSettingsSeeded() {
+        this.ensureOpen();
+      }
+      async getAppSettingRow(_key) {
+        this.ensureOpen();
+        return null;
+      }
+      async listAppSettingRows(_category) {
+        this.ensureOpen();
+        return [];
+      }
+      async upsertAppSettingRow(_input) {
+        this.ensureOpen();
+      }
+      // ── data portability ───────────────────────────────────────────────────────
+      async exportAll() {
+        this.ensureOpen();
+        const groupRows = this.db.prepare("SELECT data FROM groups").all();
+        const periodRows = this.db.prepare("SELECT data FROM billing_periods").all();
+        const notifRows = this.db.prepare("SELECT data FROM notifications").all();
+        const phRows = this.db.prepare("SELECT data FROM price_history").all();
+        return {
+          version: "1.0.0",
+          exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          source: { mode: "local", appVersion: process.env.npm_package_version ?? "unknown" },
+          data: {
+            groups: groupRows.map((r) => hydrateGroup(parseRow(r))),
+            billingPeriods: periodRows.map((r) => hydratePeriod(parseRow(r))),
+            notifications: notifRows.map((r) => hydrateNotification(parseRow(r))),
+            priceHistory: phRows.map((r) => hydratePriceHistory(parseRow(r)))
+          }
+        };
+      }
+      async importAll(bundle) {
+        this.ensureOpen();
+        const errors = [];
+        let groups = 0;
+        let billingPeriods = 0;
+        let notifications = 0;
+        let priceHistory = 0;
+        const importGroup = this.db.prepare(`
+      INSERT OR IGNORE INTO groups (id, admin_id, is_active, invite_code, data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+        const importPeriod = this.db.prepare(`
+      INSERT OR IGNORE INTO billing_periods (id, group_id, period_start, collection_opens_at, is_fully_paid, data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+        const importNotif = this.db.prepare(`
+      INSERT OR IGNORE INTO notifications (id, group_id, data, created_at) VALUES (?, ?, ?, ?)
+    `);
+        const importPh = this.db.prepare(`
+      INSERT OR IGNORE INTO price_history (id, group_id, data, created_at) VALUES (?, ?, ?, ?)
+    `);
+        const runImport = this.db.transaction(() => {
+          for (const g of bundle.data.groups) {
+            try {
+              importGroup.run(
+                g.id,
+                g.adminId,
+                g.isActive ? 1 : 0,
+                g.inviteCode ?? null,
+                JSON.stringify(g),
+                new Date(g.createdAt).toISOString(),
+                new Date(g.updatedAt).toISOString()
+              );
+              groups++;
+            } catch (e) {
+              errors.push(`group ${g.id}: ${e instanceof Error ? e.message : String(e)}`);
+            }
+          }
+          for (const p7 of bundle.data.billingPeriods) {
+            try {
+              importPeriod.run(
+                p7.id,
+                p7.groupId,
+                new Date(p7.periodStart).toISOString(),
+                p7.collectionOpensAt ? new Date(p7.collectionOpensAt).toISOString() : null,
+                p7.isFullyPaid ? 1 : 0,
+                JSON.stringify(p7),
+                new Date(p7.createdAt).toISOString(),
+                new Date(p7.updatedAt).toISOString()
+              );
+              billingPeriods++;
+            } catch (e) {
+              errors.push(`period ${p7.id}: ${e instanceof Error ? e.message : String(e)}`);
+            }
+          }
+          for (const n of bundle.data.notifications) {
+            try {
+              importNotif.run(n.id, n.groupId ?? null, JSON.stringify(n), new Date(n.createdAt).toISOString());
+              notifications++;
+            } catch (e) {
+              errors.push(`notification ${n.id}: ${e instanceof Error ? e.message : String(e)}`);
+            }
+          }
+          for (const ph of bundle.data.priceHistory) {
+            try {
+              importPh.run(ph.id, ph.groupId, JSON.stringify(ph), new Date(ph.createdAt).toISOString());
+              priceHistory++;
+            } catch (e) {
+              errors.push(`priceHistory ${ph.id}: ${e instanceof Error ? e.message : String(e)}`);
+            }
+          }
+        });
+        runImport();
+        return { groups, billingPeriods, notifications, priceHistory, errors };
+      }
+    };
+  }
+});
+
+// src/lib/storage/index.ts
+var storage_exports = {};
+__export(storage_exports, {
+  db: () => db,
+  getAdapter: () => getAdapter,
+  isStorageId: () => isStorageId,
+  resetAdapter: () => resetAdapter,
+  setAdapter: () => setAdapter,
+  toApiShape: () => toApiShape
+});
+function getAdapter() {
+  if (_adapter) return _adapter;
+  const mode = process.env.SUB5TR4CKER_MODE;
+  if (mode === "local") {
+    const { SqliteAdapter: SqliteAdapter2 } = (init_sqlite_adapter(), __toCommonJS(sqlite_adapter_exports));
+    const dataPath = process.env.SUB5TR4CKER_DATA_PATH ?? `${process.env.HOME}/.sub5tr4cker/data.db`;
+    _adapter = new SqliteAdapter2(dataPath);
+  } else {
+    _adapter = new MongooseAdapter();
+  }
+  return _adapter;
+}
+function setAdapter(adapter) {
+  _adapter = adapter;
+}
+function resetAdapter() {
+  _adapter = null;
+  _initPromise = null;
+}
+async function db() {
+  if (_initPromise) return _initPromise;
+  const adapter = getAdapter();
+  _initPromise = adapter.initialize().then(() => adapter).catch((error) => {
+    _initPromise = null;
+    throw error;
+  });
+  return _initPromise;
+}
+var _adapter, _initPromise;
+var init_storage = __esm({
+  "src/lib/storage/index.ts"() {
+    "use strict";
+    init_mongoose_adapter();
+    init_api();
+    init_types();
+    _adapter = null;
+    _initPromise = null;
+  }
+});
+
 // src/lib/settings/migrate.ts
 async function ensureSettingsMigrated() {
   if (!migrationPromise) {
@@ -934,31 +3266,14 @@ async function ensureSettingsMigrated() {
   await migrationPromise;
 }
 async function runSettingsMigration() {
-  await dbConnect();
-  for (const definition of settingsDefinitions) {
-    const existing = await Settings.findOne({ key: definition.key }).lean().exec();
-    if (existing) {
-      continue;
-    }
-    const envValue = process.env[definition.envVar];
-    const value = envValue ?? definition.defaultValue ?? null;
-    await Settings.create({
-      key: definition.key,
-      value,
-      category: definition.category,
-      isSecret: definition.isSecret,
-      label: definition.label,
-      description: definition.description
-    });
-  }
+  const store = await db();
+  await store.ensureAppSettingsSeeded();
 }
 var migrationPromise;
 var init_migrate = __esm({
   "src/lib/settings/migrate.ts"() {
     "use strict";
-    init_mongoose();
-    init_models();
-    init_definitions();
+    init_storage();
     migrationPromise = null;
   }
 });
@@ -1012,9 +3327,9 @@ async function getSetting(key) {
     return cached.value;
   }
   await ensureSettingsMigrated();
-  await dbConnect();
+  const store = await db();
   const definition = getSettingsDefinition(key);
-  const record = await Settings.findOne({ key }).lean().exec();
+  const record = await store.getAppSettingRow(key);
   const rawValue = record?.value ?? resolveFallbackValue(key);
   const value = definition?.isSecret && rawValue?.startsWith("enc:") ? decryptValue(rawValue) : rawValue;
   settingsCache.set(key, {
@@ -1028,8 +3343,7 @@ var init_service = __esm({
   "src/lib/settings/service.ts"() {
     "use strict";
     import_crypto3 = __toESM(require("crypto"));
-    init_mongoose();
-    init_models();
+    init_storage();
     init_definitions();
     init_migrate();
     init_manager();
@@ -1166,151 +3480,55 @@ __export(queue_exports, {
   releaseTask: () => releaseTask
 });
 async function enqueueTask(input) {
-  await dbConnect();
+  const store = await db();
   const idempotencyKey = buildIdempotencyKey(
     input.type,
     input.payload,
     input.runAt
   );
-  const existing = await ScheduledTask.findOne({ idempotencyKey });
-  if (existing) return null;
-  const created = await ScheduledTask.create({
+  return store.enqueueTask({
     type: input.type,
-    status: "pending",
     runAt: input.runAt,
     payload: input.payload,
     idempotencyKey,
     maxAttempts: input.maxAttempts ?? 5
   });
-  return created;
 }
 async function claimTasks(workerId, options = {}) {
-  await dbConnect();
-  const limit = options.limit ?? DEFAULT_BATCH_SIZE;
-  const lockTtlMs = options.lockTtlMs ?? DEFAULT_LOCK_TTL_MS;
-  const now2 = /* @__PURE__ */ new Date();
-  const staleThreshold = new Date(now2.getTime() - lockTtlMs);
-  if (options.recoverStaleLocks) {
-    await ScheduledTask.updateMany(
-      {
-        status: "locked",
-        lockedAt: { $lt: staleThreshold }
-      },
-      {
-        $set: { status: "pending", lockedAt: null, lockedBy: null }
-      }
-    );
-  }
-  const tasks = [];
-  const cursor = ScheduledTask.find({
-    status: "pending",
-    runAt: { $lte: now2 }
-  }).sort({ runAt: 1 }).limit(limit).cursor();
-  for await (const task of cursor) {
-    const updated = await ScheduledTask.findOneAndUpdate(
-      { _id: task._id, status: "pending" },
-      {
-        $set: {
-          status: "locked",
-          lockedAt: now2,
-          lockedBy: workerId
-        }
-      },
-      { returnDocument: "after" }
-    );
-    if (updated) tasks.push(updated);
-  }
-  return tasks;
+  const store = await db();
+  return store.claimTasks(workerId, {
+    limit: options.limit ?? DEFAULT_BATCH_SIZE2,
+    lockTtlMs: options.lockTtlMs ?? DEFAULT_LOCK_TTL_MS3,
+    recoverStaleLocks: options.recoverStaleLocks
+  });
 }
 async function completeTask(task) {
-  await dbConnect();
-  return ScheduledTask.findByIdAndUpdate(
-    task._id,
-    {
-      $set: {
-        status: "completed",
-        completedAt: /* @__PURE__ */ new Date(),
-        lockedAt: null,
-        lockedBy: null
-      }
-    },
-    { returnDocument: "after" }
-  );
+  const store = await db();
+  await store.completeTask(task.id);
 }
 async function failTask(task, error) {
-  await dbConnect();
   const errMessage = error instanceof Error ? error.message : String(error);
   const attempts = (task.attempts ?? 0) + 1;
   const maxAttempts = task.maxAttempts ?? 5;
-  if (attempts >= maxAttempts) {
-    return ScheduledTask.findByIdAndUpdate(
-      task._id,
-      {
-        $set: {
-          status: "failed",
-          lastError: errMessage,
-          attempts,
-          lockedAt: null,
-          lockedBy: null
-        }
-      },
-      { returnDocument: "after" }
-    );
-  }
-  const backoffMs = Math.min(
-    2 ** attempts * 60 * 1e3,
-    24 * 60 * 60 * 1e3
-  );
-  const runAt = new Date(Date.now() + backoffMs);
-  return ScheduledTask.findByIdAndUpdate(
-    task._id,
-    {
-      $set: {
-        status: "pending",
-        runAt,
-        lastError: errMessage,
-        attempts,
-        lockedAt: null,
-        lockedBy: null
-      }
-    },
-    { returnDocument: "after" }
-  );
+  const store = await db();
+  await store.failTask(task.id, errMessage, attempts, maxAttempts);
 }
 async function releaseTask(task) {
-  await dbConnect();
-  return ScheduledTask.findByIdAndUpdate(
-    task._id,
-    {
-      $set: {
-        status: "pending",
-        lockedAt: null,
-        lockedBy: null
-      }
-    },
-    { returnDocument: "after" }
-  );
+  const store = await db();
+  await store.releaseTask(task.id);
 }
 async function getTaskCounts() {
-  await dbConnect();
-  const [pending, locked, completed, failed, cancelled] = await Promise.all([
-    ScheduledTask.countDocuments({ status: "pending" }),
-    ScheduledTask.countDocuments({ status: "locked" }),
-    ScheduledTask.countDocuments({ status: "completed" }),
-    ScheduledTask.countDocuments({ status: "failed" }),
-    ScheduledTask.countDocuments({ status: "cancelled" })
-  ]);
-  return { pending, locked, completed, failed, cancelled };
+  const store = await db();
+  return store.getTaskCounts();
 }
-var DEFAULT_LOCK_TTL_MS, DEFAULT_BATCH_SIZE;
+var DEFAULT_LOCK_TTL_MS3, DEFAULT_BATCH_SIZE2;
 var init_queue = __esm({
   "src/lib/tasks/queue.ts"() {
     "use strict";
-    init_mongoose();
-    init_scheduled_task();
+    init_storage();
     init_idempotency();
-    DEFAULT_LOCK_TTL_MS = 5 * 60 * 1e3;
-    DEFAULT_BATCH_SIZE = 50;
+    DEFAULT_LOCK_TTL_MS3 = 5 * 60 * 1e3;
+    DEFAULT_BATCH_SIZE2 = 50;
   }
 });
 
@@ -1791,7 +4009,6 @@ var init_channels = __esm({
 
 // src/lib/notifications/service.ts
 async function sendNotification(target, content) {
-  await dbConnect();
   const result = {
     email: { sent: false },
     telegram: { sent: false }
@@ -1859,11 +4076,12 @@ async function sendNotification(target, content) {
 }
 async function logNotification(params) {
   try {
-    await Notification.create({
-      recipient: params.recipientId ? new import_mongoose14.Types.ObjectId(params.recipientId) : null,
+    const store = await db();
+    const input = {
+      recipientId: params.recipientId ?? null,
       recipientEmail: params.recipientEmail,
-      group: params.groupId ? new import_mongoose14.Types.ObjectId(params.groupId) : null,
-      billingPeriod: params.billingPeriodId ? new import_mongoose14.Types.ObjectId(params.billingPeriodId) : null,
+      groupId: params.groupId ?? null,
+      billingPeriodId: params.billingPeriodId ?? null,
       type: params.type,
       channel: params.channel,
       status: params.status,
@@ -1872,26 +4090,27 @@ async function logNotification(params) {
       emailParams: params.emailParams ?? null,
       externalId: params.externalId ?? null,
       deliveredAt: params.status === "sent" ? /* @__PURE__ */ new Date() : null
-    });
+    };
+    await store.logNotification(input);
   } catch (error) {
     console.error("failed to log notification:", error);
   }
 }
-var import_mongoose14;
 var init_service2 = __esm({
   "src/lib/notifications/service.ts"() {
     "use strict";
     init_price_adjustment();
     init_price_change();
-    init_mongoose();
+    init_storage();
     init_tokens();
-    init_models();
-    import_mongoose14 = require("mongoose");
     init_channels();
   }
 });
 
 // src/lib/notifications/reminder-targeting.ts
+function asId(value) {
+  return value == null ? "" : value.toString();
+}
 function getSkipReasons(member, user, sendEmail2, sendTelegram) {
   const reasons = [];
   if (member?.unsubscribedFromEmail) reasons.push("unsubscribed_from_email");
@@ -1906,25 +4125,26 @@ function getSkipReasons(member, user, sendEmail2, sendTelegram) {
 async function getReminderEligibility(params) {
   const { group, period, payment } = params;
   const member = group.members.find(
-    (m) => m._id.toString() === payment.memberId.toString()
+    (m) => asId(m.id ?? m._id) === asId(payment.memberId)
   );
   let user = params.user;
-  if (!user && member?.user) {
-    await dbConnect();
-    const u = await User.findById(member.user).lean();
+  const memberUserId = member?.userId ?? asId(member?.user);
+  if (!user && memberUserId) {
+    const store = await db();
+    const u = await store.getUser(memberUserId);
     user = u ? { telegram: u.telegram, notificationPreferences: u.notificationPreferences } : null;
   }
   const sendEmail2 = !member?.unsubscribedFromEmail && (user?.notificationPreferences?.email ?? true);
   const sendTelegram = !!(user?.telegram?.chatId && (user.notificationPreferences?.telegram ?? false));
   const skipReasons = getSkipReasons(member ?? void 0, user, sendEmail2, sendTelegram);
   return {
-    paymentId: payment._id.toString(),
-    memberId: payment.memberId.toString(),
+    paymentId: payment.id ?? asId(payment._id),
+    memberId: asId(payment.memberId),
     memberEmail: payment.memberEmail,
     memberNickname: payment.memberNickname,
-    groupId: group._id.toString(),
+    groupId: group.id ?? asId(group._id),
     groupName: group.name,
-    periodId: period._id.toString(),
+    periodId: period.id ?? asId(period._id),
     periodLabel: period.periodLabel,
     amount: payment.amount,
     currency: period.currency || "EUR",
@@ -1937,8 +4157,7 @@ async function getReminderEligibility(params) {
 var init_reminder_targeting = __esm({
   "src/lib/notifications/reminder-targeting.ts"() {
     "use strict";
-    init_mongoose();
-    init_models();
+    init_storage();
   }
 });
 
@@ -2037,6 +4256,9 @@ var init_payment_reminder = __esm({
 });
 
 // src/lib/notifications/reminder-send.ts
+function asId2(value) {
+  return value.toString();
+}
 async function sendReminderForPayment(group, period, payment, options) {
   const eligibility = await getReminderEligibility({ group, period, payment });
   let sendEmail2 = eligibility.sendEmail;
@@ -2047,12 +4269,13 @@ async function sendReminderForPayment(group, period, payment, options) {
     return { emailSent: false, telegramSent: false };
   }
   const member = group.members.find(
-    (m) => m._id.toString() === payment.memberId.toString()
+    (m) => m.id === asId2(payment.memberId)
   );
-  const user = member?.user ? await User.findById(member.user) : null;
-  const periodId = period._id.toString();
-  const groupId = group._id.toString();
-  const memberId = payment.memberId.toString();
+  const store = await db();
+  const user = member?.userId ? await store.getUser(member.userId) : null;
+  const periodId = period.id;
+  const groupId = group.id;
+  const memberId = asId2(payment.memberId);
   const portalToken = await createMemberPortalToken(memberId, groupId);
   const portalUrl = await getMemberPortalUrl(portalToken);
   const confirmUrl = `${portalUrl}?pay=${periodId}&open=confirm`;
@@ -2063,8 +4286,8 @@ async function sendReminderForPayment(group, period, payment, options) {
   const priceNote = period.priceNote ?? null;
   const unsubscribeUrl = sendEmail2 && member ? await getUnsubscribeUrl(
     await createUnsubscribeToken(
-      payment.memberId.toString(),
-      group._id.toString()
+      asId2(payment.memberId),
+      group.id
     )
   ) : null;
   const reminderTemplateParams = {
@@ -2091,14 +4314,14 @@ async function sendReminderForPayment(group, period, payment, options) {
     ...reminderTemplateParams
   } : void 0;
   const keyboard = paymentConfirmationKeyboard(
-    period._id.toString(),
-    payment.memberId.toString()
+    period.id,
+    asId2(payment.memberId)
   );
   const result = await sendNotification(
     {
       email: payment.memberEmail,
       telegramChatId: user?.telegram?.chatId,
-      userId: user?._id?.toString(),
+      userId: user?.id,
       preferences: {
         email: sendEmail2,
         telegram: sendTelegram
@@ -2119,7 +4342,7 @@ async function sendReminderForPayment(group, period, payment, options) {
         priceNote
       }),
       telegramKeyboard: keyboard,
-      groupId: group._id.toString(),
+      groupId: group.id,
       billingPeriodId: periodId,
       emailParams
     }
@@ -2132,7 +4355,7 @@ async function sendReminderForPayment(group, period, payment, options) {
 var init_reminder_send = __esm({
   "src/lib/notifications/reminder-send.ts"() {
     "use strict";
-    init_models();
+    init_storage();
     init_service2();
     init_reminder_targeting();
     init_keyboards();
@@ -2241,13 +4464,15 @@ var init_aggregated_payment_reminder = __esm({
 });
 
 // src/lib/notifications/aggregated-reminder-send.ts
+function asId3(value) {
+  return value == null ? "" : value.toString();
+}
 async function sendAggregatedReminder(memberEmail, memberName, payments, options) {
   if (payments.length === 0) {
     return { emailSent: false, telegramSent: false };
   }
-  const { dbConnect: dbConnect2 } = await Promise.resolve().then(() => (init_mongoose(), mongoose_exports));
-  await dbConnect2();
-  const user = await User.findOne({ email: memberEmail }).select("telegram notificationPreferences").lean().exec();
+  const store = await db();
+  const user = await store.getUserByEmail(memberEmail);
   const sendEmail2 = user?.notificationPreferences?.email ?? true;
   const sendTelegram = !!(user?.telegram?.chatId && (user.notificationPreferences?.telegram ?? false));
   let wantEmail = sendEmail2;
@@ -2259,9 +4484,9 @@ async function sendAggregatedReminder(memberEmail, memberName, payments, options
   }
   const entries = [];
   for (const { group, period, payment } of payments) {
-    const periodId = period._id.toString();
-    const groupId = group._id.toString();
-    const memberId = payment.memberId.toString();
+    const periodId = period.id ?? asId3(period._id);
+    const groupId = group.id ?? asId3(group._id);
+    const memberId = asId3(payment.memberId);
     const portalToken = await createMemberPortalToken(memberId, groupId);
     const portalUrl = await getMemberPortalUrl(portalToken);
     const confirmUrl = `${portalUrl}?pay=${periodId}&open=confirm`;
@@ -2283,14 +4508,14 @@ async function sendAggregatedReminder(memberEmail, memberName, payments, options
     });
   }
   const distinctGroupCount = new Set(
-    payments.map((i) => i.group._id.toString())
+    payments.map((i) => i.group.id ?? asId3(i.group._id))
   ).size;
   const distinctPeriodCount = new Set(
-    payments.map((i) => i.period._id.toString())
+    payments.map((i) => i.period.id ?? asId3(i.period._id))
   ).size;
   const first = payments[0];
-  const firstMemberId = first.payment.memberId.toString();
-  const firstGroupId = first.group._id.toString();
+  const firstMemberId = asId3(first.payment.memberId);
+  const firstGroupId = first.group.id ?? asId3(first.group._id);
   const unsubscribeUrl = wantEmail ? await getUnsubscribeUrl(
     await createUnsubscribeToken(firstMemberId, firstGroupId)
   ) : null;
@@ -2318,7 +4543,7 @@ async function sendAggregatedReminder(memberEmail, memberName, payments, options
     distinctGroupCount,
     distinctPeriodCount
   });
-  const firstPeriodId = first.period._id.toString();
+  const firstPeriodId = first.period.id ?? asId3(first.period._id);
   const keyboard = paymentConfirmationKeyboard(firstPeriodId, firstMemberId, {
     includePayDetails: distinctGroupCount === 1
   });
@@ -2326,7 +4551,7 @@ async function sendAggregatedReminder(memberEmail, memberName, payments, options
     {
       email: memberEmail,
       telegramChatId: user?.telegram?.chatId ?? null,
-      userId: user?._id?.toString() ?? null,
+      userId: user?.id ?? null,
       preferences: {
         email: wantEmail,
         telegram: wantTelegram
@@ -2351,7 +4576,7 @@ async function sendAggregatedReminder(memberEmail, memberName, payments, options
 var init_aggregated_reminder_send = __esm({
   "src/lib/notifications/aggregated-reminder-send.ts"() {
     "use strict";
-    init_models();
+    init_storage();
     init_service2();
     init_keyboards();
     init_tokens();
@@ -2417,10 +4642,11 @@ async function sendAdminConfirmationNudge(group, period) {
     (p7) => p7.status === "member_confirmed"
   );
   if (unverified.length === 0) return;
-  const admin = await User.findById(group.admin);
+  const store = await db();
+  const admin = await store.getUser(group.adminId);
   if (!admin) return;
   const appUrl = (await getSetting("general.appUrl") || "").replace(/\/$/, "");
-  const dashboardUrl = appUrl ? `${appUrl}/dashboard/groups/${group._id.toString()}/billing` : null;
+  const dashboardUrl = appUrl ? `${appUrl}/dashboard/groups/${group.id}/billing` : null;
   const templateParams = {
     groupName: group.name,
     periodLabel: period.periodLabel,
@@ -2446,7 +4672,7 @@ async function sendAdminConfirmationNudge(group, period) {
     {
       email: admin.email,
       telegramChatId: admin.telegram?.chatId,
-      userId: admin._id.toString(),
+      userId: admin.id,
       preferences: {
         telegram: telegramPref,
         email: !canDeliverTelegram && emailPref
@@ -2457,8 +4683,8 @@ async function sendAdminConfirmationNudge(group, period) {
       subject: `Verify payments for ${group.name} \u2014 ${period.periodLabel}`,
       emailHtml,
       telegramText,
-      groupId: group._id.toString(),
-      billingPeriodId: period._id.toString(),
+      groupId: group.id,
+      billingPeriodId: period.id,
       emailParams
     }
   );
@@ -2466,7 +4692,7 @@ async function sendAdminConfirmationNudge(group, period) {
 var init_admin_nudge = __esm({
   "src/lib/notifications/admin-nudge.ts"() {
     "use strict";
-    init_models();
+    init_storage();
     init_service2();
     init_admin_follow_up();
     init_bot();
@@ -2481,20 +4707,19 @@ function isPaymentStillUnpaid(payment) {
 async function executeTask(task) {
   const payload = task.payload;
   try {
+    const store = await db();
     switch (task.type) {
       case "payment_reminder": {
         if (!payload.billingPeriodId || !payload.paymentId) {
           throw new Error("payment_reminder task missing billingPeriodId or paymentId");
         }
-        const group = await Group.findById(payload.groupId);
-        const period = await BillingPeriod.findById(payload.billingPeriodId).populate(
-          "group"
-        );
+        const group = payload.groupId ? await store.getGroup(payload.groupId) : null;
+        const period = payload.groupId ? await store.getBillingPeriod(payload.billingPeriodId, payload.groupId) : null;
         if (!group || !period) {
           throw new Error("group or period not found");
         }
         const payment = period.payments.find(
-          (p7) => p7._id.toString() === payload.paymentId
+          (p7) => p7.id === payload.paymentId
         );
         if (!payment) {
           throw new Error("payment not found");
@@ -2514,13 +4739,11 @@ async function executeTask(task) {
         }
         const inputs = [];
         for (const ref of payload.payments) {
-          const group = await Group.findById(ref.groupId);
-          const period = await BillingPeriod.findById(ref.billingPeriodId).populate(
-            "group"
-          );
+          const group = await store.getGroup(ref.groupId);
+          const period = await store.getBillingPeriod(ref.billingPeriodId, ref.groupId);
           if (!group || !period) continue;
           const payment = period.payments.find(
-            (p7) => p7._id.toString() === ref.paymentId
+            (p7) => p7.id === ref.paymentId
           );
           if (!payment) continue;
           if (!isPaymentStillUnpaid(payment)) continue;
@@ -2546,8 +4769,8 @@ async function executeTask(task) {
         if (!payload.billingPeriodId) {
           throw new Error("admin_confirmation_request task missing billingPeriodId");
         }
-        const group = await Group.findById(payload.groupId);
-        const period = await BillingPeriod.findById(payload.billingPeriodId);
+        const group = payload.groupId ? await store.getGroup(payload.groupId) : null;
+        const period = payload.groupId ? await store.getBillingPeriod(payload.billingPeriodId, payload.groupId) : null;
         if (!group || !period) {
           throw new Error("group or period not found");
         }
@@ -2584,7 +4807,7 @@ async function runWorkerBatch(workerId, options = {}) {
 var init_worker = __esm({
   "src/lib/tasks/worker.ts"() {
     "use strict";
-    init_models();
+    init_storage();
     init_reminder_send();
     init_aggregated_reminder_send();
     init_admin_nudge();
@@ -2600,17 +4823,17 @@ __export(run_notification_tasks_exports, {
 async function runNotificationTasks(options) {
   const workerId = typeof process !== "undefined" && process.env.HOSTNAME ? `${process.env.HOSTNAME}:${process.pid}` : `worker:${process.pid}`;
   return runWorkerBatch(workerId, {
-    limit: options?.limit ?? DEFAULT_BATCH_SIZE2,
+    limit: options?.limit ?? DEFAULT_BATCH_SIZE3,
     lockTtlMs: LOCK_TTL_MS,
     recoverStaleLocks: true
   });
 }
-var DEFAULT_BATCH_SIZE2, LOCK_TTL_MS;
+var DEFAULT_BATCH_SIZE3, LOCK_TTL_MS;
 var init_run_notification_tasks = __esm({
   "src/jobs/run-notification-tasks.ts"() {
     "use strict";
     init_worker();
-    DEFAULT_BATCH_SIZE2 = 50;
+    DEFAULT_BATCH_SIZE3 = 50;
     LOCK_TTL_MS = 5 * 60 * 1e3;
   }
 });
@@ -2807,15 +5030,13 @@ function registerHandlers(bot2) {
   });
 }
 async function handleMemberConfirm(ctx, periodId, memberId) {
-  await dbConnect();
-  const period = await BillingPeriod.findById(periodId);
+  const store = await db();
+  const period = await store.getBillingPeriodById(periodId);
   if (!period) {
     await ctx.answerCallbackQuery({ text: "Period not found" });
     return;
   }
-  const payment = period.payments.find(
-    (p7) => p7.memberId.toString() === memberId
-  );
+  const payment = period.payments.find((p7) => p7.memberId === memberId);
   if (!payment) {
     await ctx.answerCallbackQuery({ text: "Payment not found" });
     return;
@@ -2824,20 +5045,21 @@ async function handleMemberConfirm(ctx, periodId, memberId) {
     await ctx.answerCallbackQuery({ text: "Already confirmed!" });
     return;
   }
-  payment.status = "member_confirmed";
-  payment.memberConfirmedAt = /* @__PURE__ */ new Date();
-  await period.save();
+  await store.updatePaymentStatus(periodId, memberId, {
+    status: "member_confirmed",
+    memberConfirmedAt: /* @__PURE__ */ new Date()
+  });
   await ctx.answerCallbackQuery?.({ text: "Marked as paid!" });
   await ctx.editMessageText?.(
     "You've confirmed payment for this period. Waiting for admin verification."
   );
-  const group = await Group.findById(period.group);
+  const group = await store.getGroup(period.groupId);
   if (group) {
     await enqueueTask({
       type: "admin_confirmation_request",
       runAt: /* @__PURE__ */ new Date(),
       payload: {
-        groupId: group._id.toString(),
+        groupId: group.id,
         billingPeriodId: periodId
       }
     });
@@ -2845,13 +5067,13 @@ async function handleMemberConfirm(ctx, periodId, memberId) {
   }
 }
 async function handlePayDetails(ctx, periodId) {
-  await dbConnect();
-  const period = await BillingPeriod.findById(periodId);
+  const store = await db();
+  const period = await store.getBillingPeriodById(periodId);
   if (!period) {
     await ctx.answerCallbackQuery({ text: "Period not found" });
     return;
   }
-  const group = await Group.findById(period.group);
+  const group = await store.getGroup(period.groupId);
   if (!group) {
     await ctx.answerCallbackQuery({ text: "Group not found" });
     return;
@@ -2874,55 +5096,49 @@ async function handleSnooze(ctx) {
   );
 }
 async function handleAdminConfirm(ctx, periodId, memberId) {
-  await dbConnect();
-  const period = await BillingPeriod.findById(periodId);
+  const store = await db();
+  const period = await store.getBillingPeriodById(periodId);
   if (!period) {
     await ctx.answerCallbackQuery({ text: "Period not found" });
     return;
   }
-  const payment = period.payments.find(
-    (p7) => p7.memberId.toString() === memberId
-  );
+  const payment = period.payments.find((p7) => p7.memberId === memberId);
   if (!payment) {
     await ctx.answerCallbackQuery({ text: "Payment not found" });
     return;
   }
-  payment.status = "confirmed";
-  payment.adminConfirmedAt = /* @__PURE__ */ new Date();
-  const allConfirmed = period.payments.every(
-    (p7) => p7.status === "confirmed" || p7.status === "waived"
-  );
-  period.isFullyPaid = allConfirmed;
-  await period.save();
+  const updated = await store.updatePaymentStatus(periodId, memberId, {
+    status: "confirmed",
+    adminConfirmedAt: /* @__PURE__ */ new Date()
+  });
+  const payAfter = updated.payments.find((p7) => p7.memberId === memberId);
   await ctx.answerCallbackQuery?.({ text: "Payment confirmed!" });
   await ctx.editMessageText?.(
-    `Confirmed payment from ${payment.memberNickname} (${payment.amount.toFixed(2)}${period.currency}).`
+    `Confirmed payment from ${payAfter?.memberNickname ?? payment.memberNickname} (${payment.amount.toFixed(2)}${updated.currency}).`
   );
 }
 async function handleAdminReject(ctx, periodId, memberId) {
-  await dbConnect();
-  const period = await BillingPeriod.findById(periodId);
+  const store = await db();
+  const period = await store.getBillingPeriodById(periodId);
   if (!period) {
     await ctx.answerCallbackQuery({ text: "Period not found" });
     return;
   }
-  const payment = period.payments.find(
-    (p7) => p7.memberId.toString() === memberId
-  );
+  const payment = period.payments.find((p7) => p7.memberId === memberId);
   if (!payment) {
     await ctx.answerCallbackQuery({ text: "Payment not found" });
     return;
   }
-  payment.status = "pending";
-  payment.memberConfirmedAt = null;
-  await period.save();
+  await store.updatePaymentStatus(periodId, memberId, {
+    status: "pending",
+    memberConfirmedAt: null
+  });
   await ctx.answerCallbackQuery?.({ text: "Payment rejected" });
   await ctx.editMessageText?.(
     `Rejected payment claim from ${payment.memberNickname}. They'll be reminded again.`
   );
 }
 async function handleAccountLink(ctx, code) {
-  await dbConnect();
   const chatId = ctx.chat?.id;
   const username = ctx.from?.username ?? null;
   if (!chatId) {
@@ -2935,23 +5151,14 @@ async function handleAccountLink(ctx, code) {
     );
     return;
   }
+  const store = await db();
   const now2 = /* @__PURE__ */ new Date();
-  const user = await User.findOneAndUpdate(
-    {
-      "telegramLinkCode.code": code,
-      "telegramLinkCode.expiresAt": { $gt: now2 }
-    },
-    {
-      $set: {
-        "telegram.chatId": chatId,
-        "telegram.username": username,
-        "telegram.linkedAt": now2,
-        "notificationPreferences.telegram": true
-      },
-      $unset: { telegramLinkCode: "" }
-    },
-    { returnDocument: "after" }
-  );
+  const user = await store.linkTelegramAccountWithLinkCode({
+    code,
+    chatId,
+    username,
+    now: now2
+  });
   if (!user) {
     await ctx.reply(
       "This link has expired or is invalid. Generate a new one from the app Profile page."
@@ -2970,28 +5177,23 @@ async function handleInviteLink(ctx, token) {
     );
     return;
   }
-  await dbConnect();
+  const store = await db();
   const chatId = ctx.chat?.id;
   const username = ctx.from?.username ?? null;
   if (!chatId) {
     await ctx.reply("Could not get chat id.");
     return;
   }
-  let group = null;
-  if (payload.groupId) {
-    group = await Group.findById(payload.groupId);
-  } else {
-    group = await Group.findOne({
-      isActive: true,
-      "members._id": payload.memberId
-    });
-  }
-  if (!group || !group.isActive) {
+  const group = await store.findActiveGroupForMemberInvitation({
+    groupId: payload.groupId ?? null,
+    memberId: payload.memberId
+  });
+  if (!group) {
     await ctx.reply("This invite link is no longer valid.");
     return;
   }
   const member = group.members.find(
-    (m) => m._id.toString() === payload.memberId && m.isActive && !m.leftAt
+    (m) => m.id === payload.memberId && m.isActive && !m.leftAt
   );
   if (!member) {
     await ctx.reply("This invite link is no longer valid.");
@@ -3000,20 +5202,16 @@ async function handleInviteLink(ctx, token) {
   const wasAccepted = !!member.acceptedAt;
   const now2 = /* @__PURE__ */ new Date();
   const normalizedEmail = member.email.toLowerCase().trim();
-  let user = member.user ? await User.findById(member.user) : null;
+  let user = member.userId ? await store.getUser(member.userId) : null;
   if (!user) {
-    user = await User.findOne({ email: normalizedEmail });
+    user = await store.getUserByEmail(normalizedEmail);
   }
   if (!user) {
-    user = await User.create({
+    user = await store.createUser({
       name: member.nickname.trim() || normalizedEmail,
       email: normalizedEmail,
+      role: "user",
       hashedPassword: null,
-      telegram: {
-        chatId,
-        username,
-        linkedAt: now2
-      },
       notificationPreferences: {
         email: true,
         telegram: true,
@@ -3021,50 +5219,47 @@ async function handleInviteLink(ctx, token) {
       }
     });
   } else {
-    user.telegram = {
-      chatId,
-      username,
-      linkedAt: now2
-    };
-    if (user.notificationPreferences) {
-      user.notificationPreferences.telegram = true;
-    }
-    await user.save();
+    await store.updateUser(user.id, {
+      telegram: {
+        chatId,
+        username,
+        linkedAt: now2
+      },
+      notificationPreferences: {
+        ...user.notificationPreferences,
+        telegram: true
+      }
+    });
+    user = await store.getUser(user.id);
   }
-  if (!member.user || member.user.toString() !== user._id.toString()) {
-    member.user = user._id;
-  }
-  if (!member.acceptedAt) {
-    member.acceptedAt = now2;
-  }
-  await group.save();
-  const welcomeEmailClaimed = await User.findOneAndUpdate(
-    { _id: user._id, welcomeEmailSentAt: null },
-    { $set: { welcomeEmailSentAt: now2 } }
+  const nextMembers = group.members.map(
+    (m) => m.id === member.id ? {
+      ...m,
+      userId: user.id,
+      acceptedAt: m.acceptedAt ?? now2
+    } : m
   );
-  const shouldSendWelcomeEmail = !wasAccepted && !!welcomeEmailClaimed;
+  await store.updateGroup(group.id, { members: nextMembers });
+  const shouldSendWelcomeEmail = !wasAccepted && await store.tryClaimWelcomeEmailSentAt(user.id, now2);
   if (shouldSendWelcomeEmail) {
     const appUrlSetting = await getSetting("general.appUrl");
     const baseUrl = (appUrlSetting?.trim() || "http://localhost:3054").replace(
       /\/$/,
       ""
     );
-    const magicToken = await createMagicLoginToken(user._id.toString());
-    const magicLoginUrl = `${baseUrl}/invite-callback?token=${encodeURIComponent(magicToken)}&groupId=${encodeURIComponent(group._id.toString())}`;
+    const magicToken = await createMagicLoginToken(user.id);
+    const magicLoginUrl = `${baseUrl}/invite-callback?token=${encodeURIComponent(magicToken)}&groupId=${encodeURIComponent(group.id)}`;
     const sendEmail2 = !member.unsubscribedFromEmail;
     const unsubscribeUrl = sendEmail2 ? await getUnsubscribeUrl(
-      await createUnsubscribeToken(
-        member._id.toString(),
-        group._id.toString()
-      )
+      await createUnsubscribeToken(member.id, group.id)
     ) : null;
-    const admin = await User.findById(group.admin);
+    const adminUser = await store.getUser(group.adminId);
     const telegramWelcomeParams = {
       memberName: member.nickname,
       groupName: group.name,
-      groupId: group._id.toString(),
+      groupId: group.id,
       serviceName: group.service.name,
-      adminName: admin?.name ?? "The group admin",
+      adminName: adminUser?.name ?? "The group admin",
       billingSummary: buildBillingSummary(group),
       paymentPlatform: group.payment.platform,
       paymentLink: group.payment.link ?? null,
@@ -3084,7 +5279,7 @@ async function handleInviteLink(ctx, token) {
       {
         email: user.email,
         telegramChatId: null,
-        userId: user._id.toString(),
+        userId: user.id,
         preferences: {
           email: sendEmail2,
           telegram: false
@@ -3095,7 +5290,7 @@ async function handleInviteLink(ctx, token) {
         subject: `Welcome to ${group.name}`,
         emailHtml,
         telegramText: `Welcome to ${group.name}`,
-        groupId: group._id.toString(),
+        groupId: group.id,
         emailParams
       }
     );
@@ -3111,8 +5306,7 @@ async function handleInviteLink(ctx, token) {
 var init_handlers = __esm({
   "src/lib/telegram/handlers.ts"() {
     "use strict";
-    init_mongoose();
-    init_models();
+    init_storage();
     init_tokens();
     init_service();
     init_queue();
@@ -3293,1702 +5487,6 @@ var init_polling = __esm({
   }
 });
 
-// src/lib/billing/collection-window.ts
-function collectionWindowOpenFilter(now2) {
-  return {
-    $expr: {
-      $lte: [{ $ifNull: ["$collectionOpensAt", "$periodStart"] }, now2]
-    }
-  };
-}
-function getFirstReminderEligibleAt(collectionOpensAt, gracePeriodDays) {
-  const d = new Date(collectionOpensAt);
-  d.setDate(d.getDate() + gracePeriodDays);
-  return d;
-}
-function resolveCollectionOpensAt(period) {
-  return period.collectionOpensAt ?? period.periodStart;
-}
-var init_collection_window = __esm({
-  "src/lib/billing/collection-window.ts"() {
-    "use strict";
-  }
-});
-
-// src/lib/storage/mongoose-adapter.ts
-var mongoose_adapter_exports = {};
-__export(mongoose_adapter_exports, {
-  MongooseAdapter: () => MongooseAdapter
-});
-function toId(v) {
-  if (v instanceof import_mongoose17.Types.ObjectId) return v.toString();
-  if (typeof v === "string") return v;
-  return String(v);
-}
-function toIdOrNull(v) {
-  if (!v) return null;
-  return toId(v);
-}
-function userToStorage(u) {
-  return {
-    id: toId(u._id),
-    name: u.name,
-    email: u.email,
-    role: u.role,
-    emailVerified: u.emailVerified,
-    image: u.image,
-    hashedPassword: u.hashedPassword,
-    telegram: u.telegram ? {
-      chatId: u.telegram.chatId,
-      username: u.telegram.username,
-      linkedAt: u.telegram.linkedAt
-    } : null,
-    telegramLinkCode: u.telegramLinkCode ? { code: u.telegramLinkCode.code, expiresAt: u.telegramLinkCode.expiresAt } : null,
-    notificationPreferences: {
-      email: u.notificationPreferences?.email ?? true,
-      telegram: u.notificationPreferences?.telegram ?? false,
-      reminderFrequency: u.notificationPreferences?.reminderFrequency ?? "every_3_days"
-    },
-    welcomeEmailSentAt: u.welcomeEmailSentAt,
-    createdAt: u.createdAt,
-    updatedAt: u.updatedAt
-  };
-}
-function memberToStorage(m) {
-  return {
-    id: toId(m._id),
-    userId: toIdOrNull(m.user),
-    email: m.email,
-    nickname: m.nickname,
-    role: m.role,
-    joinedAt: m.joinedAt,
-    leftAt: m.leftAt,
-    isActive: m.isActive,
-    customAmount: m.customAmount,
-    acceptedAt: m.acceptedAt,
-    unsubscribedFromEmail: m.unsubscribedFromEmail,
-    billingStartsAt: m.billingStartsAt
-  };
-}
-function groupToStorage(g) {
-  return {
-    id: toId(g._id),
-    name: g.name,
-    description: g.description,
-    adminId: toId(g.admin),
-    service: {
-      name: g.service.name,
-      icon: g.service.icon,
-      url: g.service.url,
-      accentColor: g.service.accentColor,
-      emailTheme: g.service.emailTheme
-    },
-    billing: {
-      mode: g.billing.mode,
-      currentPrice: g.billing.currentPrice,
-      currency: g.billing.currency,
-      cycleDay: g.billing.cycleDay,
-      cycleType: g.billing.cycleType,
-      adminIncludedInSplit: g.billing.adminIncludedInSplit,
-      fixedMemberAmount: g.billing.fixedMemberAmount,
-      gracePeriodDays: g.billing.gracePeriodDays,
-      paymentInAdvanceDays: g.billing.paymentInAdvanceDays
-    },
-    payment: {
-      platform: g.payment.platform,
-      link: g.payment.link,
-      instructions: g.payment.instructions,
-      stripeAccountId: g.payment.stripeAccountId
-    },
-    notifications: {
-      remindersEnabled: g.notifications.remindersEnabled,
-      followUpsEnabled: g.notifications.followUpsEnabled,
-      priceChangeEnabled: g.notifications.priceChangeEnabled,
-      saveEmailParams: g.notifications.saveEmailParams
-    },
-    members: g.members.map(memberToStorage),
-    announcements: {
-      notifyOnPriceChange: g.announcements?.notifyOnPriceChange ?? true,
-      extraText: g.announcements?.extraText ?? null
-    },
-    telegramGroup: {
-      chatId: g.telegramGroup?.chatId ?? null,
-      linkedAt: g.telegramGroup?.linkedAt ?? null
-    },
-    isActive: g.isActive,
-    inviteCode: g.inviteCode,
-    inviteLinkEnabled: g.inviteLinkEnabled,
-    initializedAt: g.initializedAt,
-    createdAt: g.createdAt,
-    updatedAt: g.updatedAt
-  };
-}
-function paymentToStorage(p7) {
-  return {
-    id: toId(p7._id),
-    memberId: toId(p7.memberId),
-    memberEmail: p7.memberEmail,
-    memberNickname: p7.memberNickname,
-    amount: p7.amount,
-    adjustedAmount: p7.adjustedAmount,
-    adjustmentReason: p7.adjustmentReason,
-    status: p7.status,
-    memberConfirmedAt: p7.memberConfirmedAt,
-    adminConfirmedAt: p7.adminConfirmedAt,
-    confirmationToken: p7.confirmationToken,
-    notes: p7.notes
-  };
-}
-function periodToStorage(p7) {
-  return {
-    id: toId(p7._id),
-    groupId: toId(p7.group),
-    periodStart: p7.periodStart,
-    collectionOpensAt: p7.collectionOpensAt ?? null,
-    periodEnd: p7.periodEnd,
-    periodLabel: p7.periodLabel,
-    totalPrice: p7.totalPrice,
-    currency: p7.currency,
-    priceNote: p7.priceNote,
-    payments: p7.payments.map(paymentToStorage),
-    reminders: p7.reminders.map((r) => ({
-      sentAt: r.sentAt,
-      channel: r.channel,
-      recipientCount: r.recipientCount,
-      type: r.type
-    })),
-    isFullyPaid: p7.isFullyPaid,
-    createdAt: p7.createdAt,
-    updatedAt: p7.updatedAt
-  };
-}
-function notificationToStorage(n) {
-  return {
-    id: toId(n._id),
-    recipientId: toIdOrNull(n.recipient),
-    recipientEmail: n.recipientEmail,
-    groupId: toIdOrNull(n.group),
-    billingPeriodId: toIdOrNull(n.billingPeriod),
-    type: n.type,
-    channel: n.channel,
-    status: n.status,
-    subject: n.subject,
-    preview: n.preview,
-    emailParams: n.emailParams ?? null,
-    externalId: n.externalId,
-    error: n.error,
-    deliveredAt: n.deliveredAt,
-    createdAt: n.createdAt
-  };
-}
-function taskToStorage(t) {
-  return {
-    id: toId(t._id),
-    type: t.type,
-    status: t.status,
-    runAt: t.runAt,
-    lockedAt: t.lockedAt,
-    lockedBy: t.lockedBy,
-    attempts: t.attempts,
-    maxAttempts: t.maxAttempts,
-    lastError: t.lastError,
-    completedAt: t.completedAt,
-    cancelledAt: t.cancelledAt ?? null,
-    idempotencyKey: t.idempotencyKey,
-    payload: t.payload,
-    createdAt: t.createdAt,
-    updatedAt: t.updatedAt
-  };
-}
-function priceHistoryToStorage(p7) {
-  return {
-    id: toId(p7._id),
-    groupId: toId(p7.group),
-    price: p7.price,
-    previousPrice: p7.previousPrice,
-    currency: p7.currency,
-    effectiveFrom: p7.effectiveFrom,
-    note: p7.note,
-    membersNotified: p7.membersNotified,
-    createdBy: toId(p7.createdBy),
-    createdAt: p7.createdAt
-  };
-}
-var import_mongoose17, DEFAULT_LOCK_TTL_MS2, DEFAULT_BATCH_SIZE3, MongooseAdapter;
-var init_mongoose_adapter = __esm({
-  "src/lib/storage/mongoose-adapter.ts"() {
-    "use strict";
-    import_mongoose17 = require("mongoose");
-    init_mongoose();
-    init_models();
-    init_collection_window();
-    DEFAULT_LOCK_TTL_MS2 = 5 * 60 * 1e3;
-    DEFAULT_BATCH_SIZE3 = 50;
-    MongooseAdapter = class {
-      async initialize() {
-        await dbConnect();
-      }
-      async close() {
-      }
-      // ── users ──────────────────────────────────────────────────────────────────
-      async getUser(id) {
-        await dbConnect();
-        const u = await User.findById(id).lean();
-        return u ? userToStorage(u) : null;
-      }
-      async getUserByEmail(email) {
-        await dbConnect();
-        const u = await User.findOne({ email: email.toLowerCase().trim() }).lean();
-        return u ? userToStorage(u) : null;
-      }
-      async getUserByTelegramChatId(chatId) {
-        await dbConnect();
-        const u = await User.findOne({ "telegram.chatId": chatId }).lean();
-        return u ? userToStorage(u) : null;
-      }
-      async updateUser(id, data) {
-        await dbConnect();
-        const updated = await User.findByIdAndUpdate(id, { $set: data }, { new: true }).lean();
-        if (!updated) throw new Error(`user not found: ${id}`);
-        return userToStorage(updated);
-      }
-      // ── groups ─────────────────────────────────────────────────────────────────
-      async createGroup(data) {
-        await dbConnect();
-        const members = data.members.map((m) => ({
-          user: m.userId ? new import_mongoose17.Types.ObjectId(m.userId) : null,
-          email: m.email,
-          nickname: m.nickname,
-          role: m.role,
-          joinedAt: m.joinedAt,
-          leftAt: m.leftAt,
-          isActive: m.isActive,
-          customAmount: m.customAmount,
-          acceptedAt: m.acceptedAt,
-          unsubscribedFromEmail: m.unsubscribedFromEmail,
-          billingStartsAt: m.billingStartsAt
-        }));
-        const g = await Group.create({
-          name: data.name,
-          description: data.description,
-          admin: new import_mongoose17.Types.ObjectId(data.adminId),
-          service: data.service,
-          billing: data.billing,
-          payment: data.payment,
-          notifications: data.notifications,
-          members,
-          announcements: data.announcements,
-          telegramGroup: data.telegramGroup,
-          isActive: data.isActive,
-          inviteCode: data.inviteCode,
-          inviteLinkEnabled: data.inviteLinkEnabled,
-          initializedAt: data.initializedAt
-        });
-        return groupToStorage(g);
-      }
-      async getGroup(id) {
-        await dbConnect();
-        const g = await Group.findById(id).lean();
-        return g ? groupToStorage(g) : null;
-      }
-      async getGroupWithMemberUsers(id) {
-        await dbConnect();
-        const g = await Group.findById(id).populate({
-          path: "members.user",
-          model: "User",
-          select: "telegram notificationPreferences"
-        }).lean();
-        if (!g) return null;
-        const base = groupToStorage(g);
-        const memberUsers = /* @__PURE__ */ new Map();
-        for (const m of g.members) {
-          const memberId = toId(m._id);
-          if (m.user && typeof m.user === "object" && "notificationPreferences" in m.user) {
-            const u = m.user;
-            memberUsers.set(memberId, {
-              telegram: u.telegram ? { chatId: u.telegram.chatId, username: u.telegram.username, linkedAt: u.telegram.linkedAt } : null,
-              notificationPreferences: {
-                email: u.notificationPreferences?.email ?? true,
-                telegram: u.notificationPreferences?.telegram ?? false,
-                reminderFrequency: u.notificationPreferences?.reminderFrequency ?? "every_3_days"
-              }
-            });
-          } else {
-            memberUsers.set(memberId, null);
-          }
-        }
-        return { ...base, memberUsers };
-      }
-      async listGroupsForUser(userId, email) {
-        await dbConnect();
-        const groups = await Group.find({
-          isActive: true,
-          $or: [
-            { admin: userId },
-            { "members.user": userId },
-            { "members.email": email, "members.isActive": true }
-          ]
-        }).lean();
-        return groups.map(groupToStorage);
-      }
-      async updateGroup(id, data) {
-        await dbConnect();
-        const setFields = {};
-        if (data.name !== void 0) setFields.name = data.name;
-        if (data.description !== void 0) setFields.description = data.description;
-        if (data.service !== void 0) setFields.service = data.service;
-        if (data.billing !== void 0) setFields.billing = data.billing;
-        if (data.payment !== void 0) setFields.payment = data.payment;
-        if (data.notifications !== void 0) setFields.notifications = data.notifications;
-        if (data.announcements !== void 0) setFields.announcements = data.announcements;
-        if (data.telegramGroup !== void 0) setFields.telegramGroup = data.telegramGroup;
-        if (data.isActive !== void 0) setFields.isActive = data.isActive;
-        if (data.inviteCode !== void 0) setFields.inviteCode = data.inviteCode;
-        if (data.inviteLinkEnabled !== void 0) setFields.inviteLinkEnabled = data.inviteLinkEnabled;
-        if (data.initializedAt !== void 0) setFields.initializedAt = data.initializedAt;
-        if (data.members !== void 0) {
-          setFields.members = data.members.map((m) => ({
-            _id: m.id ? new import_mongoose17.Types.ObjectId(m.id) : void 0,
-            user: m.userId ? new import_mongoose17.Types.ObjectId(m.userId) : null,
-            email: m.email,
-            nickname: m.nickname,
-            role: m.role,
-            joinedAt: m.joinedAt,
-            leftAt: m.leftAt,
-            isActive: m.isActive,
-            customAmount: m.customAmount,
-            acceptedAt: m.acceptedAt,
-            unsubscribedFromEmail: m.unsubscribedFromEmail,
-            billingStartsAt: m.billingStartsAt
-          }));
-        }
-        const updated = await Group.findByIdAndUpdate(id, { $set: setFields }, { new: true }).lean();
-        if (!updated) throw new Error(`group not found: ${id}`);
-        return groupToStorage(updated);
-      }
-      async softDeleteGroup(id) {
-        await dbConnect();
-        await Group.findByIdAndUpdate(id, { $set: { isActive: false } });
-      }
-      async findGroupByInviteCode(code) {
-        await dbConnect();
-        const g = await Group.findOne({ inviteCode: code }).lean();
-        return g ? groupToStorage(g) : null;
-      }
-      // ── billing periods ────────────────────────────────────────────────────────
-      async createBillingPeriod(data) {
-        await dbConnect();
-        const payments = data.payments.map((p7) => ({
-          memberId: new import_mongoose17.Types.ObjectId(p7.memberId),
-          memberEmail: p7.memberEmail,
-          memberNickname: p7.memberNickname,
-          amount: p7.amount,
-          adjustedAmount: p7.adjustedAmount,
-          adjustmentReason: p7.adjustmentReason,
-          status: p7.status,
-          memberConfirmedAt: p7.memberConfirmedAt,
-          adminConfirmedAt: p7.adminConfirmedAt,
-          confirmationToken: p7.confirmationToken,
-          notes: p7.notes
-        }));
-        const period = await BillingPeriod.create({
-          group: new import_mongoose17.Types.ObjectId(data.groupId),
-          periodStart: data.periodStart,
-          collectionOpensAt: data.collectionOpensAt,
-          periodEnd: data.periodEnd,
-          periodLabel: data.periodLabel,
-          totalPrice: data.totalPrice,
-          currency: data.currency,
-          priceNote: data.priceNote,
-          payments,
-          reminders: data.reminders,
-          isFullyPaid: data.isFullyPaid
-        });
-        return periodToStorage(period);
-      }
-      async getBillingPeriod(id, groupId) {
-        await dbConnect();
-        const p7 = await BillingPeriod.findOne({ _id: id, group: groupId }).lean();
-        return p7 ? periodToStorage(p7) : null;
-      }
-      async getBillingPeriodByStart(groupId, periodStart) {
-        await dbConnect();
-        const p7 = await BillingPeriod.findOne({ group: groupId, periodStart }).lean();
-        return p7 ? periodToStorage(p7) : null;
-      }
-      async getOpenBillingPeriods(filter) {
-        await dbConnect();
-        const query = {
-          ...collectionWindowOpenFilter(filter.asOf)
-        };
-        if (filter.unpaidOnly) query.isFullyPaid = false;
-        if (filter.groupIds && filter.groupIds.length > 0) {
-          query.group = { $in: filter.groupIds.map((id) => new import_mongoose17.Types.ObjectId(id)) };
-        }
-        const periods = await BillingPeriod.find(query).lean();
-        return periods.map(periodToStorage);
-      }
-      async getPeriodsForGroup(groupId) {
-        await dbConnect();
-        const periods = await BillingPeriod.find({ group: groupId }).sort({ periodStart: -1 }).lean();
-        return periods.map(periodToStorage);
-      }
-      async getFuturePeriods(groupId, afterDate) {
-        await dbConnect();
-        const periods = await BillingPeriod.find({
-          group: groupId,
-          periodStart: { $gt: afterDate }
-        }).sort({ periodStart: 1 }).lean();
-        return periods.map(periodToStorage);
-      }
-      async updateBillingPeriod(id, data) {
-        await dbConnect();
-        const setFields = {};
-        if (data.periodStart !== void 0) setFields.periodStart = data.periodStart;
-        if (data.collectionOpensAt !== void 0) setFields.collectionOpensAt = data.collectionOpensAt;
-        if (data.periodEnd !== void 0) setFields.periodEnd = data.periodEnd;
-        if (data.periodLabel !== void 0) setFields.periodLabel = data.periodLabel;
-        if (data.totalPrice !== void 0) setFields.totalPrice = data.totalPrice;
-        if (data.currency !== void 0) setFields.currency = data.currency;
-        if (data.priceNote !== void 0) setFields.priceNote = data.priceNote;
-        if (data.isFullyPaid !== void 0) setFields.isFullyPaid = data.isFullyPaid;
-        if (data.reminders !== void 0) setFields.reminders = data.reminders;
-        if (data.payments !== void 0) {
-          setFields.payments = data.payments.map((p7) => ({
-            _id: p7.id ? new import_mongoose17.Types.ObjectId(p7.id) : void 0,
-            memberId: new import_mongoose17.Types.ObjectId(p7.memberId),
-            memberEmail: p7.memberEmail,
-            memberNickname: p7.memberNickname,
-            amount: p7.amount,
-            adjustedAmount: p7.adjustedAmount,
-            adjustmentReason: p7.adjustmentReason,
-            status: p7.status,
-            memberConfirmedAt: p7.memberConfirmedAt,
-            adminConfirmedAt: p7.adminConfirmedAt,
-            confirmationToken: p7.confirmationToken,
-            notes: p7.notes
-          }));
-        }
-        const updated = await BillingPeriod.findByIdAndUpdate(id, { $set: setFields }, { new: true }).lean();
-        if (!updated) throw new Error(`billing period not found: ${id}`);
-        return periodToStorage(updated);
-      }
-      async deleteBillingPeriod(id, groupId) {
-        await dbConnect();
-        await BillingPeriod.findOneAndDelete({ _id: id, group: groupId });
-      }
-      async updatePaymentStatus(periodId, memberId, update) {
-        await dbConnect();
-        const period = await BillingPeriod.findById(periodId);
-        if (!period) throw new Error(`billing period not found: ${periodId}`);
-        const payment = period.payments.find(
-          (p7) => p7.memberId.toString() === memberId
-        );
-        if (!payment) throw new Error(`payment not found for member ${memberId} in period ${periodId}`);
-        if (update.status !== void 0) payment.status = update.status;
-        if (update.memberConfirmedAt !== void 0) payment.memberConfirmedAt = update.memberConfirmedAt;
-        if (update.adminConfirmedAt !== void 0) payment.adminConfirmedAt = update.adminConfirmedAt;
-        if (update.confirmationToken !== void 0) payment.confirmationToken = update.confirmationToken;
-        if (update.notes !== void 0) payment.notes = update.notes;
-        if (update.adjustedAmount !== void 0) payment.adjustedAmount = update.adjustedAmount;
-        if (update.adjustmentReason !== void 0) payment.adjustmentReason = update.adjustmentReason;
-        period.isFullyPaid = period.payments.every(
-          (p7) => p7.status === "confirmed" || p7.status === "waived"
-        );
-        await period.save();
-        return periodToStorage(period);
-      }
-      async getBillingPeriodByConfirmationToken(token) {
-        await dbConnect();
-        const period = await BillingPeriod.findOne({
-          "payments.confirmationToken": token
-        });
-        if (!period) return null;
-        const paymentIndex = period.payments.findIndex(
-          (p7) => p7.confirmationToken === token
-        );
-        if (paymentIndex === -1) return null;
-        return { period: periodToStorage(period), paymentIndex };
-      }
-      // ── notifications ──────────────────────────────────────────────────────────
-      async logNotification(data) {
-        await dbConnect();
-        const n = await Notification.create({
-          recipient: data.recipientId ? new import_mongoose17.Types.ObjectId(data.recipientId) : null,
-          recipientEmail: data.recipientEmail,
-          group: data.groupId ? new import_mongoose17.Types.ObjectId(data.groupId) : null,
-          billingPeriod: data.billingPeriodId ? new import_mongoose17.Types.ObjectId(data.billingPeriodId) : null,
-          type: data.type,
-          channel: data.channel,
-          status: data.status,
-          subject: data.subject ?? null,
-          preview: data.preview,
-          emailParams: data.emailParams ?? null,
-          externalId: data.externalId ?? null,
-          error: data.error ?? null,
-          deliveredAt: data.deliveredAt ?? null
-        });
-        return notificationToStorage(n);
-      }
-      async getNotificationsForGroup(groupId, limit = 50) {
-        await dbConnect();
-        const ns = await Notification.find({ group: groupId }).sort({ createdAt: -1 }).limit(limit).lean();
-        return ns.map(notificationToStorage);
-      }
-      // ── scheduled tasks ────────────────────────────────────────────────────────
-      async enqueueTask(data) {
-        await dbConnect();
-        const existing = await ScheduledTask.findOne({ idempotencyKey: data.idempotencyKey });
-        if (existing) return null;
-        const t = await ScheduledTask.create({
-          type: data.type,
-          status: "pending",
-          runAt: data.runAt,
-          payload: data.payload,
-          idempotencyKey: data.idempotencyKey,
-          maxAttempts: data.maxAttempts ?? 5
-        });
-        return taskToStorage(t);
-      }
-      async claimTasks(workerId, options = {}) {
-        await dbConnect();
-        const limit = options.limit ?? DEFAULT_BATCH_SIZE3;
-        const lockTtlMs = options.lockTtlMs ?? DEFAULT_LOCK_TTL_MS2;
-        const now2 = /* @__PURE__ */ new Date();
-        const staleThreshold = new Date(now2.getTime() - lockTtlMs);
-        if (options.recoverStaleLocks) {
-          await ScheduledTask.updateMany(
-            { status: "locked", lockedAt: { $lt: staleThreshold } },
-            { $set: { status: "pending", lockedAt: null, lockedBy: null } }
-          );
-        }
-        const tasks = [];
-        const cursor = ScheduledTask.find({ status: "pending", runAt: { $lte: now2 } }).sort({ runAt: 1 }).limit(limit).cursor();
-        for await (const task of cursor) {
-          const updated = await ScheduledTask.findOneAndUpdate(
-            { _id: task._id, status: "pending" },
-            { $set: { status: "locked", lockedAt: now2, lockedBy: workerId } },
-            { returnDocument: "after" }
-          );
-          if (updated) tasks.push(taskToStorage(updated));
-        }
-        return tasks;
-      }
-      async completeTask(taskId) {
-        await dbConnect();
-        await ScheduledTask.findByIdAndUpdate(taskId, {
-          $set: { status: "completed", completedAt: /* @__PURE__ */ new Date(), lockedAt: null, lockedBy: null }
-        });
-      }
-      async failTask(taskId, error, attempts, maxAttempts) {
-        await dbConnect();
-        if (attempts >= maxAttempts) {
-          await ScheduledTask.findByIdAndUpdate(taskId, {
-            $set: { status: "failed", lastError: error, attempts, lockedAt: null, lockedBy: null }
-          });
-          return;
-        }
-        const backoffMs = Math.min(2 ** attempts * 60 * 1e3, 24 * 60 * 60 * 1e3);
-        await ScheduledTask.findByIdAndUpdate(taskId, {
-          $set: {
-            status: "pending",
-            runAt: new Date(Date.now() + backoffMs),
-            lastError: error,
-            attempts,
-            lockedAt: null,
-            lockedBy: null
-          }
-        });
-      }
-      async releaseTask(taskId) {
-        await dbConnect();
-        await ScheduledTask.findByIdAndUpdate(taskId, {
-          $set: { status: "pending", lockedAt: null, lockedBy: null }
-        });
-      }
-      async cancelTask(taskId) {
-        await dbConnect();
-        await ScheduledTask.findByIdAndUpdate(taskId, {
-          $set: { status: "cancelled", cancelledAt: /* @__PURE__ */ new Date() }
-        });
-      }
-      async getTaskCounts() {
-        await dbConnect();
-        const [pending, locked, completed, failed, cancelled] = await Promise.all([
-          ScheduledTask.countDocuments({ status: "pending" }),
-          ScheduledTask.countDocuments({ status: "locked" }),
-          ScheduledTask.countDocuments({ status: "completed" }),
-          ScheduledTask.countDocuments({ status: "failed" }),
-          ScheduledTask.countDocuments({ status: "cancelled" })
-        ]);
-        return { pending, locked, completed, failed, cancelled };
-      }
-      async listTasks(options = {}) {
-        await dbConnect();
-        const query = {};
-        if (options.status) query.status = options.status;
-        if (options.type) query.type = options.type;
-        if (options.groupId) query["payload.groupId"] = options.groupId;
-        const limit = options.limit ?? 50;
-        const offset = options.offset ?? 0;
-        const [tasks, total] = await Promise.all([
-          ScheduledTask.find(query).sort({ createdAt: -1 }).skip(offset).limit(limit).lean(),
-          ScheduledTask.countDocuments(query)
-        ]);
-        return { tasks: tasks.map(taskToStorage), total };
-      }
-      // ── price history ──────────────────────────────────────────────────────────
-      async createPriceHistory(data) {
-        await dbConnect();
-        const p7 = await PriceHistory.create({
-          group: new import_mongoose17.Types.ObjectId(data.groupId),
-          price: data.price,
-          previousPrice: data.previousPrice,
-          currency: data.currency,
-          effectiveFrom: data.effectiveFrom,
-          note: data.note ?? null,
-          membersNotified: data.membersNotified ?? false,
-          createdBy: new import_mongoose17.Types.ObjectId(data.createdBy)
-        });
-        return priceHistoryToStorage(p7);
-      }
-      async getPriceHistoryForGroup(groupId) {
-        await dbConnect();
-        const records = await PriceHistory.find({ group: groupId }).sort({ effectiveFrom: -1 }).lean();
-        return records.map(priceHistoryToStorage);
-      }
-      // ── data portability ───────────────────────────────────────────────────────
-      async exportAll() {
-        await dbConnect();
-        const [groups, billingPeriods, notifications, priceHistory] = await Promise.all([
-          Group.find({}).lean(),
-          BillingPeriod.find({}).lean(),
-          Notification.find({}).lean(),
-          PriceHistory.find({}).lean()
-        ]);
-        return {
-          version: "1.0.0",
-          exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
-          source: { mode: "advanced", appVersion: process.env.npm_package_version ?? "unknown" },
-          data: {
-            groups: groups.map(groupToStorage),
-            billingPeriods: billingPeriods.map(periodToStorage),
-            notifications: notifications.map(notificationToStorage),
-            priceHistory: priceHistory.map(priceHistoryToStorage)
-          }
-        };
-      }
-      async importAll(bundle) {
-        await dbConnect();
-        const errors = [];
-        let groups = 0;
-        let billingPeriods = 0;
-        let notifications = 0;
-        let priceHistory = 0;
-        for (const g of bundle.data.groups) {
-          try {
-            await Group.findByIdAndUpdate(
-              g.id,
-              {
-                $setOnInsert: {
-                  _id: g.id,
-                  name: g.name,
-                  description: g.description,
-                  admin: new import_mongoose17.Types.ObjectId(g.adminId),
-                  service: g.service,
-                  billing: g.billing,
-                  payment: g.payment,
-                  notifications: g.notifications,
-                  members: g.members.map((m) => ({
-                    _id: m.id,
-                    user: m.userId ? new import_mongoose17.Types.ObjectId(m.userId) : null,
-                    email: m.email,
-                    nickname: m.nickname,
-                    role: m.role,
-                    joinedAt: m.joinedAt,
-                    leftAt: m.leftAt,
-                    isActive: m.isActive,
-                    customAmount: m.customAmount,
-                    acceptedAt: m.acceptedAt,
-                    unsubscribedFromEmail: m.unsubscribedFromEmail,
-                    billingStartsAt: m.billingStartsAt
-                  })),
-                  announcements: g.announcements,
-                  telegramGroup: g.telegramGroup,
-                  isActive: g.isActive,
-                  inviteCode: g.inviteCode,
-                  inviteLinkEnabled: g.inviteLinkEnabled,
-                  initializedAt: g.initializedAt,
-                  createdAt: g.createdAt
-                }
-              },
-              { upsert: true }
-            );
-            groups++;
-          } catch (e) {
-            errors.push(`group ${g.id}: ${e instanceof Error ? e.message : String(e)}`);
-          }
-        }
-        for (const p7 of bundle.data.billingPeriods) {
-          try {
-            await BillingPeriod.findByIdAndUpdate(
-              p7.id,
-              {
-                $setOnInsert: {
-                  _id: p7.id,
-                  group: new import_mongoose17.Types.ObjectId(p7.groupId),
-                  periodStart: p7.periodStart,
-                  collectionOpensAt: p7.collectionOpensAt,
-                  periodEnd: p7.periodEnd,
-                  periodLabel: p7.periodLabel,
-                  totalPrice: p7.totalPrice,
-                  currency: p7.currency,
-                  priceNote: p7.priceNote,
-                  payments: p7.payments.map((pay) => ({
-                    _id: pay.id,
-                    memberId: new import_mongoose17.Types.ObjectId(pay.memberId),
-                    memberEmail: pay.memberEmail,
-                    memberNickname: pay.memberNickname,
-                    amount: pay.amount,
-                    adjustedAmount: pay.adjustedAmount,
-                    adjustmentReason: pay.adjustmentReason,
-                    status: pay.status,
-                    memberConfirmedAt: pay.memberConfirmedAt,
-                    adminConfirmedAt: pay.adminConfirmedAt,
-                    confirmationToken: pay.confirmationToken,
-                    notes: pay.notes
-                  })),
-                  reminders: p7.reminders,
-                  isFullyPaid: p7.isFullyPaid,
-                  createdAt: p7.createdAt
-                }
-              },
-              { upsert: true }
-            );
-            billingPeriods++;
-          } catch (e) {
-            errors.push(`period ${p7.id}: ${e instanceof Error ? e.message : String(e)}`);
-          }
-        }
-        for (const n of bundle.data.notifications) {
-          try {
-            await Notification.findByIdAndUpdate(
-              n.id,
-              {
-                $setOnInsert: {
-                  _id: n.id,
-                  recipient: n.recipientId ? new import_mongoose17.Types.ObjectId(n.recipientId) : null,
-                  recipientEmail: n.recipientEmail,
-                  group: n.groupId ? new import_mongoose17.Types.ObjectId(n.groupId) : null,
-                  billingPeriod: n.billingPeriodId ? new import_mongoose17.Types.ObjectId(n.billingPeriodId) : null,
-                  type: n.type,
-                  channel: n.channel,
-                  status: n.status,
-                  subject: n.subject,
-                  preview: n.preview,
-                  emailParams: n.emailParams,
-                  externalId: n.externalId,
-                  error: n.error,
-                  deliveredAt: n.deliveredAt,
-                  createdAt: n.createdAt
-                }
-              },
-              { upsert: true }
-            );
-            notifications++;
-          } catch (e) {
-            errors.push(`notification ${n.id}: ${e instanceof Error ? e.message : String(e)}`);
-          }
-        }
-        for (const ph of bundle.data.priceHistory) {
-          try {
-            await PriceHistory.findByIdAndUpdate(
-              ph.id,
-              {
-                $setOnInsert: {
-                  _id: ph.id,
-                  group: new import_mongoose17.Types.ObjectId(ph.groupId),
-                  price: ph.price,
-                  previousPrice: ph.previousPrice,
-                  currency: ph.currency,
-                  effectiveFrom: ph.effectiveFrom,
-                  note: ph.note,
-                  membersNotified: ph.membersNotified,
-                  createdBy: new import_mongoose17.Types.ObjectId(ph.createdBy),
-                  createdAt: ph.createdAt
-                }
-              },
-              { upsert: true }
-            );
-            priceHistory++;
-          } catch (e) {
-            errors.push(`priceHistory ${ph.id}: ${e instanceof Error ? e.message : String(e)}`);
-          }
-        }
-        return { groups, billingPeriods, notifications, priceHistory, errors };
-      }
-    };
-  }
-});
-
-// src/lib/storage/types.ts
-var init_types = __esm({
-  "src/lib/storage/types.ts"() {
-    "use strict";
-  }
-});
-
-// src/lib/auth/local.ts
-var LOCAL_ADMIN_USER_ID;
-var init_local = __esm({
-  "src/lib/auth/local.ts"() {
-    "use strict";
-    init_manager();
-    LOCAL_ADMIN_USER_ID = "local-admin";
-  }
-});
-
-// src/lib/storage/sqlite-adapter.ts
-var sqlite_adapter_exports = {};
-__export(sqlite_adapter_exports, {
-  SqliteAdapter: () => SqliteAdapter
-});
-function now() {
-  return (/* @__PURE__ */ new Date()).toISOString();
-}
-function parseRow(row) {
-  return JSON.parse(row.data);
-}
-function parseDates(obj, dateKeys) {
-  const out = { ...obj };
-  for (const key of dateKeys) {
-    if (typeof out[key] === "string") {
-      out[key] = new Date(out[key]);
-    } else if (out[key] === null || out[key] === void 0) {
-      out[key] = null;
-    }
-  }
-  return out;
-}
-function hydrateGroup(data) {
-  const g = parseDates(data, ["initializedAt", "createdAt", "updatedAt"]);
-  if (Array.isArray(g.members)) {
-    g.members = g.members.map(
-      (m) => parseDates(m, ["joinedAt", "leftAt", "acceptedAt", "billingStartsAt"])
-    );
-  }
-  if (g.telegramGroup) {
-    g.telegramGroup = parseDates(g.telegramGroup, ["linkedAt"]);
-  }
-  return g;
-}
-function hydratePeriod(data) {
-  const p7 = parseDates(data, ["periodStart", "collectionOpensAt", "periodEnd", "createdAt", "updatedAt"]);
-  if (Array.isArray(p7.payments)) {
-    p7.payments = p7.payments.map(
-      (pay) => parseDates(pay, ["memberConfirmedAt", "adminConfirmedAt"])
-    );
-  }
-  if (Array.isArray(p7.reminders)) {
-    p7.reminders = p7.reminders.map(
-      (r) => parseDates(r, ["sentAt"])
-    );
-  }
-  return p7;
-}
-function hydrateTask(data) {
-  return parseDates(data, ["runAt", "lockedAt", "completedAt", "cancelledAt", "createdAt", "updatedAt"]);
-}
-function hydrateNotification(data) {
-  return parseDates(data, ["deliveredAt", "createdAt"]);
-}
-function hydratePriceHistory(data) {
-  return parseDates(data, ["effectiveFrom", "createdAt"]);
-}
-function hydrateUser(data) {
-  const u = parseDates(data, ["emailVerified", "welcomeEmailSentAt", "createdAt", "updatedAt"]);
-  if (u.telegram) {
-    u.telegram = parseDates(u.telegram, ["linkedAt"]);
-  }
-  if (u.telegramLinkCode) {
-    u.telegramLinkCode = parseDates(u.telegramLinkCode, ["expiresAt"]);
-  }
-  return u;
-}
-var import_better_sqlite3, import_nanoid, SCHEMA_SQL, DEFAULT_LOCK_TTL_MS3, SqliteAdapter;
-var init_sqlite_adapter = __esm({
-  "src/lib/storage/sqlite-adapter.ts"() {
-    "use strict";
-    import_better_sqlite3 = __toESM(require("better-sqlite3"));
-    import_nanoid = require("nanoid");
-    init_manager();
-    init_local();
-    SCHEMA_SQL = `
-  CREATE TABLE IF NOT EXISTS groups (
-    id TEXT PRIMARY KEY,
-    admin_id TEXT NOT NULL,
-    is_active INTEGER NOT NULL DEFAULT 1,
-    invite_code TEXT UNIQUE,
-    data JSON NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_groups_admin ON groups(admin_id);
-  CREATE INDEX IF NOT EXISTS idx_groups_active ON groups(is_active);
-
-  CREATE TABLE IF NOT EXISTS billing_periods (
-    id TEXT PRIMARY KEY,
-    group_id TEXT NOT NULL REFERENCES groups(id),
-    period_start TEXT NOT NULL,
-    collection_opens_at TEXT,
-    is_fully_paid INTEGER NOT NULL DEFAULT 0,
-    data JSON NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_bp_group_start ON billing_periods(group_id, period_start);
-  CREATE INDEX IF NOT EXISTS idx_bp_group ON billing_periods(group_id);
-  CREATE INDEX IF NOT EXISTS idx_bp_unpaid ON billing_periods(is_fully_paid);
-
-  CREATE TABLE IF NOT EXISTS notifications (
-    id TEXT PRIMARY KEY,
-    group_id TEXT,
-    data JSON NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_notif_group ON notifications(group_id);
-  CREATE INDEX IF NOT EXISTS idx_notif_created ON notifications(created_at);
-
-  CREATE TABLE IF NOT EXISTS scheduled_tasks (
-    id TEXT PRIMARY KEY,
-    type TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending',
-    run_at TEXT NOT NULL,
-    idempotency_key TEXT UNIQUE,
-    locked_at TEXT,
-    locked_by TEXT,
-    data JSON NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_tasks_status_run ON scheduled_tasks(status, run_at);
-  CREATE INDEX IF NOT EXISTS idx_tasks_locked ON scheduled_tasks(locked_at);
-
-  CREATE TABLE IF NOT EXISTS price_history (
-    id TEXT PRIMARY KEY,
-    group_id TEXT NOT NULL REFERENCES groups(id),
-    data JSON NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_ph_group ON price_history(group_id);
-
-  CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    email TEXT UNIQUE NOT NULL,
-    telegram_chat_id INTEGER UNIQUE,
-    data JSON NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-`;
-    DEFAULT_LOCK_TTL_MS3 = 5 * 60 * 1e3;
-    SqliteAdapter = class {
-      constructor(dbPath) {
-        this.dbPath = dbPath;
-      }
-      async initialize() {
-        const fs9 = await import("fs");
-        const path11 = await import("path");
-        const dir = path11.dirname(this.dbPath);
-        if (!fs9.existsSync(dir)) {
-          fs9.mkdirSync(dir, { recursive: true });
-        }
-        this.db = new import_better_sqlite3.default(this.dbPath);
-        this.db.pragma("journal_mode = WAL");
-        this.db.pragma("foreign_keys = ON");
-        this.db.exec(SCHEMA_SQL);
-        this.seedLocalAdmin();
-      }
-      // ensure the local admin user row exists (reads email/name from config)
-      seedLocalAdmin() {
-        try {
-          const config = readConfig();
-          if (!config) return;
-          const existing = this.db.prepare("SELECT id FROM users WHERE id = ?").get(LOCAL_ADMIN_USER_ID);
-          const ts = /* @__PURE__ */ new Date();
-          const user = {
-            id: LOCAL_ADMIN_USER_ID,
-            name: config.adminName ?? "Admin",
-            email: config.adminEmail ?? "admin@localhost",
-            role: "admin",
-            emailVerified: null,
-            image: null,
-            hashedPassword: null,
-            telegram: null,
-            telegramLinkCode: null,
-            notificationPreferences: {
-              email: !!config.notifications?.channels?.email,
-              telegram: !!config.notifications?.channels?.telegram,
-              reminderFrequency: "once"
-            },
-            welcomeEmailSentAt: null,
-            createdAt: existing ? ts : ts,
-            updatedAt: ts
-          };
-          this.upsertUser(user);
-        } catch {
-        }
-      }
-      async close() {
-        this.db?.close();
-      }
-      ensureOpen() {
-        if (!this.db) throw new Error("SqliteAdapter not initialized \u2014 call initialize() first");
-      }
-      // ── users ──────────────────────────────────────────────────────────────────
-      async getUser(id) {
-        this.ensureOpen();
-        const row = this.db.prepare("SELECT data FROM users WHERE id = ?").get(id);
-        if (!row) return null;
-        return hydrateUser(parseRow(row));
-      }
-      async getUserByEmail(email) {
-        this.ensureOpen();
-        const row = this.db.prepare("SELECT data FROM users WHERE email = ?").get(email.toLowerCase().trim());
-        if (!row) return null;
-        return hydrateUser(parseRow(row));
-      }
-      async getUserByTelegramChatId(chatId) {
-        this.ensureOpen();
-        const row = this.db.prepare("SELECT data FROM users WHERE telegram_chat_id = ?").get(chatId);
-        if (!row) return null;
-        return hydrateUser(parseRow(row));
-      }
-      async updateUser(id, data) {
-        this.ensureOpen();
-        const existing = await this.getUser(id);
-        if (!existing) throw new Error(`user not found: ${id}`);
-        const merged = { ...existing, ...data, updatedAt: /* @__PURE__ */ new Date() };
-        this.db.prepare(
-          "UPDATE users SET email = ?, telegram_chat_id = ?, data = ?, updated_at = ? WHERE id = ?"
-        ).run(
-          merged.email.toLowerCase(),
-          merged.telegram?.chatId ?? null,
-          JSON.stringify(merged),
-          now(),
-          id
-        );
-        return merged;
-      }
-      // local mode: upsert the single admin user
-      upsertUser(user) {
-        this.ensureOpen();
-        this.db.prepare(`
-      INSERT INTO users (id, email, telegram_chat_id, data, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        email = excluded.email,
-        telegram_chat_id = excluded.telegram_chat_id,
-        data = excluded.data,
-        updated_at = excluded.updated_at
-    `).run(
-          user.id,
-          user.email.toLowerCase(),
-          user.telegram?.chatId ?? null,
-          JSON.stringify(user),
-          user.createdAt.toISOString(),
-          now()
-        );
-      }
-      // ── groups ─────────────────────────────────────────────────────────────────
-      async createGroup(data) {
-        this.ensureOpen();
-        const id = (0, import_nanoid.nanoid)();
-        const ts = now();
-        const group = {
-          id,
-          ...data,
-          createdAt: new Date(ts),
-          updatedAt: new Date(ts)
-        };
-        this.db.prepare(`
-      INSERT INTO groups (id, admin_id, is_active, invite_code, data, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, data.adminId, data.isActive ? 1 : 0, data.inviteCode ?? null, JSON.stringify(group), ts, ts);
-        return group;
-      }
-      async getGroup(id) {
-        this.ensureOpen();
-        const row = this.db.prepare("SELECT data FROM groups WHERE id = ?").get(id);
-        if (!row) return null;
-        return hydrateGroup(parseRow(row));
-      }
-      async getGroupWithMemberUsers(id) {
-        this.ensureOpen();
-        const group = await this.getGroup(id);
-        if (!group) return null;
-        const memberUsers = /* @__PURE__ */ new Map();
-        for (const member of group.members) {
-          if (member.userId) {
-            const user = await this.getUser(member.userId);
-            if (user) {
-              memberUsers.set(member.id, {
-                telegram: user.telegram,
-                notificationPreferences: user.notificationPreferences
-              });
-              continue;
-            }
-          }
-          memberUsers.set(member.id, null);
-        }
-        return { ...group, memberUsers };
-      }
-      async listGroupsForUser(userId, email) {
-        this.ensureOpen();
-        const rows = this.db.prepare("SELECT data FROM groups WHERE is_active = 1").all();
-        const groups = rows.map((r) => hydrateGroup(parseRow(r)));
-        return groups.filter((g) => {
-          if (g.adminId === userId) return true;
-          return g.members.some(
-            (m) => m.isActive && (m.userId === userId || m.email.toLowerCase() === email.toLowerCase())
-          );
-        });
-      }
-      async updateGroup(id, data) {
-        this.ensureOpen();
-        const existing = await this.getGroup(id);
-        if (!existing) throw new Error(`group not found: ${id}`);
-        const merged = { ...existing, ...data, updatedAt: /* @__PURE__ */ new Date() };
-        const ts = now();
-        this.db.prepare(`
-      UPDATE groups SET admin_id = ?, is_active = ?, invite_code = ?, data = ?, updated_at = ?
-      WHERE id = ?
-    `).run(merged.adminId, merged.isActive ? 1 : 0, merged.inviteCode ?? null, JSON.stringify(merged), ts, id);
-        return merged;
-      }
-      async softDeleteGroup(id) {
-        this.ensureOpen();
-        const existing = await this.getGroup(id);
-        if (!existing) return;
-        await this.updateGroup(id, { isActive: false });
-      }
-      async findGroupByInviteCode(code) {
-        this.ensureOpen();
-        const row = this.db.prepare("SELECT data FROM groups WHERE invite_code = ?").get(code);
-        if (!row) return null;
-        return hydrateGroup(parseRow(row));
-      }
-      // ── billing periods ────────────────────────────────────────────────────────
-      async createBillingPeriod(data) {
-        this.ensureOpen();
-        const id = (0, import_nanoid.nanoid)();
-        const ts = now();
-        const period = {
-          id,
-          ...data,
-          createdAt: new Date(ts),
-          updatedAt: new Date(ts)
-        };
-        this.db.prepare(`
-      INSERT INTO billing_periods (id, group_id, period_start, collection_opens_at, is_fully_paid, data, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-          id,
-          data.groupId,
-          data.periodStart.toISOString(),
-          data.collectionOpensAt?.toISOString() ?? null,
-          data.isFullyPaid ? 1 : 0,
-          JSON.stringify(period),
-          ts,
-          ts
-        );
-        return period;
-      }
-      async getBillingPeriod(id, groupId) {
-        this.ensureOpen();
-        const row = this.db.prepare(
-          "SELECT data FROM billing_periods WHERE id = ? AND group_id = ?"
-        ).get(id, groupId);
-        if (!row) return null;
-        return hydratePeriod(parseRow(row));
-      }
-      async getBillingPeriodByStart(groupId, periodStart) {
-        this.ensureOpen();
-        const row = this.db.prepare(
-          "SELECT data FROM billing_periods WHERE group_id = ? AND period_start = ?"
-        ).get(groupId, periodStart.toISOString());
-        if (!row) return null;
-        return hydratePeriod(parseRow(row));
-      }
-      async getOpenBillingPeriods(filter) {
-        this.ensureOpen();
-        const asOf = filter.asOf.toISOString();
-        let sql = `
-      SELECT data FROM billing_periods
-      WHERE COALESCE(collection_opens_at, period_start) <= ?
-    `;
-        const params = [asOf];
-        if (filter.unpaidOnly) {
-          sql += " AND is_fully_paid = 0";
-        }
-        if (filter.groupIds && filter.groupIds.length > 0) {
-          sql += ` AND group_id IN (${filter.groupIds.map(() => "?").join(",")})`;
-          params.push(...filter.groupIds);
-        }
-        const rows = this.db.prepare(sql).all(...params);
-        return rows.map((r) => hydratePeriod(parseRow(r)));
-      }
-      async getPeriodsForGroup(groupId) {
-        this.ensureOpen();
-        const rows = this.db.prepare(
-          "SELECT data FROM billing_periods WHERE group_id = ? ORDER BY period_start DESC"
-        ).all(groupId);
-        return rows.map((r) => hydratePeriod(parseRow(r)));
-      }
-      async getFuturePeriods(groupId, afterDate) {
-        this.ensureOpen();
-        const rows = this.db.prepare(
-          "SELECT data FROM billing_periods WHERE group_id = ? AND period_start > ? ORDER BY period_start ASC"
-        ).all(groupId, afterDate.toISOString());
-        return rows.map((r) => hydratePeriod(parseRow(r)));
-      }
-      async updateBillingPeriod(id, data) {
-        this.ensureOpen();
-        const existing = await this.db.prepare(
-          "SELECT data, group_id FROM billing_periods WHERE id = ?"
-        ).get(id);
-        if (!existing) throw new Error(`billing period not found: ${id}`);
-        const current = hydratePeriod(parseRow(existing));
-        const merged = { ...current, ...data, updatedAt: /* @__PURE__ */ new Date() };
-        const ts = now();
-        this.db.prepare(`
-      UPDATE billing_periods
-      SET collection_opens_at = ?, is_fully_paid = ?, data = ?, updated_at = ?
-      WHERE id = ?
-    `).run(
-          merged.collectionOpensAt?.toISOString() ?? null,
-          merged.isFullyPaid ? 1 : 0,
-          JSON.stringify(merged),
-          ts,
-          id
-        );
-        return merged;
-      }
-      async deleteBillingPeriod(id, groupId) {
-        this.ensureOpen();
-        this.db.prepare("DELETE FROM billing_periods WHERE id = ? AND group_id = ?").run(id, groupId);
-      }
-      async updatePaymentStatus(periodId, memberId, update) {
-        this.ensureOpen();
-        const row = this.db.prepare(
-          "SELECT data, group_id FROM billing_periods WHERE id = ?"
-        ).get(periodId);
-        if (!row) throw new Error(`billing period not found: ${periodId}`);
-        const period = hydratePeriod(parseRow(row));
-        const payment = period.payments.find((p7) => p7.memberId === memberId);
-        if (!payment) throw new Error(`payment not found for member ${memberId} in period ${periodId}`);
-        if (update.status !== void 0) payment.status = update.status;
-        if (update.memberConfirmedAt !== void 0) payment.memberConfirmedAt = update.memberConfirmedAt;
-        if (update.adminConfirmedAt !== void 0) payment.adminConfirmedAt = update.adminConfirmedAt;
-        if (update.confirmationToken !== void 0) payment.confirmationToken = update.confirmationToken;
-        if (update.notes !== void 0) payment.notes = update.notes;
-        if (update.adjustedAmount !== void 0) payment.adjustedAmount = update.adjustedAmount;
-        if (update.adjustmentReason !== void 0) payment.adjustmentReason = update.adjustmentReason;
-        period.isFullyPaid = period.payments.every(
-          (p7) => p7.status === "confirmed" || p7.status === "waived"
-        );
-        period.updatedAt = /* @__PURE__ */ new Date();
-        const ts = now();
-        this.db.prepare(`
-      UPDATE billing_periods SET is_fully_paid = ?, data = ?, updated_at = ? WHERE id = ?
-    `).run(period.isFullyPaid ? 1 : 0, JSON.stringify(period), ts, periodId);
-        return period;
-      }
-      async getBillingPeriodByConfirmationToken(token) {
-        this.ensureOpen();
-        const rows = this.db.prepare("SELECT data FROM billing_periods").all();
-        for (const r of rows) {
-          const period = hydratePeriod(parseRow(r));
-          const idx = period.payments.findIndex((p7) => p7.confirmationToken === token);
-          if (idx !== -1) return { period, paymentIndex: idx };
-        }
-        return null;
-      }
-      // ── notifications ──────────────────────────────────────────────────────────
-      async logNotification(data) {
-        this.ensureOpen();
-        const id = (0, import_nanoid.nanoid)();
-        const ts = now();
-        const notif = {
-          id,
-          recipientId: data.recipientId ?? null,
-          recipientEmail: data.recipientEmail,
-          groupId: data.groupId ?? null,
-          billingPeriodId: data.billingPeriodId ?? null,
-          type: data.type,
-          channel: data.channel,
-          status: data.status,
-          subject: data.subject ?? null,
-          preview: data.preview,
-          emailParams: data.emailParams ?? null,
-          externalId: data.externalId ?? null,
-          error: data.error ?? null,
-          deliveredAt: data.deliveredAt ?? null,
-          createdAt: new Date(ts)
-        };
-        this.db.prepare(`
-      INSERT INTO notifications (id, group_id, data, created_at)
-      VALUES (?, ?, ?, ?)
-    `).run(id, data.groupId ?? null, JSON.stringify(notif), ts);
-        return notif;
-      }
-      async getNotificationsForGroup(groupId, limit = 50) {
-        this.ensureOpen();
-        const rows = this.db.prepare(
-          "SELECT data FROM notifications WHERE group_id = ? ORDER BY created_at DESC LIMIT ?"
-        ).all(groupId, limit);
-        return rows.map((r) => hydrateNotification(parseRow(r)));
-      }
-      // ── scheduled tasks ────────────────────────────────────────────────────────
-      async enqueueTask(data) {
-        this.ensureOpen();
-        const existing = this.db.prepare(
-          "SELECT id FROM scheduled_tasks WHERE idempotency_key = ?"
-        ).get(data.idempotencyKey);
-        if (existing) return null;
-        const id = (0, import_nanoid.nanoid)();
-        const ts = now();
-        const task = {
-          id,
-          type: data.type,
-          status: "pending",
-          runAt: data.runAt,
-          lockedAt: null,
-          lockedBy: null,
-          attempts: 0,
-          maxAttempts: data.maxAttempts ?? 5,
-          lastError: null,
-          completedAt: null,
-          cancelledAt: null,
-          idempotencyKey: data.idempotencyKey,
-          payload: data.payload,
-          createdAt: new Date(ts),
-          updatedAt: new Date(ts)
-        };
-        this.db.prepare(`
-      INSERT INTO scheduled_tasks (id, type, status, run_at, idempotency_key, locked_at, locked_by, data, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, data.type, "pending", data.runAt.toISOString(), data.idempotencyKey, null, null, JSON.stringify(task), ts, ts);
-        return task;
-      }
-      async claimTasks(workerId, options = {}) {
-        this.ensureOpen();
-        const limit = options.limit ?? 50;
-        const lockTtlMs = options.lockTtlMs ?? DEFAULT_LOCK_TTL_MS3;
-        const nowTs = now();
-        const staleThreshold = new Date(Date.now() - lockTtlMs).toISOString();
-        if (options.recoverStaleLocks) {
-          const stale = this.db.prepare(
-            "SELECT id, data FROM scheduled_tasks WHERE status = 'locked' AND locked_at < ?"
-          ).all(staleThreshold);
-          const releaseStmt = this.db.prepare(
-            "UPDATE scheduled_tasks SET status = 'pending', locked_at = NULL, locked_by = NULL, data = ?, updated_at = ? WHERE id = ?"
-          );
-          for (const s of stale) {
-            const t = hydrateTask(parseRow(s));
-            t.status = "pending";
-            t.lockedAt = null;
-            t.lockedBy = null;
-            t.updatedAt = /* @__PURE__ */ new Date();
-            releaseStmt.run(JSON.stringify(t), nowTs, s.id);
-          }
-        }
-        const candidates = this.db.prepare(`
-      SELECT id, data FROM scheduled_tasks
-      WHERE status = 'pending' AND run_at <= ?
-      ORDER BY run_at ASC
-      LIMIT ?
-    `).all(nowTs, limit);
-        const claimed = [];
-        const claimStmt = this.db.prepare(`
-      UPDATE scheduled_tasks
-      SET status = 'locked', locked_at = ?, locked_by = ?, data = ?, updated_at = ?
-      WHERE id = ? AND status = 'pending'
-    `);
-        for (const c of candidates) {
-          const t = hydrateTask(parseRow(c));
-          t.status = "locked";
-          t.lockedAt = new Date(nowTs);
-          t.lockedBy = workerId;
-          t.updatedAt = /* @__PURE__ */ new Date();
-          const result = claimStmt.run(nowTs, workerId, JSON.stringify(t), nowTs, c.id);
-          if (result.changes > 0) claimed.push(t);
-        }
-        return claimed;
-      }
-      async completeTask(taskId) {
-        this.ensureOpen();
-        const row = this.db.prepare("SELECT data FROM scheduled_tasks WHERE id = ?").get(taskId);
-        if (!row) return;
-        const t = hydrateTask(parseRow(row));
-        t.status = "completed";
-        t.completedAt = /* @__PURE__ */ new Date();
-        t.lockedAt = null;
-        t.lockedBy = null;
-        t.updatedAt = /* @__PURE__ */ new Date();
-        const ts = now();
-        this.db.prepare("UPDATE scheduled_tasks SET status = 'completed', locked_at = NULL, locked_by = NULL, data = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(t), ts, taskId);
-      }
-      async failTask(taskId, error, attempts, maxAttempts) {
-        this.ensureOpen();
-        const row = this.db.prepare("SELECT data FROM scheduled_tasks WHERE id = ?").get(taskId);
-        if (!row) return;
-        const t = hydrateTask(parseRow(row));
-        t.attempts = attempts;
-        t.lastError = error;
-        t.lockedAt = null;
-        t.lockedBy = null;
-        t.updatedAt = /* @__PURE__ */ new Date();
-        const ts = now();
-        if (attempts >= maxAttempts) {
-          t.status = "failed";
-        } else {
-          const backoffMs = Math.min(2 ** attempts * 60 * 1e3, 24 * 60 * 60 * 1e3);
-          t.status = "pending";
-          t.runAt = new Date(Date.now() + backoffMs);
-        }
-        this.db.prepare(
-          "UPDATE scheduled_tasks SET status = ?, run_at = ?, locked_at = NULL, locked_by = NULL, data = ?, updated_at = ? WHERE id = ?"
-        ).run(t.status, t.runAt.toISOString(), JSON.stringify(t), ts, taskId);
-      }
-      async releaseTask(taskId) {
-        this.ensureOpen();
-        const row = this.db.prepare("SELECT data FROM scheduled_tasks WHERE id = ?").get(taskId);
-        if (!row) return;
-        const t = hydrateTask(parseRow(row));
-        t.status = "pending";
-        t.lockedAt = null;
-        t.lockedBy = null;
-        t.updatedAt = /* @__PURE__ */ new Date();
-        const ts = now();
-        this.db.prepare("UPDATE scheduled_tasks SET status = 'pending', locked_at = NULL, locked_by = NULL, data = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(t), ts, taskId);
-      }
-      async cancelTask(taskId) {
-        this.ensureOpen();
-        const row = this.db.prepare("SELECT data FROM scheduled_tasks WHERE id = ?").get(taskId);
-        if (!row) return;
-        const t = hydrateTask(parseRow(row));
-        t.status = "cancelled";
-        t.cancelledAt = /* @__PURE__ */ new Date();
-        t.updatedAt = /* @__PURE__ */ new Date();
-        const ts = now();
-        this.db.prepare("UPDATE scheduled_tasks SET status = 'cancelled', data = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(t), ts, taskId);
-      }
-      async getTaskCounts() {
-        this.ensureOpen();
-        const rows = this.db.prepare(
-          "SELECT status, COUNT(*) as count FROM scheduled_tasks GROUP BY status"
-        ).all();
-        const counts = { pending: 0, locked: 0, completed: 0, failed: 0, cancelled: 0 };
-        for (const row of rows) {
-          if (row.status in counts) counts[row.status] = row.count;
-        }
-        return counts;
-      }
-      async listTasks(options = {}) {
-        this.ensureOpen();
-        const conditions = [];
-        const params = [];
-        if (options.status) {
-          conditions.push("status = ?");
-          params.push(options.status);
-        }
-        if (options.type) {
-          conditions.push("type = ?");
-          params.push(options.type);
-        }
-        if (options.groupId) {
-          conditions.push("json_extract(data, '$.payload.groupId') = ?");
-          params.push(options.groupId);
-        }
-        const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-        const limit = options.limit ?? 50;
-        const offset = options.offset ?? 0;
-        const total = this.db.prepare(`SELECT COUNT(*) as c FROM scheduled_tasks ${where}`).get(...params).c;
-        const rows = this.db.prepare(
-          `SELECT data FROM scheduled_tasks ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-        ).all(...params, limit, offset);
-        return { tasks: rows.map((r) => hydrateTask(parseRow(r))), total };
-      }
-      // ── price history ──────────────────────────────────────────────────────────
-      async createPriceHistory(data) {
-        this.ensureOpen();
-        const id = (0, import_nanoid.nanoid)();
-        const ts = now();
-        const ph = {
-          id,
-          groupId: data.groupId,
-          price: data.price,
-          previousPrice: data.previousPrice,
-          currency: data.currency,
-          effectiveFrom: data.effectiveFrom,
-          note: data.note ?? null,
-          membersNotified: data.membersNotified ?? false,
-          createdBy: data.createdBy,
-          createdAt: new Date(ts)
-        };
-        this.db.prepare(`
-      INSERT INTO price_history (id, group_id, data, created_at) VALUES (?, ?, ?, ?)
-    `).run(id, data.groupId, JSON.stringify(ph), ts);
-        return ph;
-      }
-      async getPriceHistoryForGroup(groupId) {
-        this.ensureOpen();
-        const rows = this.db.prepare(
-          "SELECT data FROM price_history WHERE group_id = ? ORDER BY created_at DESC"
-        ).all(groupId);
-        return rows.map((r) => hydratePriceHistory(parseRow(r)));
-      }
-      // ── data portability ───────────────────────────────────────────────────────
-      async exportAll() {
-        this.ensureOpen();
-        const groupRows = this.db.prepare("SELECT data FROM groups").all();
-        const periodRows = this.db.prepare("SELECT data FROM billing_periods").all();
-        const notifRows = this.db.prepare("SELECT data FROM notifications").all();
-        const phRows = this.db.prepare("SELECT data FROM price_history").all();
-        return {
-          version: "1.0.0",
-          exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
-          source: { mode: "local", appVersion: process.env.npm_package_version ?? "unknown" },
-          data: {
-            groups: groupRows.map((r) => hydrateGroup(parseRow(r))),
-            billingPeriods: periodRows.map((r) => hydratePeriod(parseRow(r))),
-            notifications: notifRows.map((r) => hydrateNotification(parseRow(r))),
-            priceHistory: phRows.map((r) => hydratePriceHistory(parseRow(r)))
-          }
-        };
-      }
-      async importAll(bundle) {
-        this.ensureOpen();
-        const errors = [];
-        let groups = 0;
-        let billingPeriods = 0;
-        let notifications = 0;
-        let priceHistory = 0;
-        const importGroup = this.db.prepare(`
-      INSERT OR IGNORE INTO groups (id, admin_id, is_active, invite_code, data, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-        const importPeriod = this.db.prepare(`
-      INSERT OR IGNORE INTO billing_periods (id, group_id, period_start, collection_opens_at, is_fully_paid, data, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-        const importNotif = this.db.prepare(`
-      INSERT OR IGNORE INTO notifications (id, group_id, data, created_at) VALUES (?, ?, ?, ?)
-    `);
-        const importPh = this.db.prepare(`
-      INSERT OR IGNORE INTO price_history (id, group_id, data, created_at) VALUES (?, ?, ?, ?)
-    `);
-        const runImport = this.db.transaction(() => {
-          for (const g of bundle.data.groups) {
-            try {
-              importGroup.run(
-                g.id,
-                g.adminId,
-                g.isActive ? 1 : 0,
-                g.inviteCode ?? null,
-                JSON.stringify(g),
-                new Date(g.createdAt).toISOString(),
-                new Date(g.updatedAt).toISOString()
-              );
-              groups++;
-            } catch (e) {
-              errors.push(`group ${g.id}: ${e instanceof Error ? e.message : String(e)}`);
-            }
-          }
-          for (const p7 of bundle.data.billingPeriods) {
-            try {
-              importPeriod.run(
-                p7.id,
-                p7.groupId,
-                new Date(p7.periodStart).toISOString(),
-                p7.collectionOpensAt ? new Date(p7.collectionOpensAt).toISOString() : null,
-                p7.isFullyPaid ? 1 : 0,
-                JSON.stringify(p7),
-                new Date(p7.createdAt).toISOString(),
-                new Date(p7.updatedAt).toISOString()
-              );
-              billingPeriods++;
-            } catch (e) {
-              errors.push(`period ${p7.id}: ${e instanceof Error ? e.message : String(e)}`);
-            }
-          }
-          for (const n of bundle.data.notifications) {
-            try {
-              importNotif.run(n.id, n.groupId ?? null, JSON.stringify(n), new Date(n.createdAt).toISOString());
-              notifications++;
-            } catch (e) {
-              errors.push(`notification ${n.id}: ${e instanceof Error ? e.message : String(e)}`);
-            }
-          }
-          for (const ph of bundle.data.priceHistory) {
-            try {
-              importPh.run(ph.id, ph.groupId, JSON.stringify(ph), new Date(ph.createdAt).toISOString());
-              priceHistory++;
-            } catch (e) {
-              errors.push(`priceHistory ${ph.id}: ${e instanceof Error ? e.message : String(e)}`);
-            }
-          }
-        });
-        runImport();
-        return { groups, billingPeriods, notifications, priceHistory, errors };
-      }
-    };
-  }
-});
-
-// src/lib/storage/index.ts
-var storage_exports = {};
-__export(storage_exports, {
-  getAdapter: () => getAdapter,
-  resetAdapter: () => resetAdapter,
-  setAdapter: () => setAdapter
-});
-function getAdapter() {
-  if (_adapter) return _adapter;
-  const mode = process.env.SUB5TR4CKER_MODE;
-  if (mode === "local") {
-    const { SqliteAdapter: SqliteAdapter2 } = (init_sqlite_adapter(), __toCommonJS(sqlite_adapter_exports));
-    const dataPath = process.env.SUB5TR4CKER_DATA_PATH ?? `${process.env.HOME}/.sub5tr4cker/data.db`;
-    _adapter = new SqliteAdapter2(dataPath);
-  } else {
-    _adapter = new MongooseAdapter();
-  }
-  return _adapter;
-}
-function setAdapter(adapter) {
-  _adapter = adapter;
-}
-function resetAdapter() {
-  _adapter = null;
-}
-var _adapter;
-var init_storage = __esm({
-  "src/lib/storage/index.ts"() {
-    "use strict";
-    init_mongoose_adapter();
-    init_types();
-    _adapter = null;
-  }
-});
-
 // src/lib/notifications/member-email.ts
 function normalizeMemberEmailForAggregation(email) {
   return email.trim().toLowerCase();
@@ -5005,39 +5503,39 @@ __export(enqueue_reminders_exports, {
   enqueueReminders: () => enqueueReminders
 });
 async function enqueueReminders() {
-  await dbConnect();
+  const store = await db();
   const now2 = /* @__PURE__ */ new Date();
   const aggregateReminders = await getSetting("notifications.aggregateReminders") === "true";
   let enqueued = 0;
-  const periods = await BillingPeriod.find({
-    isFullyPaid: false,
-    ...collectionWindowOpenFilter(now2),
-    "payments.status": { $in: ["pending", "overdue"] }
-  }).populate("group");
+  const periodsRaw = await store.getOpenBillingPeriods({
+    asOf: now2,
+    unpaidOnly: true
+  });
+  const periods = periodsRaw.filter(
+    (period) => period.payments.some(
+      (p7) => p7.status === "pending" || p7.status === "overdue"
+    )
+  );
   if (aggregateReminders) {
     const byEmail = /* @__PURE__ */ new Map();
     for (const period of periods) {
-      const group = period.group;
-      if (!group || typeof group !== "object" || Array.isArray(group)) continue;
-      if (!group.isActive) continue;
+      const group = await store.getGroup(period.groupId);
+      if (!group || !group.isActive) continue;
       if (group.notifications?.remindersEnabled === false) continue;
       const graceDays = group.billing.gracePeriodDays ?? 3;
       const collectionOpensAt = resolveCollectionOpensAt(period);
-      const firstReminderAt = getFirstReminderEligibleAt(
-        collectionOpensAt,
-        graceDays
-      );
+      const firstReminderAt = getFirstReminderEligibleAt(collectionOpensAt, graceDays);
       if (now2 < firstReminderAt) continue;
-      const groupId = group._id.toString();
-      const billingPeriodId = period._id.toString();
+      const groupId = group.id;
+      const billingPeriodId = period.id;
       for (const payment of period.payments) {
         if (payment.status !== "pending" && payment.status !== "overdue") continue;
         const bucketKey = normalizeMemberEmailForAggregation(payment.memberEmail);
         const ref = {
           groupId,
           billingPeriodId,
-          memberId: payment.memberId.toString(),
-          paymentId: payment._id.toString(),
+          memberId: payment.memberId,
+          paymentId: payment.id,
           memberEmail: payment.memberEmail
         };
         const list = byEmail.get(bucketKey) ?? [];
@@ -5064,31 +5562,27 @@ async function enqueueReminders() {
     return enqueued;
   }
   for (const period of periods) {
-    const group = await Group.findById(period.group);
+    const group = await store.getGroup(period.groupId);
     if (!group || !group.isActive) continue;
     if (group.notifications?.remindersEnabled === false) continue;
     const graceDays = group.billing.gracePeriodDays ?? 3;
     const collectionOpensAt = resolveCollectionOpensAt(period);
-    const firstReminderAt = getFirstReminderEligibleAt(
-      collectionOpensAt,
-      graceDays
-    );
+    const firstReminderAt = getFirstReminderEligibleAt(collectionOpensAt, graceDays);
     if (now2 < firstReminderAt) continue;
-    const groupId = group._id.toString();
-    const billingPeriodId = period._id.toString();
+    const groupId = group.id;
+    const billingPeriodId = period.id;
     for (const payment of period.payments) {
       if (payment.status !== "pending" && payment.status !== "overdue") {
         continue;
       }
-      const paymentId = payment._id.toString();
       const task = await enqueueTask({
         type: "payment_reminder",
         runAt: now2,
         payload: {
           groupId,
           billingPeriodId,
-          memberId: payment.memberId.toString(),
-          paymentId
+          memberId: payment.memberId,
+          paymentId: payment.id
         }
       });
       if (task) enqueued++;
@@ -5099,12 +5593,11 @@ async function enqueueReminders() {
 var init_enqueue_reminders = __esm({
   "src/jobs/enqueue-reminders.ts"() {
     "use strict";
-    init_mongoose();
-    init_models();
     init_collection_window();
     init_service();
     init_member_email();
     init_queue();
+    init_storage();
   }
 });
 
@@ -5928,20 +6421,25 @@ async function runStartCommand(options = {}) {
     HOSTNAME: "localhost",
     NEXTAUTH_URL: `http://localhost:${port}`
   };
+  const nextBin = import_path10.default.join(pkgRoot, "node_modules", ".bin", "next");
   let child;
-  if ((0, import_fs8.existsSync)(standaloneServer)) {
+  if ((0, import_fs8.existsSync)(nextBin)) {
+    child = (0, import_child_process3.spawn)(nextBin, ["start", "--port", String(port)], {
+      env,
+      stdio: "inherit",
+      cwd: pkgRoot
+    });
+  } else if ((0, import_fs8.existsSync)(standaloneServer)) {
     child = (0, import_child_process3.spawn)("node", [standaloneServer], {
       env,
       stdio: "inherit",
       cwd: import_path10.default.join(pkgRoot, ".next", "standalone")
     });
   } else {
-    const nextBin = import_path10.default.join(pkgRoot, "node_modules", ".bin", "next");
-    child = (0, import_child_process3.spawn)(nextBin, ["start", "--port", String(port)], {
-      env,
-      stdio: "inherit",
-      cwd: pkgRoot
-    });
+    p2.log.error(
+      "No Next.js start path found. Install dependencies (pnpm install) and run s54r init / pnpm build."
+    );
+    process.exit(1);
   }
   child.on("error", (e) => {
     p2.log.error(`Failed to start server: ${e.message}`);

@@ -4,11 +4,10 @@ import {
   createMemberPortalToken,
   getMemberPortalUrl,
 } from "@/lib/tokens";
-import { dbConnect } from "@/lib/db/mongoose";
-import { BillingPeriod, Group } from "@/models";
 import { enqueueTask } from "@/lib/tasks/queue";
 import { runNotificationTasks } from "@/jobs/run-notification-tasks";
 import { getSetting } from "@/lib/settings/service";
+import { db, type StorageMemberPayment } from "@/lib/storage";
 
 export async function GET(
   _request: NextRequest,
@@ -20,9 +19,7 @@ export async function GET(
     (await getSetting("general.appUrl")) || new URL(_request.url).origin;
 
   if (!payload) {
-    return NextResponse.redirect(
-      new URL("/confirmed?error=invalid", appUrl)
-    );
+    return NextResponse.redirect(new URL("/confirmed?error=invalid", appUrl));
   }
 
   const memberPortalToken = await createMemberPortalToken(
@@ -31,38 +28,37 @@ export async function GET(
   );
   const memberPortalUrl = await getMemberPortalUrl(memberPortalToken);
 
-  await dbConnect();
-
-  const period = await BillingPeriod.findById(payload.periodId);
+  const store = await db();
+  const period = await store.getBillingPeriod(payload.periodId, payload.groupId);
   if (!period) {
-    return NextResponse.redirect(
-      new URL(memberPortalUrl, appUrl)
-    );
+    return NextResponse.redirect(new URL(memberPortalUrl, appUrl));
   }
 
-  const payment = period.payments.find(
-    (p: { memberId: { toString: () => string } }) => p.memberId.toString() === payload.memberId
+  const payIdx = period.payments.findIndex(
+    (p: StorageMemberPayment) => p.memberId === payload.memberId
   );
-  if (!payment) {
-    return NextResponse.redirect(
-      new URL(memberPortalUrl, appUrl)
-    );
+  if (payIdx === -1) {
+    return NextResponse.redirect(new URL(memberPortalUrl, appUrl));
   }
 
-  // already confirmed
+  const payment = period.payments[payIdx]!;
+
   if (payment.status !== "pending" && payment.status !== "overdue") {
     return NextResponse.redirect(
       new URL(`${memberPortalUrl}?confirmed=true&already=true`, appUrl)
     );
   }
 
-  // mark as member confirmed
-  payment.status = "member_confirmed";
-  payment.memberConfirmedAt = new Date();
-  await period.save();
+  const updatedPayment: StorageMemberPayment = {
+    ...payment,
+    status: "member_confirmed",
+    memberConfirmedAt: new Date(),
+  };
+  const payments = period.payments.map((p, i) => (i === payIdx ? updatedPayment : p));
 
-  // enqueue admin verification nudge (telegram by default when linked; email if tg unavailable)
-  const group = await Group.findById(payload.groupId);
+  await store.updateBillingPeriod(payload.periodId, { payments });
+
+  const group = await store.getGroup(payload.groupId);
   if (group) {
     await enqueueTask({
       type: "admin_confirmation_request",

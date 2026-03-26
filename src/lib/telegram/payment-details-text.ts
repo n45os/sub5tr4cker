@@ -1,6 +1,6 @@
-import type { IGroup } from "@/models";
+import type { StorageGroup } from "@/lib/storage";
 
-const PLATFORM_LABEL: Record<IGroup["payment"]["platform"], string> = {
+const PLATFORM_LABEL: Record<StorageGroup["payment"]["platform"], string> = {
   revolut: "Revolut",
   paypal: "PayPal",
   bank_transfer: "Bank transfer",
@@ -10,7 +10,7 @@ const PLATFORM_LABEL: Record<IGroup["payment"]["platform"], string> = {
 
 /** plain-text block for Telegram (no HTML; safe for admin-entered instructions) */
 export function formatGroupPaymentDetailsPlainText(
-  group: Pick<IGroup, "name" | "payment" | "announcements">
+  group: Pick<StorageGroup, "name" | "payment" | "announcements">
 ): string {
   const platform =
     PLATFORM_LABEL[group.payment.platform] ?? group.payment.platform;

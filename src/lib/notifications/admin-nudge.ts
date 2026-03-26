@@ -1,6 +1,4 @@
-import { User } from "@/models";
-import type { IGroup } from "@/models";
-import type { IBillingPeriod } from "@/models/billing-period";
+import { db, type StorageBillingPeriod, type StorageGroup } from "@/lib/storage";
 import { sendNotification } from "@/lib/notifications/service";
 import {
   buildAdminFollowUpEmailHtml,
@@ -9,13 +7,11 @@ import {
 import { isTelegramEnabled } from "@/lib/telegram/bot";
 import { getSetting } from "@/lib/settings/service";
 
-type GroupDoc = IGroup & { _id: { toString: () => string } };
-type PeriodDoc = IBillingPeriod & {
-  _id: { toString: () => string };
-  periodLabel: string;
-  currency: string;
-  payments: Array<{ status: string; memberNickname: string; amount: number }>;
-};
+type GroupDoc = StorageGroup;
+type PeriodDoc = Pick<
+  StorageBillingPeriod,
+  "id" | "periodLabel" | "currency" | "payments"
+>;
 
 /**
  * Send admin a single notification to verify member_confirmed payments for a period.
@@ -30,11 +26,12 @@ export async function sendAdminConfirmationNudge(
   );
   if (unverified.length === 0) return;
 
-  const admin = await User.findById(group.admin);
+  const store = await db();
+  const admin = await store.getUser(group.adminId);
   if (!admin) return;
   const appUrl = ((await getSetting("general.appUrl")) || "").replace(/\/$/, "");
   const dashboardUrl = appUrl
-    ? `${appUrl}/dashboard/groups/${group._id.toString()}/billing`
+    ? `${appUrl}/dashboard/groups/${group.id}/billing`
     : null;
 
   const templateParams = {
@@ -71,7 +68,7 @@ export async function sendAdminConfirmationNudge(
     {
       email: admin.email,
       telegramChatId: admin.telegram?.chatId,
-      userId: admin._id.toString(),
+      userId: admin.id,
       preferences: {
         telegram: telegramPref,
         email: !canDeliverTelegram && emailPref,
@@ -82,8 +79,8 @@ export async function sendAdminConfirmationNudge(
       subject: `Verify payments for ${group.name} — ${period.periodLabel}`,
       emailHtml,
       telegramText,
-      groupId: group._id.toString(),
-      billingPeriodId: period._id.toString(),
+      groupId: group.id,
+      billingPeriodId: period.id,
       emailParams,
     }
   );

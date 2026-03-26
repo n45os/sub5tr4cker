@@ -1,10 +1,9 @@
-import { AuditEvent } from "@/models";
-import type { AuditAction } from "@/models";
+import { db, type StorageAuditAction } from "@/lib/storage";
 
 interface LogAuditParams {
   actorId: string;
   actorName: string;
-  action: AuditAction;
+  action: StorageAuditAction;
   groupId?: string | null;
   billingPeriodId?: string | null;
   targetMemberId?: string | null;
@@ -22,13 +21,14 @@ export async function logAudit(params: LogAuditParams): Promise<void> {
     metadata = {},
   } = params;
   try {
-    await AuditEvent.create({
-      actor: actorId,
+    const store = await db();
+    await store.logAudit({
+      actorId,
       actorName,
       action,
-      group: groupId || undefined,
-      billingPeriod: billingPeriodId || undefined,
-      targetMember: targetMemberId || undefined,
+      groupId: groupId || undefined,
+      billingPeriodId: billingPeriodId || undefined,
+      targetMemberId: targetMemberId || undefined,
       metadata,
     });
   } catch (err) {

@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import mongoose from "mongoose";
+import { nanoid } from "nanoid";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group, BillingPeriod } from "@/models";
-import type { IGroupMember, IMemberPayment } from "@/models";
 import {
   filterBillingForMember,
   getGroupAccess,
@@ -14,6 +11,7 @@ import {
 import { calculateShares } from "@/lib/billing/calculator";
 import { getCollectionOpensAt } from "@/lib/billing/collection-window";
 import { createConfirmationToken } from "@/lib/tokens";
+import { db, isStorageId, type StorageBillingPeriod } from "@/lib/storage";
 
 const createPeriodSchema = z.object({
   periodLabel: z.string().min(1).max(50),
@@ -25,6 +23,26 @@ const createPeriodSchema = z.object({
 function parseDate(s: string): Date {
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + "T00:00:00.000Z");
   return new Date(s);
+}
+
+function memberLikeId(m: { id?: string; _id?: { toString(): string } }): string {
+  if ("id" in m && m.id) return m.id;
+  const oid = (m as { _id?: { toString(): string } })._id;
+  return oid?.toString() ?? "";
+}
+
+function periodMatchesFilters(
+  period: StorageBillingPeriod,
+  statusFilter: string | undefined,
+  effectiveMemberId: string | undefined
+): boolean {
+  if (statusFilter && !period.payments.some((pay) => pay.status === statusFilter)) {
+    return false;
+  }
+  if (effectiveMemberId && !period.payments.some((pay) => pay.memberId === effectiveMemberId)) {
+    return false;
+  }
+  return true;
 }
 
 export async function GET(
@@ -40,7 +58,7 @@ export async function GET(
   }
 
   const { groupId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId)) {
+  if (!isStorageId(groupId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group id" } },
       { status: 400 }
@@ -53,9 +71,8 @@ export async function GET(
   const statusFilter = searchParams.get("status") || undefined;
   const memberIdFilter = searchParams.get("memberId") || undefined;
 
-  await dbConnect();
-
-  const group = await Group.findById(groupId);
+  const store = await db();
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
@@ -80,7 +97,6 @@ export async function GET(
     session.user.id,
     (session.user.email as string) || ""
   );
-  // admins may not be in the members array; members must have an entry
   if (access === "member" && !memberEntry) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Not authorized to view this group" } },
@@ -90,70 +106,51 @@ export async function GET(
 
   const effectiveMemberId =
     access === "member" && memberEntry
-      ? memberEntry._id.toString()
-      : memberIdFilter;
+      ? memberLikeId(memberEntry)
+      : memberIdFilter && isStorageId(memberIdFilter)
+        ? memberIdFilter
+        : undefined;
 
-  const query: Record<string, unknown> = { group: groupId };
-  if (statusFilter) {
-    query["payments.status"] = statusFilter;
-  }
-  if (effectiveMemberId && mongoose.isValidObjectId(effectiveMemberId)) {
-    query["payments.memberId"] = effectiveMemberId;
-  }
-
-  const total = await BillingPeriod.countDocuments(query);
+  const allLoaded = await store.getPeriodsForGroup(groupId);
+  const filtered = allLoaded.filter((p) =>
+    periodMatchesFilters(p, statusFilter, effectiveMemberId)
+  );
+  const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / limit));
-  const periods = await BillingPeriod.find(query)
-    .sort({ periodStart: -1 })
-    .skip((page - 1) * limit)
-    .limit(limit)
-    .lean()
-    .exec();
+  const slice = filtered.slice((page - 1) * limit, page * limit);
 
-  type PeriodDoc = {
-    _id: { toString: () => string };
-    periodStart: Date;
-    periodEnd: Date;
-    periodLabel: string;
-    totalPrice: number;
-    priceNote?: string | null;
-    payments: Array<{
-      memberId: { toString: () => string };
-      memberNickname: string;
-      amount: number;
-      adjustedAmount?: number | null;
-      adjustmentReason?: string | null;
-      status: string;
-      memberConfirmedAt: Date | null;
-      adminConfirmedAt: Date | null;
-    }>;
-    isFullyPaid: boolean;
-  };
-  const allPeriods = periods as PeriodDoc[];
-  const list = access === "member"
-    ? filterBillingForMember(allPeriods, effectiveMemberId!)
-    : allPeriods.map((p) => {
+  if (access === "member" && effectiveMemberId) {
+    const list = filterBillingForMember(slice, effectiveMemberId);
+    return NextResponse.json({
+      data: {
+        periods: list,
+        pagination: { page, totalPages, total },
+      },
+    });
+  }
+
+  const list = slice.map((p) => {
     const payments = p.payments.map((pay) => ({
-      memberId: pay.memberId.toString(),
+      memberId: pay.memberId,
       memberNickname: pay.memberNickname,
       amount: pay.amount,
       adjustedAmount: pay.adjustedAmount ?? null,
       adjustmentReason: pay.adjustmentReason ?? null,
       status: pay.status,
       memberConfirmedAt: pay.memberConfirmedAt
-        ? (pay.memberConfirmedAt as Date).toISOString()
+        ? pay.memberConfirmedAt.toISOString()
         : null,
       adminConfirmedAt: pay.adminConfirmedAt
-        ? (pay.adminConfirmedAt as Date).toISOString()
+        ? pay.adminConfirmedAt.toISOString()
         : null,
     }));
     const filteredPayments = effectiveMemberId
       ? payments.filter((pay) => pay.memberId === effectiveMemberId)
       : payments;
     return {
-      _id: p._id.toString(),
-      periodStart: (p.periodStart as Date).toISOString().slice(0, 10),
-      periodEnd: (p.periodEnd as Date).toISOString().slice(0, 10),
+      _id: p.id,
+      periodStart: p.periodStart.toISOString().slice(0, 10),
+      periodEnd: p.periodEnd.toISOString().slice(0, 10),
       periodLabel: p.periodLabel,
       totalPrice: p.totalPrice,
       priceNote: p.priceNote ?? null,
@@ -183,7 +180,7 @@ export async function POST(
   }
 
   const { groupId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId)) {
+  if (!isStorageId(groupId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group id" } },
       { status: 400 }
@@ -204,9 +201,8 @@ export async function POST(
     );
   }
 
-  await dbConnect();
-
-  const group = await Group.findById(groupId);
+  const store = await db();
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
@@ -214,7 +210,7 @@ export async function POST(
     );
   }
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Only the admin can create billing periods" } },
       { status: 403 }
@@ -226,10 +222,7 @@ export async function POST(
   const totalPrice = parsed.data.totalPrice;
   const periodLabel = parsed.data.periodLabel;
 
-  const existing = await BillingPeriod.findOne({
-    group: groupId,
-    periodStart,
-  });
+  const existing = await store.getBillingPeriodByStart(groupId, periodStart);
   if (existing) {
     return NextResponse.json(
       { error: { code: "CONFLICT", message: "A billing period already exists for this start date" } },
@@ -240,23 +233,30 @@ export async function POST(
   const shares = calculateShares(group, totalPrice, periodStart);
   if (shares.length === 0) {
     return NextResponse.json(
-      { error: { code: "VALIDATION_ERROR", message: "Group has no active members to split payment for this period" } },
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Group has no active members to split payment for this period",
+        },
+      },
       { status: 400 }
     );
   }
 
-  const payments = await Promise.all(
+  const paymentRows = await Promise.all(
     shares.map(async (share) => ({
+      id: nanoid(),
       memberId: share.memberId,
       memberEmail: share.email,
       memberNickname: share.nickname,
       amount: share.amount,
+      adjustedAmount: null as number | null,
+      adjustmentReason: null as string | null,
       status: "pending" as const,
-      confirmationToken: await createConfirmationToken(
-        share.memberId,
-        "", // periodId filled after create
-        groupId
-      ),
+      memberConfirmedAt: null as Date | null,
+      adminConfirmedAt: null as Date | null,
+      confirmationToken: await createConfirmationToken(share.memberId, "", groupId),
+      notes: null as string | null,
     }))
   );
 
@@ -265,25 +265,34 @@ export async function POST(
     group.billing.paymentInAdvanceDays ?? 0
   );
 
-  const period = await BillingPeriod.create({
-    group: groupId,
+  const created = await store.createBillingPeriod({
+    groupId,
     periodStart,
     collectionOpensAt,
     periodEnd,
     periodLabel,
     totalPrice,
     currency: group.billing.currency,
-    payments,
+    priceNote: null,
+    payments: paymentRows,
+    reminders: [],
+    isFullyPaid: false,
   });
 
-  for (const payment of period.payments) {
-    payment.confirmationToken = await createConfirmationToken(
-      payment.memberId.toString(),
-      period._id.toString(),
-      groupId
-    );
-  }
-  await period.save();
+  const paymentsWithTokens = await Promise.all(
+    created.payments.map(async (payment) => ({
+      ...payment,
+      confirmationToken: await createConfirmationToken(
+        payment.memberId,
+        created.id,
+        groupId
+      ),
+    }))
+  );
+
+  await store.updateBillingPeriod(created.id, { payments: paymentsWithTokens });
+
+  const period = (await store.getBillingPeriod(created.id, groupId))!;
 
   const actorName =
     (session.user.name as string) ||
@@ -294,7 +303,7 @@ export async function POST(
     actorName,
     action: "billing_period_created",
     groupId,
-    billingPeriodId: period._id.toString(),
+    billingPeriodId: period.id,
     metadata: {
       periodLabel: period.periodLabel,
       totalPrice: period.totalPrice,
@@ -303,14 +312,14 @@ export async function POST(
 
   return NextResponse.json({
     data: {
-      _id: period._id.toString(),
+      _id: period.id,
       periodLabel: period.periodLabel,
       periodStart: period.periodStart.toISOString().slice(0, 10),
       periodEnd: period.periodEnd.toISOString().slice(0, 10),
       totalPrice: period.totalPrice,
       currency: period.currency,
-      payments: period.payments.map((p: IMemberPayment) => ({
-        memberId: p.memberId.toString(),
+      payments: period.payments.map((p) => ({
+        memberId: p.memberId,
         memberNickname: p.memberNickname,
         amount: p.amount,
         status: p.status,

@@ -1,4 +1,4 @@
-import { IGroup, IGroupMember } from "@/models";
+import type { StorageGroup, StorageGroupMember } from "@/lib/storage";
 
 export interface MemberShare {
   memberId: string;
@@ -8,7 +8,7 @@ export interface MemberShare {
 }
 
 // date when member's billing effectively starts (billingStartsAt or joinedAt)
-function memberBillingStart(m: IGroupMember): Date {
+function memberBillingStart(m: StorageGroupMember): Date {
   const d = m.billingStartsAt ?? m.joinedAt;
   return d instanceof Date ? d : (m.joinedAt as Date);
 }
@@ -16,7 +16,7 @@ function memberBillingStart(m: IGroupMember): Date {
 // calculate the share each active member owes for a given price
 // when periodStart is set, only members whose billing has started by that date are included
 export function calculateShares(
-  group: IGroup,
+  group: StorageGroup,
   totalPrice?: number,
   periodStart?: Date
 ): MemberShare[] {
@@ -43,8 +43,8 @@ export function calculateShares(
 }
 
 function calculateEqualSplit(
-  group: IGroup,
-  activeMembers: IGroupMember[],
+  group: StorageGroup,
+  activeMembers: StorageGroupMember[],
   price: number
 ): MemberShare[] {
   // total people splitting = active external members + (admin if included)
@@ -56,7 +56,7 @@ function calculateEqualSplit(
   const sharePerPerson = price / splitCount;
 
   return activeMembers.map((member) => ({
-    memberId: member._id.toString(),
+    memberId: member.id,
     email: member.email,
     nickname: member.nickname,
     amount: round2(member.customAmount ?? sharePerPerson),
@@ -64,13 +64,13 @@ function calculateEqualSplit(
 }
 
 function calculateFixedAmount(
-  group: IGroup,
-  activeMembers: IGroupMember[]
+  group: StorageGroup,
+  activeMembers: StorageGroupMember[]
 ): MemberShare[] {
   const fixedAmount = group.billing.fixedMemberAmount ?? 0;
 
   return activeMembers.map((member) => ({
-    memberId: member._id.toString(),
+    memberId: member.id,
     email: member.email,
     nickname: member.nickname,
     amount: round2(member.customAmount ?? fixedAmount),

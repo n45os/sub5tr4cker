@@ -1,5 +1,4 @@
-import { dbConnect } from "@/lib/db/mongoose";
-import { User } from "@/models";
+import { db } from "@/lib/storage";
 
 let ensured = false;
 
@@ -9,15 +8,12 @@ let ensured = false;
  */
 export async function ensureInstanceAdmin(): Promise<void> {
   if (ensured) return;
-  await dbConnect();
-  const adminCount = await User.countDocuments({ role: "admin" });
+  const store = await db();
+  const adminCount = await store.getAdminUserCount();
   if (adminCount > 0) {
     ensured = true;
     return;
   }
-  const oldest = await User.findOne().sort({ createdAt: 1 }).select("_id").lean();
-  if (oldest) {
-    await User.updateOne({ _id: oldest._id }, { $set: { role: "admin" } });
-  }
+  await store.promoteOldestUserToAdmin();
   ensured = true;
 }

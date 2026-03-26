@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import mongoose from "mongoose";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group } from "@/models";
 import { getSetting } from "@/lib/settings/service";
 import { generateUniqueInviteCode } from "@/lib/invite-code";
 import { z } from "zod";
+import { db, isStorageId, type StorageGroup } from "@/lib/storage";
 
 const toggleSchema = z.object({
   enabled: z.boolean(),
@@ -19,8 +17,8 @@ async function getAppUrl(request: NextRequest): Promise<string> {
 
 async function ensureAdminGroup(
   groupId: string
-): Promise<{ error: NextResponse } | { group: InstanceType<typeof Group> }> {
-  if (!mongoose.isValidObjectId(groupId)) {
+): Promise<{ error: NextResponse } | { group: StorageGroup }> {
+  if (!isStorageId(groupId)) {
     return {
       error: NextResponse.json(
         { error: { code: "VALIDATION_ERROR", message: "Invalid group id" } },
@@ -28,8 +26,8 @@ async function ensureAdminGroup(
       ),
     };
   }
-  await dbConnect();
-  const group = await Group.findById(groupId);
+  const store = await db();
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return {
       error: NextResponse.json(
@@ -58,7 +56,7 @@ export async function GET(
   if ("error" in result) return result.error;
   const { group } = result;
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       {
         error: {
@@ -104,7 +102,7 @@ export async function POST(
   if ("error" in result) return result.error;
   const { group } = result;
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       {
         error: {
@@ -117,13 +115,16 @@ export async function POST(
   }
 
   const code = await generateUniqueInviteCode(async (c) => {
-    const existing = await Group.findOne({ inviteCode: c }).lean();
-    return !!existing;
+    const store = await db();
+    const existing = await store.findGroupByInviteCode(c);
+    return existing != null;
   });
 
-  group.inviteCode = code;
-  group.inviteLinkEnabled = true;
-  await group.save();
+  const store = await db();
+  await store.updateGroup(groupId, {
+    inviteCode: code,
+    inviteLinkEnabled: true,
+  });
 
   const appUrl = await getAppUrl(request);
   const inviteUrl = `${appUrl}/invite/${code}`;
@@ -154,7 +155,7 @@ export async function PATCH(
   if ("error" in result) return result.error;
   const { group } = result;
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       {
         error: {
@@ -180,19 +181,21 @@ export async function PATCH(
     );
   }
 
-  group.inviteLinkEnabled = parsed.data.enabled;
-  await group.save();
+  const store = await db();
+  const updated = await store.updateGroup(groupId, {
+    inviteLinkEnabled: parsed.data.enabled,
+  });
 
   const appUrl = await getAppUrl(request);
   const inviteUrl =
-    group.inviteCode && group.inviteLinkEnabled
-      ? `${appUrl}/invite/${group.inviteCode}`
+    updated.inviteCode && updated.inviteLinkEnabled
+      ? `${appUrl}/invite/${updated.inviteCode}`
       : null;
 
   return NextResponse.json({
     data: {
-      inviteLinkEnabled: group.inviteLinkEnabled,
-      inviteCode: group.inviteCode,
+      inviteLinkEnabled: updated.inviteLinkEnabled,
+      inviteCode: updated.inviteCode,
       inviteUrl,
     },
   });
@@ -215,7 +218,7 @@ export async function DELETE(
   if ("error" in result) return result.error;
   const { group } = result;
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       {
         error: {
@@ -227,9 +230,11 @@ export async function DELETE(
     );
   }
 
-  group.inviteCode = null;
-  group.inviteLinkEnabled = false;
-  await group.save();
+  const store = await db();
+  await store.updateGroup(groupId, {
+    inviteCode: null,
+    inviteLinkEnabled: false,
+  });
 
   return NextResponse.json({
     data: { inviteCode: null, inviteLinkEnabled: false, inviteUrl: null },

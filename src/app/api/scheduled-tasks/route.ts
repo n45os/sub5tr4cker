@@ -1,22 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import mongoose from "mongoose";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { BillingPeriod, Group, ScheduledTask } from "@/models";
-import type { ScheduledTaskType, ScheduledTaskStatus } from "@/models/scheduled-task";
-import {
-  buildScheduledTaskVisibilityFilter,
-  getGroupIdsWhereUserIsAdmin,
-} from "@/lib/tasks/admin-access";
+import { getGroupIdsWhereUserIsAdmin } from "@/lib/tasks/admin-access";
+import { db, type StorageScheduledTask } from "@/lib/storage";
 
-const TYPES: ScheduledTaskType[] = [
+const TYPES: StorageScheduledTask["type"][] = [
   "payment_reminder",
   "aggregated_payment_reminder",
   "admin_confirmation_request",
 ];
 
-const STATUSES: ScheduledTaskStatus[] = [
+const STATUSES: StorageScheduledTask["status"][] = [
   "pending",
   "locked",
   "completed",
@@ -27,8 +21,8 @@ const STATUSES: ScheduledTaskStatus[] = [
 const querySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),
   limit: z.coerce.number().int().min(1).max(50).optional().default(20),
-  status: z.enum(STATUSES as [ScheduledTaskStatus, ...ScheduledTaskStatus[]]).optional(),
-  type: z.enum(TYPES as [ScheduledTaskType, ...ScheduledTaskType[]]).optional(),
+  status: z.enum(STATUSES as [StorageScheduledTask["status"], ...StorageScheduledTask["status"][]]).optional(),
+  type: z.enum(TYPES as [StorageScheduledTask["type"], ...StorageScheduledTask["type"][]]).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -68,91 +62,58 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  await dbConnect();
-
-  const visibility = buildScheduledTaskVisibilityFilter(adminGroupIds);
-  const filter: Record<string, unknown> = {
-    ...visibility,
-    ...(statusFilter ? { status: statusFilter } : {}),
-    ...(typeFilter ? { type: typeFilter } : {}),
-  };
-
+  const store = await db();
   const skip = (page - 1) * limit;
-  const [total, tasks] = await Promise.all([
-    ScheduledTask.countDocuments(filter),
-    ScheduledTask.find(filter)
-      .sort({ runAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean()
-      .exec(),
-  ]);
+  const { tasks, total } = await store.listTasks({
+    anyGroupIdIn: adminGroupIds,
+    status: statusFilter,
+    type: typeFilter,
+    limit,
+    offset: skip,
+  });
 
   const groupIds = new Set<string>();
-  const periodIds = new Set<string>();
   for (const t of tasks) {
-    const p = t.payload as {
-      groupId?: string;
-      billingPeriodId?: string;
-      payments?: Array<{ groupId?: string; billingPeriodId?: string }>;
-    };
+    const p = t.payload;
     if (p.groupId) groupIds.add(p.groupId);
-    if (p.billingPeriodId) periodIds.add(p.billingPeriodId);
     if (p.payments?.length) {
       for (const ref of p.payments) {
         if (ref.groupId) groupIds.add(ref.groupId);
-        if (ref.billingPeriodId) periodIds.add(ref.billingPeriodId);
       }
     }
   }
 
-  const validGroupOids = [...groupIds].filter((id) =>
-    mongoose.isValidObjectId(id)
-  );
-  const validPeriodOids = [...periodIds].filter((id) =>
-    mongoose.isValidObjectId(id)
-  );
+  const groupNameById = new Map<string, string>();
+  const periodLabelById = new Map<string, string>();
 
-  const [groups, periods] = await Promise.all([
-    validGroupOids.length
-      ? Group.find({
-          _id: {
-            $in: validGroupOids.map((id) => new mongoose.Types.ObjectId(id)),
-          },
-        })
-          .select("name")
-          .lean()
-      : [],
-    validPeriodOids.length
-      ? BillingPeriod.find({
-          _id: {
-            $in: validPeriodOids.map((id) => new mongoose.Types.ObjectId(id)),
-          },
-        })
-          .select("periodLabel")
-          .lean()
-      : [],
-  ]);
+  for (const gid of groupIds) {
+    const g = await store.getGroup(gid);
+    if (g) groupNameById.set(gid, g.name);
+  }
 
-  const groupNameById = new Map(
-    groups.map((g) => [g._id.toString(), g.name as string])
-  );
-  const periodLabelById = new Map(
-    periods.map((p) => [p._id.toString(), p.periodLabel as string])
-  );
+  const periodPairs = new Set<string>();
+  for (const t of tasks) {
+    const p = t.payload;
+    if (p.groupId && p.billingPeriodId) {
+      periodPairs.add(`${p.billingPeriodId}\t${p.groupId}`);
+    }
+    if (p.payments?.length) {
+      for (const ref of p.payments) {
+        if (ref.groupId && ref.billingPeriodId) {
+          periodPairs.add(`${ref.billingPeriodId}\t${ref.groupId}`);
+        }
+      }
+    }
+  }
+  for (const pair of periodPairs) {
+    const [periodId, groupId] = pair.split("\t");
+    if (!periodId || !groupId) continue;
+    const per = await store.getBillingPeriod(periodId, groupId);
+    if (per) periodLabelById.set(periodId, per.periodLabel);
+  }
 
   const items = tasks.map((t) => {
-    const payload = t.payload as {
-      groupId?: string;
-      billingPeriodId?: string;
-      memberEmail?: string;
-      paymentId?: string;
-      payments?: Array<{
-        groupId: string;
-        billingPeriodId: string;
-        paymentId: string;
-      }>;
-    };
+    const payload = t.payload;
     let summary = "";
     if (t.type === "aggregated_payment_reminder" && payload.memberEmail) {
       const n = payload.payments?.length ?? 0;
@@ -168,7 +129,7 @@ export async function GET(request: NextRequest) {
     }
 
     return {
-      _id: t._id.toString(),
+      _id: t.id,
       type: t.type,
       status: t.status,
       runAt: t.runAt.toISOString(),
@@ -176,7 +137,7 @@ export async function GET(request: NextRequest) {
       maxAttempts: t.maxAttempts ?? 5,
       lastError: t.lastError ?? null,
       completedAt: t.completedAt?.toISOString() ?? null,
-      cancelledAt: (t as { cancelledAt?: Date | null }).cancelledAt?.toISOString() ?? null,
+      cancelledAt: t.cancelledAt?.toISOString() ?? null,
       idempotencyKey: t.idempotencyKey,
       summary,
       payload: t.payload,

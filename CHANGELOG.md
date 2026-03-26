@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.35.1] - 2026-03-26
+
+### Fixed
+
+- **`s54r start`** — Prefer `next start` from the package root when `node_modules/.bin/next` exists so `better-sqlite3` loads its native binding. The Next.js standalone server alone often lacks the compiled `.node` file under `.next/standalone/node_modules`.
+
+## [0.35.0] - 2026-03-26
+
+### Changed
+
+- **StorageAdapter coverage** — Remaining API routes, billing cron jobs, Activity (`GET /api/activity`, email preview), public member portal page, grammy telegram handlers (`/start` linking, payment confirm/reject, pay details), and advanced-mode **Settings** persistence now go through `db()` / `StorageAdapter` instead of direct Mongoose calls. `@/models` imports are confined to `mongoose-adapter.ts` and schema files.
+- **Adapter API** — Added helpers used by the above: e.g. `getBillingPeriodById`, `findActiveGroupForMemberInvitation`, `listNotifications` / `getNotificationById`, `linkTelegramAccountWithLinkCode`, `tryClaimWelcomeEmailSentAt`, app settings `ensureAppSettingsSeeded` / `getAppSettingRow` / `listAppSettingRows` / `upsertAppSettingRow`, `listAuditEvents({ unbounded })` for activity merge.
+- Removed legacy `buildOpenOutstandingPeriodsQuery` export from `billing-snapshot.ts`.
+
 ## [0.34.0] - 2026-03-26
 
 ### Added

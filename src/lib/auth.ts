@@ -4,12 +4,11 @@ import GoogleProvider from "next-auth/providers/google";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import { MongoClient } from "mongodb";
 import { compare } from "bcryptjs";
-import { dbConnect } from "@/lib/db/mongoose";
-import { User } from "@/models";
 import { verifyMagicLoginToken } from "@/lib/tokens";
 import { isLocalMode } from "@/lib/config/manager";
 import { buildLocalSession, validateAuthToken, LOCAL_AUTH_COOKIE } from "@/lib/auth/local";
 import { cookies } from "next/headers";
+import { db } from "@/lib/storage";
 
 let clientPromise: Promise<MongoClient> | null = null;
 
@@ -31,8 +30,11 @@ const {
   signOut,
 } = NextAuth({
   trustHost: true,
-  secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || (process.env.NODE_ENV === "development" ? "dev-secret-change-in-production" : undefined),
-  adapter: MongoDBAdapter(getMongoClientPromise),
+  secret:
+    process.env.NEXTAUTH_SECRET ||
+    process.env.AUTH_SECRET ||
+    (process.env.NODE_ENV === "development" ? "dev-secret-change-in-production" : undefined),
+  adapter: MongoDBAdapter(getMongoClientPromise()),
   session: { strategy: "jwt", maxAge: SESSION_MAX_AGE },
   cookies: {
     sessionToken: {
@@ -65,9 +67,9 @@ const {
           console.warn("[auth] credentials: missing email or password");
           return null;
         }
-        await dbConnect();
+        const store = await db();
         const email = (credentials.email as string).toLowerCase().trim();
-        const user = await User.findOne({ email }).lean();
+        const user = await store.getUserByEmail(email);
         if (!user) {
           console.warn("[auth] credentials: user not found");
           return null;
@@ -76,16 +78,13 @@ const {
           console.warn("[auth] credentials: user has no password set");
           return null;
         }
-        const match = await compare(
-          credentials.password as string,
-          user.hashedPassword
-        );
+        const match = await compare(credentials.password as string, user.hashedPassword);
         if (!match) {
           console.warn("[auth] credentials: password mismatch");
           return null;
         }
         return {
-          id: String(user._id),
+          id: user.id,
           email: user.email,
           name: user.name,
           image: user.image,
@@ -110,14 +109,14 @@ const {
           console.warn("[auth] magic-invite: token invalid or expired");
           return null;
         }
-        await dbConnect();
-        const user = await User.findById(payload.userId).lean();
+        const store = await db();
+        const user = await store.getUser(payload.userId);
         if (!user) {
           console.warn("[auth] magic-invite: user not found for id", payload.userId);
           return null;
         }
         return {
-          id: String(user._id),
+          id: user.id,
           email: user.email,
           name: user.name,
           image: user.image,
@@ -137,9 +136,8 @@ const {
     async session({ session, token }) {
       if (token.id && session.user) {
         session.user.id = token.id as string;
-        await dbConnect();
-        // load fresh user from DB so profile changes (e.g. email) are reflected
-        const u = await User.findById(token.id).lean();
+        const store = await db();
+        const u = await store.getUser(token.id as string);
         if (u) {
           session.user.email = u.email;
           session.user.name = u.name;

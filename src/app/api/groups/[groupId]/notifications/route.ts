@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import mongoose from "mongoose";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group } from "@/models";
+import { db, isStorageId } from "@/lib/storage";
 
 const updateNotificationsSchema = z
   .object({
@@ -27,7 +25,7 @@ export async function PATCH(
   }
 
   const { groupId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId)) {
+  if (!isStorageId(groupId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group id" } },
       { status: 400 }
@@ -48,8 +46,8 @@ export async function PATCH(
     );
   }
 
-  await dbConnect();
-  const group = await Group.findById(groupId);
+  const store = await db();
+  const group = await store.getGroup(groupId);
 
   if (!group || !group.isActive) {
     return NextResponse.json(
@@ -58,7 +56,7 @@ export async function PATCH(
     );
   }
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Only the admin can update notifications" } },
       { status: 403 }
@@ -84,11 +82,14 @@ export async function PATCH(
     group.notifications.saveEmailParams = body.saveEmailParams;
   }
 
-  await group.save();
+  const updated = await store.updateGroup(groupId, {
+    notifications: group.notifications,
+    announcements: group.announcements,
+  });
 
   return NextResponse.json({
     data: {
-      notifications: group.notifications,
+      notifications: updated.notifications,
     },
   });
 }

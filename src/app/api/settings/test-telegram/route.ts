@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { User } from "@/models";
 import { sendTelegramMessage } from "@/lib/telegram/send";
+import { db } from "@/lib/storage";
 
 export async function POST() {
   const session = await auth();
@@ -13,8 +12,8 @@ export async function POST() {
     );
   }
 
-  await dbConnect();
-  const user = await User.findById(session.user.id);
+  const store = await db();
+  const user = await store.getUser(session.user.id);
 
   if (!user?.telegram?.chatId) {
     return NextResponse.json(

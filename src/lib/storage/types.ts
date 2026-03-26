@@ -32,6 +32,16 @@ export interface StorageUser {
   updatedAt: Date;
 }
 
+/** insert user (register) — adapter assigns id and timestamps in local mode */
+export interface CreateUserInput {
+  name: string;
+  email: string;
+  role: "admin" | "user";
+  /** null when the account is created from an invite (magic login only) */
+  hashedPassword: string | null;
+  notificationPreferences: StorageUser["notificationPreferences"];
+}
+
 // ─── group ────────────────────────────────────────────────────────────────────
 
 export interface StorageGroupMember {
@@ -178,6 +188,42 @@ export interface StorageNotification {
   createdAt: Date;
 }
 
+/** persisted app settings row (MongoDB in advanced mode; local mode uses config.json) */
+export interface StorageAppSettingRow {
+  key: string;
+  value: string | null;
+  category: string;
+  isSecret: boolean;
+  label: string;
+  description: string;
+}
+
+// ─── audit ────────────────────────────────────────────────────────────────────
+
+export type StorageAuditAction =
+  | "payment_confirmed"
+  | "payment_self_confirmed"
+  | "payment_rejected"
+  | "payment_waived"
+  | "group_created"
+  | "group_edited"
+  | "member_added"
+  | "member_removed"
+  | "member_updated"
+  | "billing_period_created";
+
+export interface StorageAuditEvent {
+  id: string;
+  actorId: string;
+  actorName: string;
+  action: StorageAuditAction;
+  groupId: string | null;
+  billingPeriodId: string | null;
+  targetMemberId: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+}
+
 // ─── scheduled task ───────────────────────────────────────────────────────────
 
 export type StorageTaskType =
@@ -275,6 +321,16 @@ export interface CreateNotificationInput {
   externalId?: string | null;
   error?: string | null;
   deliveredAt?: Date | null;
+}
+
+export interface CreateAuditEventInput {
+  actorId: string;
+  actorName: string;
+  action: StorageAuditAction;
+  groupId?: string | null;
+  billingPeriodId?: string | null;
+  targetMemberId?: string | null;
+  metadata?: Record<string, unknown>;
 }
 
 export interface CreateTaskInput {

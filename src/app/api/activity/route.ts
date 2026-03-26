@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { AuditEvent, Group, BillingPeriod, Notification } from "@/models";
-import type { NotificationType } from "@/models";
+import { db } from "@/lib/storage";
+import type { StorageGroup, StorageNotificationType } from "@/lib/storage/types";
 import {
-  collectionWindowOpenFilter,
   getFirstReminderEligibleAt,
   resolveCollectionOpensAt,
 } from "@/lib/billing/collection-window";
 
-const NOTIFICATION_TYPES: NotificationType[] = [
+const NOTIFICATION_TYPES: StorageNotificationType[] = [
   "payment_reminder",
   "payment_confirmed",
   "admin_confirmation_request",
@@ -22,27 +20,18 @@ const NOTIFICATION_TYPES: NotificationType[] = [
 ];
 const CHANNELS = ["email", "telegram"] as const;
 
-type GroupLike = {
-  admin: { toString: () => string };
-  members: Array<{
-    isActive?: boolean;
-    leftAt?: Date | null;
-    user?: { toString: () => string } | null;
-    email: string;
-  }>;
-};
-
 function canAccessGroup(
-  group: GroupLike,
+  group: StorageGroup,
   userId: string,
   userEmail: string
 ): boolean {
-  if (group.admin.toString() === userId) return true;
+  if (group.adminId === userId) return true;
   return group.members.some(
     (m) =>
       m.isActive &&
       !m.leftAt &&
-      (m.user?.toString() === userId || m.email === userEmail)
+      (m.userId === userId ||
+        m.email.toLowerCase() === userEmail.toLowerCase())
   );
 }
 
@@ -94,7 +83,7 @@ export async function GET(request: NextRequest) {
   const channelFilter = searchParams.get("channel") || undefined;
   const sourceFilter = searchParams.get("source") || "all"; // "all" | "actions" | "notifications"
 
-  if (typeFilter && !NOTIFICATION_TYPES.includes(typeFilter as NotificationType)) {
+  if (typeFilter && !NOTIFICATION_TYPES.includes(typeFilter as StorageNotificationType)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid type filter" } },
       { status: 400 }
@@ -113,15 +102,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  await dbConnect();
+  const store = await db();
 
   const userId = session.user.id;
   const userEmail = (session.user.email as string) || "";
 
-  const groups = await Group.find({ isActive: true }).lean();
+  const groups = await store.listAllActiveGroups();
   const allowedGroupIds = groups
-    .filter((g) => canAccessGroup(g as unknown as GroupLike, userId, userEmail))
-    .map((g) => g._id);
+    .filter((g) => canAccessGroup(g, userId, userEmail))
+    .map((g) => g.id);
 
   if (allowedGroupIds.length === 0) {
     return NextResponse.json({
@@ -131,10 +120,6 @@ export async function GET(request: NextRequest) {
       },
     });
   }
-
-  const sentQuery: Record<string, unknown> = { group: { $in: allowedGroupIds } };
-  if (typeFilter) sentQuery.type = typeFilter;
-  if (channelFilter) sentQuery.channel = channelFilter;
 
   type SentItem =
     | {
@@ -172,17 +157,19 @@ export async function GET(request: NextRequest) {
   };
 
   if (sourceFilter === "notifications") {
-    const totalSent = await Notification.countDocuments(sentQuery);
+    const { total: totalSent, notifications: sentNotifications } =
+      await store.listNotifications({
+        groupIds: allowedGroupIds,
+        type: typeFilter as StorageNotificationType | undefined,
+        channel: channelFilter as "email" | "telegram" | undefined,
+        limit,
+        offset: (page - 1) * limit,
+      });
     const totalPages = Math.max(1, Math.ceil(totalSent / limit));
-    const sentNotifications = await Notification.find(sentQuery)
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .lean();
     sent = {
       items: sentNotifications.map((n) => ({
         source: "notification" as const,
-        _id: n._id.toString(),
+        _id: n.id,
         type: n.type,
         channel: n.channel,
         status: n.status,
@@ -191,49 +178,48 @@ export async function GET(request: NextRequest) {
         recipientEmail: n.recipientEmail,
         externalId: n.externalId ?? null,
         hasEmailParams: !!n.emailParams,
-        groupId: n.group?.toString() ?? null,
-        billingPeriodId: n.billingPeriod?.toString() ?? null,
+        groupId: n.groupId ?? null,
+        billingPeriodId: n.billingPeriodId ?? null,
         deliveredAt: n.deliveredAt ? n.deliveredAt.toISOString() : null,
         createdAt: n.createdAt.toISOString(),
       })),
       pagination: { page, totalPages, total: totalSent },
     };
   } else if (sourceFilter === "actions") {
-    const actionQuery: Record<string, unknown> = {
-      group: { $in: allowedGroupIds },
-    };
-    const totalActions = await AuditEvent.countDocuments(actionQuery);
+    const { total: totalActions, events: auditEvents } =
+      await store.listAuditEvents({
+        groupIds: allowedGroupIds,
+        limit,
+        offset: (page - 1) * limit,
+      });
     const totalPages = Math.max(1, Math.ceil(totalActions / limit));
-    const auditEvents = await AuditEvent.find(actionQuery)
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .lean();
     sent = {
       items: auditEvents.map((a) => ({
         source: "action" as const,
-        _id: a._id.toString(),
+        _id: a.id,
         type: "action",
         actorName: a.actorName,
         action: a.action,
-        groupId: a.group?.toString() ?? null,
-        billingPeriodId: a.billingPeriod?.toString() ?? null,
-        targetMemberId: a.targetMember?.toString() ?? null,
-        metadata: (a.metadata as Record<string, unknown>) ?? {},
+        groupId: a.groupId ?? null,
+        billingPeriodId: a.billingPeriodId ?? null,
+        targetMemberId: a.targetMemberId ?? null,
+        metadata: a.metadata ?? {},
         createdAt: a.createdAt.toISOString(),
       })),
       pagination: { page, totalPages, total: totalActions },
     };
   } else {
-    const [notifications, auditEvents] = await Promise.all([
-      Notification.find(sentQuery).sort({ createdAt: -1 }).lean(),
-      AuditEvent.find({ group: { $in: allowedGroupIds } })
-        .sort({ createdAt: -1 })
-        .lean(),
+    const [{ notifications }, { events: auditEvents }] = await Promise.all([
+      store.listNotifications({
+        groupIds: allowedGroupIds,
+        type: typeFilter as StorageNotificationType | undefined,
+        channel: channelFilter as "email" | "telegram" | undefined,
+      }),
+      store.listAuditEvents({ groupIds: allowedGroupIds, unbounded: true }),
     ]);
     const notifItems: SentItem[] = notifications.map((n) => ({
       source: "notification" as const,
-      _id: n._id.toString(),
+      _id: n.id,
       type: n.type,
       channel: n.channel,
       status: n.status,
@@ -242,21 +228,21 @@ export async function GET(request: NextRequest) {
       recipientEmail: n.recipientEmail,
       externalId: n.externalId ?? null,
       hasEmailParams: !!n.emailParams,
-      groupId: n.group?.toString() ?? null,
-      billingPeriodId: n.billingPeriod?.toString() ?? null,
+      groupId: n.groupId ?? null,
+      billingPeriodId: n.billingPeriodId ?? null,
       deliveredAt: n.deliveredAt ? n.deliveredAt.toISOString() : null,
       createdAt: n.createdAt.toISOString(),
     }));
     const actionItems: SentItem[] = auditEvents.map((a) => ({
       source: "action" as const,
-      _id: a._id.toString(),
+      _id: a.id,
       type: "action",
       actorName: a.actorName,
       action: a.action,
-      groupId: a.group?.toString() ?? null,
-      billingPeriodId: a.billingPeriod?.toString() ?? null,
-      targetMemberId: a.targetMember?.toString() ?? null,
-      metadata: (a.metadata as Record<string, unknown>) ?? {},
+      groupId: a.groupId ?? null,
+      billingPeriodId: a.billingPeriodId ?? null,
+      targetMemberId: a.targetMemberId ?? null,
+      metadata: a.metadata ?? {},
       createdAt: a.createdAt.toISOString(),
     }));
     const merged = [...notifItems, ...actionItems].sort(
@@ -278,14 +264,11 @@ export async function GET(request: NextRequest) {
 
   const reminderRuns = getNextReminderRunTimes(14);
   for (const runAt of reminderRuns) {
-    const periods = await BillingPeriod.find({
-      group: { $in: allowedGroupIds },
-      isFullyPaid: false,
-      ...collectionWindowOpenFilter(runAt),
-      "payments.status": { $in: ["pending", "overdue"] },
-    })
-      .populate("group")
-      .lean();
+    const periods = await store.getOpenBillingPeriods({
+      groupIds: allowedGroupIds,
+      asOf: runAt,
+      unpaidOnly: true,
+    });
 
     const groupsInRun: Array<{
       groupId: string;
@@ -294,31 +277,31 @@ export async function GET(request: NextRequest) {
       recipientCount: number;
     }> = [];
     for (const period of periods) {
-      const group = period.group as { _id: unknown; name: string; billing?: { gracePeriodDays?: number }; notifications?: { remindersEnabled?: boolean } };
-      if (!group || !group.name) continue;
-      const g = await Group.findById(group._id);
+      const hasReminderTarget = period.payments.some(
+        (p) => p.status === "pending" || p.status === "overdue"
+      );
+      if (!hasReminderTarget) continue;
+
+      const g = await store.getGroup(period.groupId);
       if (!g?.isActive || g.notifications?.remindersEnabled === false) continue;
+
       const graceDays = g.billing.gracePeriodDays ?? 3;
       const collectionOpensAt = resolveCollectionOpensAt({
-        periodStart: period.periodStart as Date,
-        collectionOpensAt: period.collectionOpensAt as Date | null | undefined,
+        periodStart: period.periodStart,
+        collectionOpensAt: period.collectionOpensAt,
       });
       const firstReminderAt = getFirstReminderEligibleAt(
         collectionOpensAt,
         graceDays
       );
       if (runAt < firstReminderAt) continue;
-      const recipientCount = (period.payments as Array<{ status: string }>).filter(
+      const recipientCount = period.payments.filter(
         (p) => p.status === "pending" || p.status === "overdue"
       ).length;
       if (recipientCount === 0) continue;
-      const groupIdStr =
-        typeof period.group === "object" && period.group !== null && "_id" in period.group
-          ? String((period.group as { _id: unknown })._id)
-          : String(period.group);
       groupsInRun.push({
-        groupId: groupIdStr,
-        groupName: group.name,
+        groupId: period.groupId,
+        groupName: g.name,
         periodLabel: period.periodLabel,
         recipientCount,
       });
@@ -335,14 +318,11 @@ export async function GET(request: NextRequest) {
 
   const followUpRuns = getNextFollowUpRunTimes(5);
   for (const runAt of followUpRuns) {
-    const periods = await BillingPeriod.find({
-      group: { $in: allowedGroupIds },
-      isFullyPaid: false,
-      ...collectionWindowOpenFilter(runAt),
-      "payments.status": "member_confirmed",
-    })
-      .populate("group")
-      .lean();
+    const periods = await store.getOpenBillingPeriods({
+      groupIds: allowedGroupIds,
+      asOf: runAt,
+      unpaidOnly: true,
+    });
 
     const groupsInRun: Array<{
       groupId: string;
@@ -351,17 +331,16 @@ export async function GET(request: NextRequest) {
       recipientCount?: number;
     }> = [];
     for (const period of periods) {
-      const group = period.group as { _id: unknown; name: string };
-      if (!group?.name) continue;
-      const g = await Group.findById(group._id);
+      const hasFollowUpTarget = period.payments.some(
+        (p) => p.status === "member_confirmed"
+      );
+      if (!hasFollowUpTarget) continue;
+
+      const g = await store.getGroup(period.groupId);
       if (!g?.isActive || g.notifications?.followUpsEnabled === false) continue;
-      const groupIdStr =
-        typeof period.group === "object" && period.group !== null && "_id" in period.group
-          ? String((period.group as { _id: unknown })._id)
-          : String(period.group);
       groupsInRun.push({
-        groupId: groupIdStr,
-        groupName: group.name,
+        groupId: period.groupId,
+        groupName: g.name,
         periodLabel: period.periodLabel,
       });
     }

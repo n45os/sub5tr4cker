@@ -1,7 +1,4 @@
-import { dbConnect } from "@/lib/db/mongoose";
-import { User } from "@/models";
-import type { IGroup, IGroupMember } from "@/models";
-import type { IMemberPayment, IBillingPeriod } from "@/models/billing-period";
+import { db } from "@/lib/storage";
 
 export type SkipReason =
   | "unsubscribed_from_email"
@@ -27,25 +24,54 @@ export interface ReminderEligibility {
   skipReasons: SkipReason[];
 }
 
-type GroupLike = Pick<
-  IGroup,
-  "_id" | "name" | "service" | "billing" | "payment" | "announcements" | "members"
-> & { members: IGroupMember[] };
+type IdLike = { toString: () => string } | string;
 
-type PeriodLike = Pick<
-  IBillingPeriod,
-  "_id" | "periodLabel" | "currency"
->;
+type ReminderUserLike = {
+  telegram?: { chatId: number | null } | null;
+  notificationPreferences?: { email?: boolean; telegram?: boolean };
+} | null | undefined;
 
-export type PaymentLike = Pick<
-  IMemberPayment,
-  "_id" | "memberId" | "memberEmail" | "memberNickname" | "amount" | "status" | "confirmationToken"
->;
+type MemberLike = {
+  id?: string;
+  _id?: IdLike;
+  userId?: string | null;
+  user?: IdLike | null;
+  unsubscribedFromEmail?: boolean;
+};
+
+type GroupLike = {
+  id?: string;
+  _id?: IdLike;
+  name: string;
+  members: MemberLike[];
+};
+
+type PeriodLike = {
+  id?: string;
+  _id?: IdLike;
+  periodLabel: string;
+  currency?: string;
+};
+
+export type PaymentLike = {
+  id?: string;
+  _id?: IdLike;
+  memberId: IdLike;
+  memberEmail: string;
+  memberNickname: string;
+  amount: number;
+  status: string;
+  confirmationToken?: string | null;
+};
+
+function asId(value: IdLike | undefined | null): string {
+  return value == null ? "" : value.toString();
+}
 
 /** compute skip reasons for a single payment from member/user and resolved channel flags */
 export function getSkipReasons(
-  member: IGroupMember | undefined,
-  user: { telegram?: { chatId: number | null }; notificationPreferences?: { email?: boolean; telegram?: boolean } } | null | undefined,
+  member: MemberLike | undefined,
+  user: ReminderUserLike,
   sendEmail: boolean,
   sendTelegram: boolean
 ): SkipReason[] {
@@ -65,16 +91,17 @@ export async function getReminderEligibility(params: {
   group: GroupLike;
   period: PeriodLike;
   payment: PaymentLike;
-  user?: { telegram?: { chatId: number | null }; notificationPreferences?: { email?: boolean; telegram?: boolean } } | null;
+  user?: ReminderUserLike;
 }): Promise<ReminderEligibility> {
   const { group, period, payment } = params;
   const member = group.members.find(
-    (m) => m._id.toString() === (payment.memberId as { toString: () => string }).toString()
+    (m) => asId(m.id ?? m._id) === asId(payment.memberId)
   );
   let user = params.user;
-  if (!user && member?.user) {
-    await dbConnect();
-    const u = await User.findById(member.user).lean();
+  const memberUserId = member?.userId ?? asId(member?.user);
+  if (!user && memberUserId) {
+    const store = await db();
+    const u = await store.getUser(memberUserId);
     user = u ? { telegram: u.telegram, notificationPreferences: u.notificationPreferences } : null;
   }
 
@@ -83,13 +110,13 @@ export async function getReminderEligibility(params: {
   const skipReasons = getSkipReasons(member ?? undefined, user, sendEmail, sendTelegram);
 
   return {
-    paymentId: (payment._id as { toString: () => string }).toString(),
-    memberId: (payment.memberId as { toString: () => string }).toString(),
+    paymentId: payment.id ?? asId(payment._id),
+    memberId: asId(payment.memberId),
     memberEmail: payment.memberEmail,
     memberNickname: payment.memberNickname,
-    groupId: (group._id as { toString: () => string }).toString(),
+    groupId: group.id ?? asId(group._id),
     groupName: group.name,
-    periodId: (period._id as { toString: () => string }).toString(),
+    periodId: period.id ?? asId(period._id),
     periodLabel: period.periodLabel,
     amount: payment.amount,
     currency: period.currency || "EUR",

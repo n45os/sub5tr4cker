@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import mongoose from "mongoose";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group } from "@/models";
 import { sendMemberAddedNotifications } from "@/lib/notifications/service";
+import { db, isStorageId } from "@/lib/storage";
 
 const notifyMemberAddedSchema = z.object({
   newMemberId: z.string().optional(),
@@ -44,7 +42,7 @@ export async function POST(
   }
 
   const { groupId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId)) {
+  if (!isStorageId(groupId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group id" } },
       { status: 400 }
@@ -65,9 +63,9 @@ export async function POST(
     );
   }
 
-  await dbConnect();
+  const store = await db();
 
-  const group = await Group.findById(groupId);
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
@@ -75,7 +73,7 @@ export async function POST(
     );
   }
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Only the admin can notify members" } },
       { status: 403 }
@@ -94,7 +92,7 @@ export async function POST(
   let newMemberId = bodyNewMemberId ?? "";
   if (!newMemberId && group.members.length > 0) {
     const lastActive = [...group.members].reverse().find((m) => m.isActive && !m.leftAt);
-    if (lastActive) newMemberId = lastActive._id.toString();
+    if (lastActive) newMemberId = lastActive.id;
   }
 
   try {

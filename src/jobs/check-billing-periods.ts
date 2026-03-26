@@ -1,13 +1,11 @@
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group } from "@/models";
 import { createPeriodIfDue } from "@/lib/billing/periods";
+import { db } from "@/lib/storage";
 
 // create billing period entries for groups that are due
 export async function checkBillingPeriods(): Promise<void> {
-  await dbConnect();
-
+  const store = await db();
   const now = new Date();
-  const activeGroups = await Group.find({ isActive: true });
+  const activeGroups = await store.listAllActiveGroups();
 
   for (const group of activeGroups) {
     try {
@@ -16,7 +14,7 @@ export async function checkBillingPeriods(): Promise<void> {
         console.log(`created billing period for group ${group.name}`);
       }
     } catch (error) {
-      console.error(`error creating period for group ${group._id}:`, error);
+      console.error(`error creating period for group ${group.id}:`, error);
     }
   }
 }

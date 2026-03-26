@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import mongoose from "mongoose";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group, BillingPeriod } from "@/models";
-import type { IMemberPayment } from "@/models";
+import { db, isStorageId, type StorageMemberPayment } from "@/lib/storage";
 
 const updatePeriodSchema = z
   .object({
@@ -38,7 +35,7 @@ export async function PATCH(
   }
 
   const { groupId, periodId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(periodId)) {
+  if (!isStorageId(groupId) || !isStorageId(periodId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group or period id" } },
       { status: 400 }
@@ -59,9 +56,8 @@ export async function PATCH(
     );
   }
 
-  await dbConnect();
-
-  const group = await Group.findById(groupId);
+  const store = await db();
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
@@ -69,17 +65,14 @@ export async function PATCH(
     );
   }
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Only the admin can update billing periods" } },
       { status: 403 }
     );
   }
 
-  const period = await BillingPeriod.findOne({
-    _id: periodId,
-    group: groupId,
-  });
+  const period = await store.getBillingPeriod(periodId, groupId);
   if (!period) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Billing period not found" } },
@@ -88,52 +81,59 @@ export async function PATCH(
   }
 
   const body = parsed.data;
-  if (body.totalPrice !== undefined) period.totalPrice = body.totalPrice;
-  if (body.currency !== undefined) period.currency = body.currency;
-  if ("priceNote" in body) period.priceNote = body.priceNote ?? null;
+  let totalPrice = period.totalPrice;
+  let currency = period.currency;
+  let priceNote = period.priceNote;
+  let payments = [...period.payments];
+
+  if (body.totalPrice !== undefined) totalPrice = body.totalPrice;
+  if (body.currency !== undefined) currency = body.currency;
+  if ("priceNote" in body) priceNote = body.priceNote ?? null;
 
   if (body.payments?.length) {
     for (const update of body.payments) {
-      const payment = period.payments.find(
-        (p: IMemberPayment) => p.memberId.toString() === update.memberId
-      );
-      if (payment) {
-        if (update.status === "waived") payment.status = "waived";
-        if ("adjustedAmount" in update) payment.adjustedAmount = update.adjustedAmount ?? null;
-        if ("adjustmentReason" in update) payment.adjustmentReason = update.adjustmentReason ?? null;
-        if ("notes" in update) payment.notes = update.notes ?? null;
-      }
+      const idx = payments.findIndex((p: StorageMemberPayment) => p.memberId === update.memberId);
+      if (idx === -1) continue;
+      const payment = { ...payments[idx]! };
+      if (update.status === "waived") payment.status = "waived";
+      if ("adjustedAmount" in update) payment.adjustedAmount = update.adjustedAmount ?? null;
+      if ("adjustmentReason" in update) payment.adjustmentReason = update.adjustmentReason ?? null;
+      if ("notes" in update) payment.notes = update.notes ?? null;
+      payments[idx] = payment;
     }
   }
 
-  period.isFullyPaid = period.payments.every(
-    (p: IMemberPayment) => p.status === "confirmed" || p.status === "waived"
+  const isFullyPaid = payments.every(
+    (p: StorageMemberPayment) => p.status === "confirmed" || p.status === "waived"
   );
-  await period.save();
+
+  const updated = await store.updateBillingPeriod(periodId, {
+    totalPrice,
+    currency,
+    priceNote,
+    payments,
+    isFullyPaid,
+  });
 
   return NextResponse.json({
     data: {
-      _id: period._id.toString(),
-      periodLabel: period.periodLabel,
-      totalPrice: period.totalPrice,
-      currency: period.currency,
-      priceNote: period.priceNote,
-      payments: period.payments.map((p: IMemberPayment) => ({
-        memberId: p.memberId.toString(),
+      _id: updated.id,
+      periodLabel: updated.periodLabel,
+      totalPrice: updated.totalPrice,
+      currency: updated.currency,
+      priceNote: updated.priceNote,
+      payments: updated.payments.map((p) => ({
+        memberId: p.memberId,
         memberNickname: p.memberNickname,
         amount: p.amount,
         adjustedAmount: p.adjustedAmount,
         adjustmentReason: p.adjustmentReason,
         status: p.status,
         notes: p.notes,
-        memberConfirmedAt: p.memberConfirmedAt
-          ? (p.memberConfirmedAt as Date).toISOString()
-          : null,
-        adminConfirmedAt: p.adminConfirmedAt
-          ? (p.adminConfirmedAt as Date).toISOString()
-          : null,
+        memberConfirmedAt: p.memberConfirmedAt ? p.memberConfirmedAt.toISOString() : null,
+        adminConfirmedAt: p.adminConfirmedAt ? p.adminConfirmedAt.toISOString() : null,
       })),
-      isFullyPaid: period.isFullyPaid,
+      isFullyPaid: updated.isFullyPaid,
     },
   });
 }
@@ -151,16 +151,15 @@ export async function DELETE(
   }
 
   const { groupId, periodId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(periodId)) {
+  if (!isStorageId(groupId) || !isStorageId(periodId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group or period id" } },
       { status: 400 }
     );
   }
 
-  await dbConnect();
-
-  const group = await Group.findById(groupId);
+  const store = await db();
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
@@ -168,23 +167,22 @@ export async function DELETE(
     );
   }
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Only the admin can delete billing periods" } },
       { status: 403 }
     );
   }
 
-  const period = await BillingPeriod.findOneAndDelete({
-    _id: periodId,
-    group: groupId,
-  });
-  if (!period) {
+  const existing = await store.getBillingPeriod(periodId, groupId);
+  if (!existing) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Billing period not found" } },
       { status: 404 }
     );
   }
+
+  await store.deleteBillingPeriod(periodId, groupId);
 
   return NextResponse.json({ data: { deleted: true } });
 }

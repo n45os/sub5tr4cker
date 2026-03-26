@@ -1,7 +1,4 @@
-import { Types } from "mongoose";
-import type { IScheduledTask } from "@/models/scheduled-task";
-import type { IMemberPayment } from "@/models/billing-period";
-import { Group, BillingPeriod } from "@/models";
+import { db, type StorageMemberPayment, type StorageScheduledTask } from "@/lib/storage";
 import { sendReminderForPayment } from "@/lib/notifications/reminder-send";
 import {
   sendAggregatedReminder,
@@ -10,14 +7,14 @@ import {
 import { sendAdminConfirmationNudge } from "@/lib/notifications/admin-nudge";
 import { completeTask, failTask } from "./queue";
 
-function isPaymentStillUnpaid(payment: IMemberPayment): boolean {
+function isPaymentStillUnpaid(payment: StorageMemberPayment): boolean {
   return payment.status === "pending" || payment.status === "overdue";
 }
 
 /**
  * Execute a single scheduled task (load data, send notification, update task state).
  */
-export async function executeTask(task: IScheduledTask): Promise<void> {
+export async function executeTask(task: StorageScheduledTask): Promise<void> {
   const payload = task.payload as {
     groupId?: string;
     billingPeriodId?: string;
@@ -33,20 +30,21 @@ export async function executeTask(task: IScheduledTask): Promise<void> {
   };
 
   try {
+    const store = await db();
     switch (task.type) {
       case "payment_reminder": {
         if (!payload.billingPeriodId || !payload.paymentId) {
           throw new Error("payment_reminder task missing billingPeriodId or paymentId");
         }
-        const group = await Group.findById(payload.groupId);
-        const period = await BillingPeriod.findById(payload.billingPeriodId).populate(
-          "group"
-        );
+        const group = payload.groupId ? await store.getGroup(payload.groupId) : null;
+        const period = payload.groupId
+          ? await store.getBillingPeriod(payload.billingPeriodId, payload.groupId)
+          : null;
         if (!group || !period) {
           throw new Error("group or period not found");
         }
         const payment = period.payments.find(
-          (p: IMemberPayment) => (p._id as Types.ObjectId).toString() === payload.paymentId
+          (p) => p.id === payload.paymentId
         );
         if (!payment) {
           throw new Error("payment not found");
@@ -66,20 +64,17 @@ export async function executeTask(task: IScheduledTask): Promise<void> {
         }
         const inputs: AggregatedPaymentInput[] = [];
         for (const ref of payload.payments) {
-          const group = await Group.findById(ref.groupId);
-          const period = await BillingPeriod.findById(ref.billingPeriodId).populate(
-            "group"
-          );
+          const group = await store.getGroup(ref.groupId);
+          const period = await store.getBillingPeriod(ref.billingPeriodId, ref.groupId);
           if (!group || !period) continue;
           const payment = period.payments.find(
-            (p: IMemberPayment) =>
-              (p._id as Types.ObjectId).toString() === ref.paymentId
+            (p) => p.id === ref.paymentId
           );
           if (!payment) continue;
           if (!isPaymentStillUnpaid(payment)) continue;
           inputs.push({
-            group: group as AggregatedPaymentInput["group"],
-            period: period as AggregatedPaymentInput["period"],
+            group,
+            period,
             payment,
           });
         }
@@ -99,8 +94,10 @@ export async function executeTask(task: IScheduledTask): Promise<void> {
         if (!payload.billingPeriodId) {
           throw new Error("admin_confirmation_request task missing billingPeriodId");
         }
-        const group = await Group.findById(payload.groupId);
-        const period = await BillingPeriod.findById(payload.billingPeriodId);
+        const group = payload.groupId ? await store.getGroup(payload.groupId) : null;
+        const period = payload.groupId
+          ? await store.getBillingPeriod(payload.billingPeriodId, payload.groupId)
+          : null;
         if (!group || !period) {
           throw new Error("group or period not found");
         }

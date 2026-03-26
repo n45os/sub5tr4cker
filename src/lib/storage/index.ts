@@ -2,6 +2,7 @@ import type { StorageAdapter } from "./adapter";
 import { MongooseAdapter } from "./mongoose-adapter";
 
 let _adapter: StorageAdapter | null = null;
+let _initPromise: Promise<StorageAdapter> | null = null;
 
 /**
  * Returns the current storage adapter singleton.
@@ -44,7 +45,24 @@ export function setAdapter(adapter: StorageAdapter): void {
  */
 export function resetAdapter(): void {
   _adapter = null;
+  _initPromise = null;
+}
+
+export async function db(): Promise<StorageAdapter> {
+  if (_initPromise) return _initPromise;
+
+  const adapter = getAdapter();
+  _initPromise = adapter
+    .initialize()
+    .then(() => adapter)
+    .catch((error) => {
+      _initPromise = null;
+      throw error;
+    });
+
+  return _initPromise;
 }
 
 export type { StorageAdapter } from "./adapter";
+export * from "./api";
 export * from "./types";

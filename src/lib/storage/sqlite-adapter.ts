@@ -10,6 +10,7 @@ import type {
   StorageGroupWithUsers,
   StorageBillingPeriod,
   StorageNotification,
+  StorageAuditEvent,
   StorageScheduledTask,
   StoragePriceHistory,
   CreateGroupInput,
@@ -18,11 +19,15 @@ import type {
   UpdateBillingPeriodInput,
   PaymentStatusUpdate,
   CreateNotificationInput,
+  CreateAuditEventInput,
   CreateTaskInput,
   CreatePriceHistoryInput,
+  CreateUserInput,
   OpenPeriodsFilter,
   ExportBundle,
   ImportResult,
+  StorageNotificationType,
+  StorageAppSettingRow,
 } from "./types";
 
 // ── schema ────────────────────────────────────────────────────────────────────
@@ -65,6 +70,16 @@ const SCHEMA_SQL = `
 
   CREATE INDEX IF NOT EXISTS idx_notif_group ON notifications(group_id);
   CREATE INDEX IF NOT EXISTS idx_notif_created ON notifications(created_at);
+
+  CREATE TABLE IF NOT EXISTS audit_events (
+    id TEXT PRIMARY KEY,
+    group_id TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    data JSON NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_audit_group ON audit_events(group_id);
+  CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_events(created_at);
 
   CREATE TABLE IF NOT EXISTS scheduled_tasks (
     id TEXT PRIMARY KEY,
@@ -109,6 +124,19 @@ function now(): string {
   return new Date().toISOString();
 }
 
+// same logic as canUserManageTask in admin-access (duplicated to avoid import cycle with db())
+function taskVisibleToAdminGroups(
+  task: StorageScheduledTask,
+  adminGroupIds: Set<string>
+): boolean {
+  const payload = task.payload;
+  if (payload.groupId && adminGroupIds.has(payload.groupId)) return true;
+  if (payload.payments?.length) {
+    return payload.payments.some((p) => p.groupId && adminGroupIds.has(p.groupId));
+  }
+  return false;
+}
+
 function parseRow<T>(row: { data: string } & Record<string, unknown>): T {
   return JSON.parse(row.data as string) as T;
 }
@@ -129,6 +157,7 @@ const GROUP_DATE_KEYS = ["joinedAt", "leftAt", "acceptedAt", "billingStartsAt", 
 const PERIOD_DATE_KEYS = ["periodStart", "collectionOpensAt", "periodEnd", "createdAt", "updatedAt", "sentAt", "memberConfirmedAt", "adminConfirmedAt"];
 const TASK_DATE_KEYS = ["runAt", "lockedAt", "completedAt", "cancelledAt", "createdAt", "updatedAt"];
 const NOTIF_DATE_KEYS = ["deliveredAt", "createdAt"];
+const AUDIT_DATE_KEYS = ["createdAt"];
 const PH_DATE_KEYS = ["effectiveFrom", "createdAt"];
 const USER_DATE_KEYS = ["emailVerified", "welcomeEmailSentAt", "createdAt", "updatedAt", "linkedAt", "expiresAt"];
 
@@ -168,6 +197,10 @@ function hydrateNotification(data: Record<string, unknown>): StorageNotification
   return parseDates(data, ["deliveredAt", "createdAt"]) as unknown as StorageNotification;
 }
 
+function hydrateAuditEvent(data: Record<string, unknown>): StorageAuditEvent {
+  return parseDates(data, ["createdAt"]) as unknown as StorageAuditEvent;
+}
+
 function hydratePriceHistory(data: Record<string, unknown>): StoragePriceHistory {
   return parseDates(data, ["effectiveFrom", "createdAt"]) as unknown as StoragePriceHistory;
 }
@@ -188,6 +221,7 @@ void GROUP_DATE_KEYS;
 void PERIOD_DATE_KEYS;
 void TASK_DATE_KEYS;
 void NOTIF_DATE_KEYS;
+void AUDIT_DATE_KEYS;
 void PH_DATE_KEYS;
 void USER_DATE_KEYS;
 
@@ -204,6 +238,8 @@ export class SqliteAdapter implements StorageAdapter {
   }
 
   async initialize(): Promise<void> {
+    if (this.db) return;
+
     const fs = await import("fs");
     const path = await import("path");
     const dir = path.dirname(this.dbPath);
@@ -255,6 +291,9 @@ export class SqliteAdapter implements StorageAdapter {
 
   async close(): Promise<void> {
     this.db?.close();
+    // clear the reference so future initialize() calls can reopen it
+    // if the adapter is reused after close
+    this.db = undefined as never;
   }
 
   private ensureOpen(): void {
@@ -299,6 +338,92 @@ export class SqliteAdapter implements StorageAdapter {
       id
     );
     return merged;
+  }
+
+  async createUser(data: CreateUserInput): Promise<StorageUser> {
+    this.ensureOpen();
+    const id = nanoid();
+    const ts = now();
+    const user: StorageUser = {
+      id,
+      name: data.name.trim(),
+      email: data.email.toLowerCase().trim(),
+      role: data.role,
+      emailVerified: null,
+      image: null,
+      hashedPassword: data.hashedPassword,
+      telegram: null,
+      telegramLinkCode: null,
+      notificationPreferences: data.notificationPreferences,
+      welcomeEmailSentAt: null,
+      createdAt: new Date(ts),
+      updatedAt: new Date(ts),
+    };
+    this.db.prepare(`
+      INSERT INTO users (id, email, telegram_chat_id, data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, user.email, null, JSON.stringify(user), ts, ts);
+    return user;
+  }
+
+  async countUsers(): Promise<number> {
+    this.ensureOpen();
+    const row = this.db.prepare("SELECT COUNT(*) AS c FROM users").get() as { c: number };
+    return row.c;
+  }
+
+  async getAdminUserCount(): Promise<number> {
+    this.ensureOpen();
+    const rows = this.db.prepare("SELECT data FROM users").all() as { data: string }[];
+    return rows.filter((r) => (hydrateUser(parseRow(r)) as StorageUser).role === "admin").length;
+  }
+
+  async promoteOldestUserToAdmin(): Promise<void> {
+    this.ensureOpen();
+    const row = this.db.prepare(
+      "SELECT id, data FROM users ORDER BY created_at ASC LIMIT 1"
+    ).get() as { id: string; data: string } | undefined;
+    if (!row) return;
+    const u = hydrateUser(parseRow(row));
+    if (u.role === "admin") return;
+    await this.updateUser(u.id, { role: "admin" });
+  }
+
+  async linkTelegramAccountWithLinkCode(params: {
+    code: string;
+    chatId: number;
+    username: string | null;
+    now: Date;
+  }): Promise<StorageUser | null> {
+    this.ensureOpen();
+    const { code, chatId, username, now } = params;
+    const row = this.db
+      .prepare(
+        "SELECT id, data FROM users WHERE json_extract(data, '$.telegramLinkCode.code') = ?"
+      )
+      .get(code) as { id: string; data: string } | undefined;
+    if (!row) return null;
+    const u = hydrateUser(parseRow(row));
+    if (
+      !u.telegramLinkCode ||
+      u.telegramLinkCode.code !== code ||
+      u.telegramLinkCode.expiresAt <= now
+    ) {
+      return null;
+    }
+    return await this.updateUser(u.id, {
+      telegram: { chatId, username, linkedAt: now },
+      telegramLinkCode: null,
+      notificationPreferences: { ...u.notificationPreferences, telegram: true },
+    });
+  }
+
+  async tryClaimWelcomeEmailSentAt(userId: string, at: Date): Promise<boolean> {
+    this.ensureOpen();
+    const u = await this.getUser(userId);
+    if (!u || u.welcomeEmailSentAt) return false;
+    await this.updateUser(userId, { welcomeEmailSentAt: at });
+    return true;
   }
 
   // local mode: upsert the single admin user
@@ -385,6 +510,12 @@ export class SqliteAdapter implements StorageAdapter {
     });
   }
 
+  async listAllActiveGroups(): Promise<StorageGroup[]> {
+    this.ensureOpen();
+    const rows = this.db.prepare("SELECT data FROM groups WHERE is_active = 1").all() as { data: string }[];
+    return rows.map((r) => hydrateGroup(parseRow(r)));
+  }
+
   async updateGroup(id: string, data: UpdateGroupInput): Promise<StorageGroup> {
     this.ensureOpen();
     const existing = await this.getGroup(id);
@@ -410,6 +541,33 @@ export class SqliteAdapter implements StorageAdapter {
     const row = this.db.prepare("SELECT data FROM groups WHERE invite_code = ?").get(code) as { data: string } | undefined;
     if (!row) return null;
     return hydrateGroup(parseRow(row));
+  }
+
+  async findActiveGroupForMemberInvitation(params: {
+    groupId?: string | null;
+    memberId: string;
+  }): Promise<StorageGroup | null> {
+    this.ensureOpen();
+    const { groupId, memberId } = params;
+    if (groupId) {
+      const g = await this.getGroup(groupId);
+      if (!g?.isActive) return null;
+      const m = g.members.find(
+        (mm) => mm.id === memberId && mm.isActive && !mm.leftAt
+      );
+      return m ? g : null;
+    }
+    const rows = this.db.prepare("SELECT data FROM groups WHERE is_active = 1").all() as {
+      data: string;
+    }[];
+    for (const row of rows) {
+      const g = hydrateGroup(parseRow(row));
+      const m = g.members.find(
+        (mm) => mm.id === memberId && mm.isActive && !mm.leftAt
+      );
+      if (m) return g;
+    }
+    return null;
   }
 
   // ── billing periods ────────────────────────────────────────────────────────
@@ -458,6 +616,15 @@ export class SqliteAdapter implements StorageAdapter {
     return hydratePeriod(parseRow(row));
   }
 
+  async getBillingPeriodById(id: string): Promise<StorageBillingPeriod | null> {
+    this.ensureOpen();
+    const row = this.db.prepare("SELECT data FROM billing_periods WHERE id = ?").get(id) as
+      | { data: string }
+      | undefined;
+    if (!row) return null;
+    return hydratePeriod(parseRow(row));
+  }
+
   async getOpenBillingPeriods(filter: OpenPeriodsFilter): Promise<StorageBillingPeriod[]> {
     this.ensureOpen();
     const asOf = filter.asOf.toISOString();
@@ -486,6 +653,15 @@ export class SqliteAdapter implements StorageAdapter {
     const rows = this.db.prepare(
       "SELECT data FROM billing_periods WHERE group_id = ? ORDER BY period_start DESC"
     ).all(groupId) as { data: string }[];
+    return rows.map((r) => hydratePeriod(parseRow(r)));
+  }
+
+  async listUnpaidPeriodsWithStartBefore(asOf: Date): Promise<StorageBillingPeriod[]> {
+    this.ensureOpen();
+    const rows = this.db.prepare(`
+      SELECT data FROM billing_periods
+      WHERE is_fully_paid = 0 AND period_start < ?
+    `).all(asOf.toISOString()) as { data: string }[];
     return rows.map((r) => hydratePeriod(parseRow(r)));
   }
 
@@ -606,6 +782,133 @@ export class SqliteAdapter implements StorageAdapter {
       "SELECT data FROM notifications WHERE group_id = ? ORDER BY created_at DESC LIMIT ?"
     ).all(groupId, limit) as { data: string }[];
     return rows.map((r) => hydrateNotification(parseRow(r)));
+  }
+
+  async getNotificationById(id: string): Promise<StorageNotification | null> {
+    this.ensureOpen();
+    const row = this.db.prepare("SELECT data FROM notifications WHERE id = ?").get(id) as
+      | { data: string }
+      | undefined;
+    if (!row) return null;
+    return hydrateNotification(parseRow(row));
+  }
+
+  async listNotifications(options: {
+    groupIds: string[];
+    type?: StorageNotificationType;
+    channel?: "email" | "telegram";
+    limit?: number;
+    offset?: number;
+  }): Promise<{ notifications: StorageNotification[]; total: number }> {
+    this.ensureOpen();
+    const { groupIds, type, channel, limit, offset } = options;
+    if (!groupIds.length) {
+      return { notifications: [], total: 0 };
+    }
+
+    const inList = groupIds.map(() => "?").join(", ");
+    let sqlWhere = `WHERE group_id IN (${inList})`;
+    const params: (string | number)[] = [...groupIds];
+
+    if (type) {
+      sqlWhere += ` AND json_extract(data, '$.type') = ?`;
+      params.push(type);
+    }
+    if (channel) {
+      sqlWhere += ` AND json_extract(data, '$.channel') = ?`;
+      params.push(channel);
+    }
+
+    const totalRow = this.db.prepare(`SELECT COUNT(*) as total FROM notifications ${sqlWhere}`).get(...params) as {
+      total: number;
+    };
+
+    let sql = `SELECT data FROM notifications ${sqlWhere} ORDER BY created_at DESC`;
+    const listParams: (string | number)[] = [...params];
+    if (limit !== undefined) {
+      sql += " LIMIT ?";
+      listParams.push(limit);
+      if (offset !== undefined) {
+        sql += " OFFSET ?";
+        listParams.push(offset);
+      }
+    } else if (offset !== undefined) {
+      sql += " LIMIT -1 OFFSET ?";
+      listParams.push(offset);
+    }
+
+    const rows = this.db.prepare(sql).all(...listParams) as { data: string }[];
+    return {
+      total: totalRow.total,
+      notifications: rows.map((r) => hydrateNotification(parseRow(r))),
+    };
+  }
+
+  async logAudit(data: CreateAuditEventInput): Promise<StorageAuditEvent> {
+    this.ensureOpen();
+    const id = nanoid();
+    const ts = now();
+    const event: StorageAuditEvent = {
+      id,
+      actorId: data.actorId,
+      actorName: data.actorName,
+      action: data.action,
+      groupId: data.groupId ?? null,
+      billingPeriodId: data.billingPeriodId ?? null,
+      targetMemberId: data.targetMemberId ?? null,
+      metadata: data.metadata ?? {},
+      createdAt: new Date(ts),
+    };
+
+    this.db.prepare(`
+      INSERT INTO audit_events (id, group_id, created_at, data)
+      VALUES (?, ?, ?, ?)
+    `).run(id, event.groupId, ts, JSON.stringify(event));
+
+    return event;
+  }
+
+  async listAuditEvents(options: {
+    groupIds?: string[];
+    limit?: number;
+    offset?: number;
+    unbounded?: boolean;
+  } = {}): Promise<{ events: StorageAuditEvent[]; total: number }> {
+    this.ensureOpen();
+
+    const unbounded = options.unbounded === true;
+    const limit = unbounded ? undefined : (options.limit ?? 50);
+    const offset = unbounded ? undefined : (options.offset ?? 0);
+    const groupIds = options.groupIds ?? [];
+
+    const where = groupIds.length
+      ? `WHERE group_id IN (${groupIds.map(() => "?").join(", ")})`
+      : "";
+
+    const totalRow = this.db
+      .prepare(`SELECT COUNT(*) as total FROM audit_events ${where}`)
+      .get(...groupIds) as { total: number };
+
+    let listSql = `SELECT data FROM audit_events ${where} ORDER BY created_at DESC`;
+    const listParams: (string | number)[] = [...groupIds];
+    if (limit !== undefined) {
+      listSql += " LIMIT ?";
+      listParams.push(limit);
+      if (offset !== undefined) {
+        listSql += " OFFSET ?";
+        listParams.push(offset);
+      }
+    } else if (offset !== undefined) {
+      listSql += " LIMIT -1 OFFSET ?";
+      listParams.push(offset);
+    }
+
+    const rows = this.db.prepare(listSql).all(...listParams) as { data: string }[];
+
+    return {
+      total: totalRow.total,
+      events: rows.map((row) => hydrateAuditEvent(parseRow(row))),
+    };
   }
 
   // ── scheduled tasks ────────────────────────────────────────────────────────
@@ -755,9 +1058,81 @@ export class SqliteAdapter implements StorageAdapter {
     const t = hydrateTask(parseRow(row));
     t.status = "cancelled";
     t.cancelledAt = new Date();
+    t.lockedAt = null;
+    t.lockedBy = null;
     t.updatedAt = new Date();
     const ts = now();
     this.db.prepare("UPDATE scheduled_tasks SET status = 'cancelled', data = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(t), ts, taskId);
+  }
+
+  async getTaskById(taskId: string): Promise<StorageScheduledTask | null> {
+    this.ensureOpen();
+    const row = this.db.prepare("SELECT data FROM scheduled_tasks WHERE id = ?").get(taskId) as { data: string } | undefined;
+    if (!row) return null;
+    return hydrateTask(parseRow(row));
+  }
+
+  async retryFailedTask(taskId: string): Promise<void> {
+    this.ensureOpen();
+    const row = this.db.prepare("SELECT data FROM scheduled_tasks WHERE id = ?").get(taskId) as { data: string } | undefined;
+    if (!row) return;
+    const t = hydrateTask(parseRow(row));
+    t.status = "pending";
+    t.runAt = new Date();
+    t.attempts = 0;
+    t.lastError = null;
+    t.lockedAt = null;
+    t.lockedBy = null;
+    t.completedAt = null;
+    t.updatedAt = new Date();
+    const ts = now();
+    this.db.prepare(
+      "UPDATE scheduled_tasks SET status = 'pending', run_at = ?, data = ?, updated_at = ? WHERE id = ?"
+    ).run(t.runAt.toISOString(), JSON.stringify(t), ts, taskId);
+  }
+
+  async bulkCancelPendingTasksForAdmin(filter: {
+    adminGroupIds: string[];
+    groupId?: string;
+    memberEmail?: string;
+    type?: StorageScheduledTask["type"];
+  }): Promise<number> {
+    this.ensureOpen();
+    if (filter.adminGroupIds.length === 0) return 0;
+    const adminSet = new Set(filter.adminGroupIds);
+    const rows = this.db.prepare(
+      `SELECT data FROM scheduled_tasks WHERE status IN ('pending', 'locked')`
+    ).all() as { data: string }[];
+    let n = 0;
+    const ts = now();
+    for (const row of rows) {
+      const t = hydrateTask(parseRow(row));
+      if (!taskVisibleToAdminGroups(t, adminSet)) continue;
+      if (filter.groupId) {
+        const touches =
+          t.payload.groupId === filter.groupId ||
+          t.payload.payments?.some((p) => p.groupId === filter.groupId);
+        if (!touches) continue;
+      }
+      if (filter.memberEmail) {
+        const want = filter.memberEmail.trim().toLowerCase();
+        const email = String(t.payload.memberEmail ?? "").toLowerCase();
+        if (email !== want) continue;
+      }
+      if (filter.type && t.type !== filter.type) continue;
+      t.status = "cancelled";
+      t.cancelledAt = new Date();
+      t.lockedAt = null;
+      t.lockedBy = null;
+      t.updatedAt = new Date();
+      this.db.prepare("UPDATE scheduled_tasks SET status = 'cancelled', data = ?, updated_at = ? WHERE id = ?").run(
+        JSON.stringify(t),
+        ts,
+        t.id
+      );
+      n++;
+    }
+    return n;
   }
 
   async getTaskCounts(): Promise<{ pending: number; locked: number; completed: number; failed: number; cancelled: number }> {
@@ -776,6 +1151,7 @@ export class SqliteAdapter implements StorageAdapter {
     status?: StorageScheduledTask["status"];
     type?: StorageScheduledTask["type"];
     groupId?: string;
+    anyGroupIdIn?: string[];
     limit?: number;
     offset?: number;
   } = {}): Promise<{ tasks: StorageScheduledTask[]; total: number }> {
@@ -797,15 +1173,22 @@ export class SqliteAdapter implements StorageAdapter {
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const rows = this.db.prepare(
+      `SELECT data FROM scheduled_tasks ${where} ORDER BY run_at DESC`
+    ).all(...params) as { data: string }[];
+
+    let tasks = rows.map((r) => hydrateTask(parseRow(r)));
+    if (options.anyGroupIdIn?.length) {
+      const adminSet = new Set(options.anyGroupIdIn);
+      tasks = tasks.filter((t) => taskVisibleToAdminGroups(t, adminSet));
+    }
+
+    const total = tasks.length;
     const limit = options.limit ?? 50;
     const offset = options.offset ?? 0;
+    tasks = tasks.slice(offset, offset + limit);
 
-    const total = (this.db.prepare(`SELECT COUNT(*) as c FROM scheduled_tasks ${where}`).get(...params) as { c: number }).c;
-    const rows = this.db.prepare(
-      `SELECT data FROM scheduled_tasks ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-    ).all(...params, limit, offset) as { data: string }[];
-
-    return { tasks: rows.map((r) => hydrateTask(parseRow(r))), total };
+    return { tasks, total };
   }
 
   // ── price history ──────────────────────────────────────────────────────────
@@ -838,6 +1221,26 @@ export class SqliteAdapter implements StorageAdapter {
       "SELECT data FROM price_history WHERE group_id = ? ORDER BY created_at DESC"
     ).all(groupId) as { data: string }[];
     return rows.map((r) => hydratePriceHistory(parseRow(r)));
+  }
+
+  // ── app settings (not persisted in SQLite; local mode uses config.json) ─────
+
+  async ensureAppSettingsSeeded(): Promise<void> {
+    this.ensureOpen();
+  }
+
+  async getAppSettingRow(_key: string): Promise<StorageAppSettingRow | null> {
+    this.ensureOpen();
+    return null;
+  }
+
+  async listAppSettingRows(_category?: string): Promise<StorageAppSettingRow[]> {
+    this.ensureOpen();
+    return [];
+  }
+
+  async upsertAppSettingRow(_input: StorageAppSettingRow): Promise<void> {
+    this.ensureOpen();
   }
 
   // ── data portability ───────────────────────────────────────────────────────

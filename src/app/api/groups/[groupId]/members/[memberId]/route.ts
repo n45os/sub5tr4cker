@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import mongoose from "mongoose";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
 import {
@@ -9,8 +8,7 @@ import {
   recalculatePeriodsOnMemberRemoval,
 } from "@/lib/billing/backfill";
 import { calculateShares, getNextPeriodStart } from "@/lib/billing/calculator";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group } from "@/models";
+import { db, isStorageId, type StorageGroupMember } from "@/lib/storage";
 
 const updateMemberSchema = z
   .object({
@@ -39,7 +37,7 @@ export async function PATCH(
   }
 
   const { groupId, memberId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(memberId)) {
+  if (!isStorageId(groupId) || !isStorageId(memberId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group or member id" } },
       { status: 400 }
@@ -60,8 +58,8 @@ export async function PATCH(
     );
   }
 
-  await dbConnect();
-  const group = await Group.findById(groupId);
+  const store = await db();
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
@@ -69,59 +67,70 @@ export async function PATCH(
     );
   }
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Only the admin can update members" } },
       { status: 403 }
     );
   }
 
-  const member = group.members.id(memberId);
-  if (!member) {
+  const memberIndex = group.members.findIndex((m) => m.id === memberId);
+  if (memberIndex === -1) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Member not found" } },
       { status: 404 }
     );
   }
 
-  const body = parsed.data;
-  const previousBillingStart = member.billingStartsAt as Date | null;
+  const memberBefore = group.members[memberIndex]!;
+  const previousBillingStart = memberBefore.billingStartsAt;
 
-  if (body.nickname !== undefined) member.nickname = body.nickname;
-  if ("customAmount" in (body || {})) member.customAmount = body.customAmount ?? null;
-  if (body.isActive !== undefined) member.isActive = body.isActive;
+  const body = parsed.data;
+  const updatedMember: StorageGroupMember = { ...memberBefore };
+
+  if (body.nickname !== undefined) updatedMember.nickname = body.nickname;
+  if ("customAmount" in (body || {})) updatedMember.customAmount = body.customAmount ?? null;
+  if (body.isActive !== undefined) updatedMember.isActive = body.isActive;
   if ("billingStartsAt" in (body || {})) {
     const v = body.billingStartsAt;
     if (v === null || v === "") {
-      member.billingStartsAt = null;
+      updatedMember.billingStartsAt = null;
     } else {
       const d = new Date(v as string);
-      if (!Number.isNaN(d.getTime())) member.billingStartsAt = d;
+      if (!Number.isNaN(d.getTime())) updatedMember.billingStartsAt = d;
     }
   }
 
-  await group.save();
+  const members = group.members.map((m, i) => (i === memberIndex ? updatedMember : m));
+  await store.updateGroup(groupId, { members });
+
+  let groupForBackfill = (await store.getGroup(groupId))!;
+  const member = groupForBackfill.members.find((m) => m.id === memberId)!;
 
   // backfill into past periods when billingStartsAt moved earlier
   let backfilledPeriods = 0;
-  const newBillingStart = member.billingStartsAt as Date | null;
+  const newBillingStart = member.billingStartsAt;
   if (
     newBillingStart &&
     (!previousBillingStart || newBillingStart < previousBillingStart) &&
     newBillingStart < new Date()
   ) {
-    const result = await backfillMemberIntoPeriods(group, member);
+    const result = await backfillMemberIntoPeriods(groupForBackfill, member);
     backfilledPeriods = result.backfilledCount;
   }
 
   if (
     backfilledPeriods > 0 &&
-    (group.billing.mode === "equal_split" || group.billing.mode === "variable")
+    (groupForBackfill.billing.mode === "equal_split" ||
+      groupForBackfill.billing.mode === "variable")
   ) {
-    const fresh = await Group.findById(groupId);
+    const fresh = await store.getGroup(groupId);
     if (fresh) {
       await recalculateEqualSplitPeriodsForGroup(fresh);
     }
+    groupForBackfill = (await store.getGroup(groupId))!;
+    const m2 = groupForBackfill.members.find((m) => m.id === memberId)!;
+    Object.assign(member, m2);
   }
 
   const actorName =
@@ -139,13 +148,15 @@ export async function PATCH(
 
   return NextResponse.json({
     data: {
-      _id: member._id.toString(),
+      _id: member.id,
       email: member.email,
       nickname: member.nickname,
       role: member.role,
       isActive: member.isActive,
       customAmount: member.customAmount,
-      billingStartsAt: member.billingStartsAt ? (member.billingStartsAt as Date).toISOString().slice(0, 10) : null,
+      billingStartsAt: member.billingStartsAt
+        ? member.billingStartsAt.toISOString().slice(0, 10)
+        : null,
       backfilledPeriods,
     },
   });
@@ -164,15 +175,15 @@ export async function DELETE(
   }
 
   const { groupId, memberId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(memberId)) {
+  if (!isStorageId(groupId) || !isStorageId(memberId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group or member id" } },
       { status: 400 }
     );
   }
 
-  await dbConnect();
-  const group = await Group.findById(groupId);
+  const store = await db();
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
@@ -180,33 +191,45 @@ export async function DELETE(
     );
   }
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Only the admin can remove members" } },
       { status: 403 }
     );
   }
 
-  const member = group.members.id(memberId);
-  if (!member) {
+  const memberIndex = group.members.findIndex((m) => m.id === memberId);
+  if (memberIndex === -1) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Member not found" } },
       { status: 404 }
     );
   }
 
-  member.leftAt = new Date();
-  member.isActive = false;
-  await group.save();
+  const memberBefore = group.members[memberIndex]!;
+  const removedSnapshot: StorageGroupMember = {
+    ...memberBefore,
+    leftAt: new Date(),
+    isActive: false,
+  };
+
+  const members = group.members.map((m, i) => (i === memberIndex ? removedSnapshot : m));
+  await store.updateGroup(groupId, { members });
+
+  const groupAfterRemoval = (await store.getGroup(groupId))!;
 
   // recalculate pending period amounts now that this member is inactive
-  const recalcResult = await recalculatePeriodsOnMemberRemoval(group, member);
+  const recalcResult = await recalculatePeriodsOnMemberRemoval(groupAfterRemoval, removedSnapshot);
 
   // compute the new share for the next upcoming period
   let newShareAmount = recalcResult.newShareAmount;
   if (!newShareAmount) {
-    const nextStart = getNextPeriodStart(group.billing.cycleDay ?? 1);
-    const shares = calculateShares(group, group.billing.currentPrice, nextStart);
+    const nextStart = getNextPeriodStart(groupAfterRemoval.billing.cycleDay ?? 1);
+    const shares = calculateShares(
+      groupAfterRemoval,
+      groupAfterRemoval.billing.currentPrice,
+      nextStart
+    );
     newShareAmount = shares.length > 0 ? shares[0].amount : 0;
   }
 
@@ -220,14 +243,14 @@ export async function DELETE(
     action: "member_removed",
     groupId,
     targetMemberId: memberId,
-    metadata: { nickname: member.nickname, email: member.email },
+    metadata: { nickname: memberBefore.nickname, email: memberBefore.email },
   });
 
   return NextResponse.json({
     data: {
       success: true,
       newShareAmount,
-      currency: group.billing.currency,
+      currency: groupAfterRemoval.billing.currency,
       recalculatedCount: recalcResult.recalculatedCount,
       removedMemberPendingPeriods: recalcResult.removedMemberPendingPeriods,
     },

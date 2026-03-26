@@ -1,5 +1,4 @@
 import type { Session } from "next-auth";
-import type { IGroupMember } from "@/models";
 
 /** when members.user is populated (e.g. for admin payload), minimal user shape for channel status */
 type PopulatedMemberUser = {
@@ -7,12 +6,16 @@ type PopulatedMemberUser = {
   notificationPreferences?: { email?: boolean; telegram?: boolean } | null;
 };
 
+type IdLike = { toString: () => string } | string;
+
 type GroupMemberLike = {
-  _id: { toString: () => string };
+  id?: string;
+  _id?: IdLike;
   email: string;
   nickname: string;
   role: string;
   customAmount?: number | null;
+  userId?: string | null;
   user?: { toString: () => string } | PopulatedMemberUser | null;
   acceptedAt?: Date | null;
   billingStartsAt?: Date | null;
@@ -22,7 +25,8 @@ type GroupMemberLike = {
 };
 
 type GroupLike = {
-  _id: { toString: () => string };
+  id?: string;
+  _id?: IdLike;
   name: string;
   description: string | null;
   service: {
@@ -59,12 +63,13 @@ type GroupLike = {
   };
   initializedAt?: Date | null;
   isActive: boolean;
-  admin: { toString: () => string };
+  adminId?: string;
+  admin?: IdLike;
   members: GroupMemberLike[];
 };
 
 type BillingPaymentLike = {
-  memberId: { toString: () => string };
+  memberId: IdLike;
   memberNickname: string;
   amount: number;
   status: string;
@@ -73,7 +78,8 @@ type BillingPaymentLike = {
 };
 
 type BillingPeriodLike = {
-  _id: { toString: () => string };
+  id?: string;
+  _id?: IdLike;
   periodStart: Date;
   periodEnd?: Date;
   periodLabel: string;
@@ -81,6 +87,10 @@ type BillingPeriodLike = {
   isFullyPaid: boolean;
   payments: BillingPaymentLike[];
 };
+
+function asId(value: IdLike | undefined | null): string {
+  return value == null ? "" : value.toString();
+}
 
 export function isInstanceAdmin(session: Session | null): boolean {
   return session?.user?.role === "admin";
@@ -91,12 +101,12 @@ export function getGroupAccess(
   userId: string,
   userEmail: string
 ): "admin" | "member" | null {
-  if (group.admin.toString() === userId) return "admin";
+  if ((group.adminId ?? asId(group.admin)) === userId) return "admin";
   const member = group.members.find(
     (m) =>
       m.isActive &&
       !m.leftAt &&
-      (m.user?.toString() === userId || m.email === userEmail)
+      ((m.userId ?? asId(m.user as IdLike | undefined)) === userId || m.email === userEmail)
   );
   return member ? "member" : null;
 }
@@ -105,25 +115,25 @@ export function getMemberEntry(
   group: Pick<GroupLike, "members">,
   userId: string,
   userEmail: string
-): IGroupMember | null {
+): GroupMemberLike | null {
   const member =
     group.members.find(
       (m) =>
         m.isActive &&
         !m.leftAt &&
-        (m.user?.toString() === userId || m.email === userEmail)
+        ((m.userId ?? asId(m.user as IdLike | undefined)) === userId || m.email === userEmail)
     ) ?? null;
-  return member as unknown as IGroupMember | null;
+  return member;
 }
 
 export function filterGroupForMember(
   group: GroupLike,
-  memberEntry: IGroupMember | null,
+  memberEntry: GroupMemberLike | null,
   access: "member" | "admin"
 ) {
   if (access === "admin") {
     return {
-      _id: group._id.toString(),
+      _id: group.id ?? asId(group._id),
       name: group.name,
       description: group.description,
       service: group.service,
@@ -154,7 +164,7 @@ export function filterGroupForMember(
               : null;
           const unsubscribed = (m as GroupMemberLike).unsubscribedFromEmail ?? false;
           return {
-            _id: m._id.toString(),
+            _id: m.id ?? asId(m._id),
             email: m.email,
             nickname: m.nickname,
             role: m.role,
@@ -180,7 +190,7 @@ export function filterGroupForMember(
   const me = memberEntry!;
   const activeMembers = group.members.filter((m) => m.isActive && !m.leftAt);
   return {
-    _id: group._id.toString(),
+    _id: group.id ?? asId(group._id),
     name: group.name,
     description: group.description,
     service: group.service,
@@ -202,7 +212,7 @@ export function filterGroupForMember(
     role: access,
     memberCount: activeMembers.length,
     myMembership: {
-      _id: me._id.toString(),
+      _id: me.id ?? asId(me._id),
       nickname: me.nickname,
       role: me.role,
       customAmount: me.customAmount ?? null,
@@ -222,7 +232,7 @@ export function filterBillingForMember(
   memberId: string
 ) {
   return periods.map((period) => ({
-    _id: period._id.toString(),
+    _id: period.id ?? asId(period._id),
     periodStart: (period.periodStart as Date).toISOString().slice(0, 10),
     periodEnd: period.periodEnd
       ? (period.periodEnd as Date).toISOString().slice(0, 10)
@@ -231,9 +241,9 @@ export function filterBillingForMember(
     totalPrice: period.totalPrice,
     isFullyPaid: period.isFullyPaid,
     payments: period.payments
-      .filter((pay) => pay.memberId.toString() === memberId)
+      .filter((pay) => asId(pay.memberId) === memberId)
       .map((pay) => ({
-        memberId: pay.memberId.toString(),
+        memberId: asId(pay.memberId),
         memberNickname: pay.memberNickname,
         amount: pay.amount,
         status: pay.status,

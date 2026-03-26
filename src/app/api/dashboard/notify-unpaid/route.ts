@@ -1,18 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { BillingPeriod, Group } from "@/models";
-import { normalizeMemberEmailForAggregation } from "@/lib/notifications/member-email";
-import { getReminderEligibility } from "@/lib/notifications/reminder-targeting";
 import type { ChannelOverride } from "@/lib/notifications/reminder-send";
 import {
   sendAggregatedReminder,
   type AggregatedPaymentInput,
 } from "@/lib/notifications/aggregated-reminder-send";
+import { normalizeMemberEmailForAggregation } from "@/lib/notifications/member-email";
+import { getReminderEligibility } from "@/lib/notifications/reminder-targeting";
 import type { SkipReason } from "@/lib/notifications/reminder-targeting";
-import type { IMemberPayment } from "@/models/billing-period";
-import { collectionWindowOpenFilter } from "@/lib/billing/collection-window";
+import { db, type StorageBillingPeriod, type StorageMemberPayment } from "@/lib/storage";
 
 const postNotifyUnpaidSchema = z.object({
   groupIds: z.array(z.string()).optional(),
@@ -30,34 +27,30 @@ export async function GET() {
     );
   }
 
-  await dbConnect();
-
+  const store = await db();
   const adminId = session.user.id;
+  const userEmail = (session.user.email as string) || "";
   const now = new Date();
-  // dashboard preview always includes per-user aggregation (matches POST send)
   const aggregateReminders = true;
 
-  const groups = await Group.find({
-    admin: adminId,
-    isActive: true,
-    $or: [
-      { "notifications.remindersEnabled": { $ne: false } },
-      { notifications: { $exists: false } },
-    ],
-  })
-    .lean()
-    .exec();
+  const allForUser = await store.listGroupsForUser(adminId, userEmail);
+  const groups = allForUser.filter(
+    (g) =>
+      g.adminId === adminId &&
+      g.isActive &&
+      g.notifications.remindersEnabled !== false
+  );
 
-  const groupIds = groups.map((g) => g._id);
-  const periods = await BillingPeriod.find({
-    group: { $in: groupIds },
-    isFullyPaid: false,
-    ...collectionWindowOpenFilter(now),
-    "payments.status": { $in: ["pending", "overdue"] },
-  })
-    .populate("group")
-    .lean()
-    .exec();
+  const groupIds = groups.map((g) => g.id);
+
+  const periodsRaw =
+    groupIds.length === 0
+      ? []
+      : await store.getOpenBillingPeriods({
+          asOf: now,
+          unpaidOnly: true,
+          groupIds,
+        });
 
   const byGroup: Array<{
     groupId: string;
@@ -91,11 +84,12 @@ export async function GET() {
   let totalSendEmail = 0;
   let totalSendTelegram = 0;
 
-  for (const period of periods) {
-    const group = period.group as { _id: unknown; name: string; members: unknown[] };
-    if (!group || Array.isArray(group)) continue;
-    const groupIdStr = (group._id as { toString: () => string }).toString();
-    const unpaidPayments = (period.payments as Array<{ status: string; memberId: unknown; memberEmail: string; memberNickname: string; amount: number; confirmationToken: string | null; _id: unknown }>).filter(
+  for (const period of periodsRaw) {
+    const group = await store.getGroup(period.groupId);
+    if (!group || group.adminId !== adminId) continue;
+
+    const groupIdStr = group.id;
+    const unpaidPayments = period.payments.filter(
       (p) => p.status === "pending" || p.status === "overdue"
     );
 
@@ -121,9 +115,9 @@ export async function GET() {
 
     for (const payment of unpaidPayments) {
       const eligibility = await getReminderEligibility({
-        group: group as Parameters<typeof getReminderEligibility>[0]["group"],
-        period: period as Parameters<typeof getReminderEligibility>[0]["period"],
-        payment: payment as Parameters<typeof getReminderEligibility>[0]["payment"],
+        group,
+        period,
+        payment,
       });
       totalPayments += 1;
       if (eligibility.sendEmail) totalSendEmail += 1;
@@ -143,7 +137,7 @@ export async function GET() {
     }
 
     groupEntry.periods.push({
-      periodId: (period._id as { toString: () => string }).toString(),
+      periodId: period.id,
       periodLabel: period.periodLabel,
       payments: periodEligibilities,
     });
@@ -292,39 +286,36 @@ export async function POST(req: Request) {
 
   const channelPreference: ChannelOverride = body.channelPreference ?? "both";
 
-  await dbConnect();
-
+  const store = await db();
   const adminId = session.user.id;
+  const userEmail = (session.user.email as string) || "";
   const now = new Date();
 
-  const groups = await Group.find({
-    admin: adminId,
-    isActive: true,
-    $or: [
-      { "notifications.remindersEnabled": { $ne: false } },
-      { notifications: { $exists: false } },
-    ],
-  }).exec();
+  const allForUser = await store.listGroupsForUser(adminId, userEmail);
+  const groups = allForUser.filter(
+    (g) =>
+      g.adminId === adminId &&
+      g.isActive &&
+      g.notifications.remindersEnabled !== false
+  );
 
-  const adminGroupIds = new Set(groups.map((g) => g._id.toString()));
+  const adminGroupIds = new Set(groups.map((g) => g.id));
   const filterGroupIds =
     body.groupIds?.length && body.groupIds.every((id) => adminGroupIds.has(id))
       ? new Set(body.groupIds)
       : null;
-  const filterPaymentIds =
-    body.paymentIds?.length ? new Set(body.paymentIds) : null;
+  const filterPaymentIds = body.paymentIds?.length ? new Set(body.paymentIds) : null;
 
-  const groupIds = filterGroupIds
-    ? Array.from(filterGroupIds)
-    : groups.map((g) => g._id);
-  const periods = await BillingPeriod.find({
-    group: { $in: groupIds },
-    isFullyPaid: false,
-    ...collectionWindowOpenFilter(now),
-    "payments.status": { $in: ["pending", "overdue"] },
-  })
-    .populate("group")
-    .exec();
+  const groupIds = filterGroupIds ? Array.from(filterGroupIds) : groups.map((g) => g.id);
+
+  const periods: StorageBillingPeriod[] =
+    groupIds.length === 0
+      ? []
+      : await store.getOpenBillingPeriods({
+          asOf: now,
+          unpaidOnly: true,
+          groupIds,
+        });
 
   let emailSent = 0;
   let telegramSent = 0;
@@ -341,17 +332,16 @@ export async function POST(req: Request) {
       inputs: AggregatedPaymentInput[];
     }
   >();
+
   for (const period of periods) {
-    const group = period.group as InstanceType<typeof Group>;
-    if (!group || typeof group !== "object" || Array.isArray(group)) continue;
+    const group = await store.getGroup(period.groupId);
+    if (!group || group.adminId !== adminId) continue;
+
     for (const payment of period.payments) {
-      const p = payment as IMemberPayment;
+      const p = payment as StorageMemberPayment;
       if (p.status !== "pending" && p.status !== "overdue") continue;
-      if (
-        filterPaymentIds &&
-        !filterPaymentIds.has((p._id as { toString: () => string }).toString())
-      )
-        continue;
+      if (filterPaymentIds && !filterPaymentIds.has(p.id)) continue;
+
       const eligibility = await getReminderEligibility({
         group,
         period,
@@ -365,11 +355,7 @@ export async function POST(req: Request) {
         skipped += 1;
         continue;
       }
-      const input: AggregatedPaymentInput = {
-        group: group as AggregatedPaymentInput["group"],
-        period: period as AggregatedPaymentInput["period"],
-        payment: p,
-      };
+      const input: AggregatedPaymentInput = { group, period, payment: p };
       const key = normalizeMemberEmailForAggregation(p.memberEmail);
       let entry = byEmail.get(key);
       if (!entry) {
@@ -383,6 +369,7 @@ export async function POST(req: Request) {
       entry.inputs.push(input);
     }
   }
+
   const periodRecipientCounts = new Map<string, number>();
   for (const [, { representativeEmail, memberNickname, inputs }] of byEmail) {
     if (inputs.length === 0) continue;
@@ -396,12 +383,9 @@ export async function POST(req: Request) {
       if (result.emailSent) emailSent += 1;
       if (result.telegramSent) telegramSent += 1;
       if (result.emailSent || result.telegramSent) {
-        const periodIds = new Set(
-          inputs.map((i) =>
-            (i.period._id as { toString: () => string }).toString()
-          )
-        );
+        const periodIds = new Set(inputs.map((i) => i.period.id ?? ""));
         for (const periodIdStr of periodIds) {
+          if (!periodIdStr) continue;
           periodIdsUpdated.add(periodIdStr);
           periodRecipientCounts.set(
             periodIdStr,
@@ -413,20 +397,26 @@ export async function POST(req: Request) {
       failed += 1;
     }
   }
+
   for (const periodIdStr of periodIdsUpdated) {
-    const period = periods.find(
-      (pr) => (pr._id as { toString: () => string }).toString() === periodIdStr
-    );
-    if (period) {
-      const recipientCount = periodRecipientCounts.get(periodIdStr) ?? 1;
-      period.reminders.push({
-        sentAt: new Date(),
-        channel: "email",
-        recipientCount,
-        type: period.reminders.length === 0 ? "initial" : "follow_up",
-      });
-      await period.save();
-    }
+    const period = periods.find((pr) => pr.id === periodIdStr);
+    if (!period) continue;
+    const recipientCount = periodRecipientCounts.get(periodIdStr) ?? 1;
+    const fresh = await store.getBillingPeriod(periodIdStr, period.groupId);
+    if (!fresh) continue;
+    const nextType: "initial" | "follow_up" =
+      fresh.reminders.length === 0 ? "initial" : "follow_up";
+    await store.updateBillingPeriod(periodIdStr, {
+      reminders: [
+        ...fresh.reminders,
+        {
+          sentAt: new Date(),
+          channel: "email",
+          recipientCount,
+          type: nextType,
+        },
+      ],
+    });
   }
 
   return NextResponse.json({

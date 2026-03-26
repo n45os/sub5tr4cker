@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group } from "@/models";
-import type { IGroupMember } from "@/models";
+import { nanoid } from "nanoid";
+import { db, type StorageGroupMember } from "@/lib/storage";
 
 const joinSchema = z.object({
   inviteCode: z.string().min(1, "Invite code is required"),
@@ -12,7 +11,7 @@ const joinSchema = z.object({
 
 /**
  * Public endpoint: join a group via invite code (no auth).
- * Creates a new member with user: null. Rejects if already an active member.
+ * Creates a new member with userId: null. Rejects if already an active member.
  */
 export async function POST(request: NextRequest) {
   const parsed = joinSchema.safeParse(await request.json());
@@ -32,8 +31,8 @@ export async function POST(request: NextRequest) {
   const { inviteCode, email, nickname } = parsed.data;
   const code = inviteCode.trim();
 
-  await dbConnect();
-  const group = await Group.findOne({ inviteCode: code });
+  const store = await db();
+  const group = await store.findGroupByInviteCode(code);
   if (!group) {
     return NextResponse.json(
       {
@@ -72,7 +71,7 @@ export async function POST(request: NextRequest) {
   }
 
   const existing = group.members.find(
-    (m: IGroupMember) =>
+    (m: StorageGroupMember) =>
       m.email.toLowerCase() === email.toLowerCase() && m.isActive && !m.leftAt
   );
   if (existing) {
@@ -87,27 +86,32 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  group.members.push({
+  const newMember: StorageGroupMember = {
+    id: nanoid(),
+    userId: null,
     email,
     nickname,
     customAmount: null,
     role: "member",
     isActive: true,
     leftAt: null,
-    user: null,
-  } as never);
-  await group.save();
+    joinedAt: new Date(),
+    acceptedAt: null,
+    unsubscribedFromEmail: false,
+    billingStartsAt: null,
+  };
 
-  const added = group.members[group.members.length - 1];
+  await store.updateGroup(group.id, { members: [...group.members, newMember] });
+
   return NextResponse.json({
     data: {
-      groupId: group._id.toString(),
+      groupId: group.id,
       member: {
-        _id: added._id.toString(),
-        email: added.email,
-        nickname: added.nickname,
-        role: added.role,
-        isActive: added.isActive,
+        _id: newMember.id,
+        email: newMember.email,
+        nickname: newMember.nickname,
+        role: newMember.role,
+        isActive: newMember.isActive,
       },
     },
   });

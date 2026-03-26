@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import mongoose from "mongoose";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group, BillingPeriod } from "@/models";
-import type { IGroupMember, IMemberPayment } from "@/models";
-import { verifyMemberPortalToken } from "@/lib/tokens";
-import { enqueueTask } from "@/lib/tasks/queue";
 import { runNotificationTasks } from "@/jobs/run-notification-tasks";
+import { enqueueTask } from "@/lib/tasks/queue";
+import { verifyMemberPortalToken } from "@/lib/tokens";
+import { db, isStorageId, type StorageGroupMember, type StorageMemberPayment } from "@/lib/storage";
 
 const selfConfirmSchema = z.object({
   memberToken: z.string().optional(),
@@ -19,14 +16,14 @@ export async function POST(
   context: { params: Promise<{ groupId: string; periodId: string }> }
 ) {
   const { groupId, periodId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(periodId)) {
+  if (!isStorageId(groupId) || !isStorageId(periodId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group or period id" } },
       { status: 400 }
     );
   }
 
-  await dbConnect();
+  const store = await db();
 
   const parsed = selfConfirmSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {
@@ -42,7 +39,7 @@ export async function POST(
     );
   }
 
-  const group = await Group.findById(groupId);
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
@@ -53,7 +50,7 @@ export async function POST(
   const session = await auth();
   const memberToken = parsed.data.memberToken;
 
-  let member: IGroupMember | undefined;
+  let member: StorageGroupMember | undefined;
   let actorId: string;
   let actorName: string;
 
@@ -67,10 +64,8 @@ export async function POST(
     }
 
     member = group.members.find(
-      (m: IGroupMember) =>
-        m.isActive &&
-        !m.leftAt &&
-        m._id.toString() === payload.memberId
+      (m: StorageGroupMember) =>
+        m.isActive && !m.leftAt && m.id === payload.memberId
     );
     actorId = payload.memberId;
     actorName = member?.nickname || member?.email || "Member";
@@ -86,10 +81,10 @@ export async function POST(
     const userEmail = (session.user.email as string) || "";
 
     member = group.members.find(
-      (m: IGroupMember) =>
+      (m: StorageGroupMember) =>
         m.isActive &&
         !m.leftAt &&
-        (m.user?.toString() === userId || m.email === userEmail)
+        (m.userId === userId || m.email === userEmail)
     );
     actorId = session.user.id;
     actorName =
@@ -106,10 +101,7 @@ export async function POST(
     );
   }
 
-  const period = await BillingPeriod.findOne({
-    _id: periodId,
-    group: groupId,
-  });
+  const period = await store.getBillingPeriod(periodId, groupId);
   if (!period) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Billing period not found" } },
@@ -117,15 +109,17 @@ export async function POST(
     );
   }
 
-  const payment = period.payments.find(
-    (p: IMemberPayment) => p.memberId.toString() === member._id.toString()
+  const payIdx = period.payments.findIndex(
+    (p: StorageMemberPayment) => p.memberId === member.id
   );
-  if (!payment) {
+  if (payIdx === -1) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "No payment entry for you in this period" } },
       { status: 404 }
     );
   }
+
+  const payment = { ...period.payments[payIdx]! };
 
   if (payment.status !== "pending" && payment.status !== "overdue") {
     return NextResponse.json(
@@ -141,7 +135,9 @@ export async function POST(
 
   payment.status = "member_confirmed";
   payment.memberConfirmedAt = new Date();
-  await period.save();
+
+  const payments = period.payments.map((p, i) => (i === payIdx ? payment : p));
+  await store.updateBillingPeriod(periodId, { payments });
 
   await enqueueTask({
     type: "admin_confirmation_request",
@@ -159,12 +155,12 @@ export async function POST(
     action: "payment_self_confirmed",
     groupId,
     billingPeriodId: periodId,
-    targetMemberId: member._id.toString(),
+    targetMemberId: member.id,
   });
 
   return NextResponse.json({
     data: {
-      memberId: payment.memberId.toString(),
+      memberId: payment.memberId,
       status: payment.status,
       memberConfirmedAt: payment.memberConfirmedAt?.toISOString() ?? null,
     },

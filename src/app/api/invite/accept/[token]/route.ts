@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group, User } from "@/models";
-import type { IGroupMember } from "@/models";
 import { getSetting } from "@/lib/settings/service";
 import {
   verifyInviteAcceptToken,
-  createMagicLoginToken,
   createMemberPortalToken,
   getMemberPortalUrl,
   createInviteLinkToken,
@@ -15,16 +11,9 @@ import {
 import { sendNotification } from "@/lib/notifications/service";
 import { buildTelegramWelcomeEmailHtml } from "@/lib/email/templates/group-invite";
 import { getBot, isTelegramEnabled } from "@/lib/telegram/bot";
+import { db, type StorageGroup, type StorageGroupMember } from "@/lib/storage";
 
-function buildBillingSummary(group: {
-  billing: {
-    cycleType: "monthly" | "yearly";
-    currentPrice: number;
-    currency: string;
-    mode: "equal_split" | "fixed_amount" | "variable";
-    fixedMemberAmount?: number | null;
-  };
-}): string {
+function buildBillingSummary(group: StorageGroup): string {
   const { billing } = group;
   const cycle = billing.cycleType === "yearly" ? "year" : "month";
   const price = `${billing.currentPrice} ${billing.currency}`;
@@ -89,8 +78,8 @@ export async function GET(
       );
     }
 
-    await dbConnect();
-    const group = await Group.findById(payload.groupId);
+    const store = await db();
+    const group = await store.getGroup(payload.groupId);
     if (!group || !group.isActive) {
       return new NextResponse(
         buildHtml(
@@ -103,8 +92,8 @@ export async function GET(
     }
 
     const member = group.members.find(
-      (m: IGroupMember) =>
-        m._id.toString() === payload.memberId && m.isActive && !m.leftAt
+      (m: StorageGroupMember) =>
+        m.id === payload.memberId && m.isActive && !m.leftAt
     );
     if (!member) {
       return new NextResponse(
@@ -133,59 +122,42 @@ export async function GET(
     const nickname =
       typeof member.nickname === "string" ? member.nickname.trim() : "";
 
-    // atomic find-or-create: avoids duplicate key races on telegramLinkCode
-    const user = await User.findOneAndUpdate(
-      { email: normalizedEmail },
-      {
-        $setOnInsert: {
-          name: nickname || normalizedEmail,
-          email: normalizedEmail,
-          hashedPassword: null,
-          notificationPreferences: {
-            email: true,
-            telegram: false,
-            reminderFrequency: "every_3_days",
-          },
+    let user = await store.getUserByEmail(normalizedEmail);
+    if (!user) {
+      user = await store.createUser({
+        name: nickname || normalizedEmail,
+        email: normalizedEmail,
+        role: "user",
+        hashedPassword: null,
+        notificationPreferences: {
+          email: true,
+          telegram: false,
+          reminderFrequency: "every_3_days",
         },
-      },
-      { upsert: true, returnDocument: "after" }
-    );
+      });
+    }
 
-    await Group.updateOne(
-      { _id: group._id, "members._id": member._id },
-      {
-        $set: {
-          "members.$.user": user._id,
-          "members.$.acceptedAt": new Date(),
-        },
-      }
+    const members = group.members.map((m) =>
+      m.id === member.id
+        ? { ...m, userId: user.id, acceptedAt: new Date() }
+        : m
     );
+    await store.updateGroup(group.id, { members });
 
-    const groupIdStr = group._id.toString();
-    const memberPortalToken = await createMemberPortalToken(
-      member._id.toString(),
-      groupIdStr
-    );
+    const groupIdStr = group.id;
+    const memberPortalToken = await createMemberPortalToken(member.id, groupIdStr);
     const memberPortalUrl = await getMemberPortalUrl(memberPortalToken);
 
-    // send welcome email at most once per user (atomic claim so repeat visits don't resend)
-    const baseUrl = appUrl.replace(/\/$/, "");
-    const claimed = await User.findOneAndUpdate(
-      { _id: user._id, welcomeEmailSentAt: null },
-      { $set: { welcomeEmailSentAt: new Date() } }
-    );
-    if (claimed) {
+    const freshUser = await store.getUser(user.id);
+    const shouldSendWelcome = freshUser && !freshUser.welcomeEmailSentAt;
+    if (shouldSendWelcome) {
+      await store.updateUser(user.id, { welcomeEmailSentAt: new Date() });
       void (async () => {
         try {
-          const magicToken = await createMagicLoginToken(user._id.toString());
-          const magicLoginUrl = `${baseUrl}/invite-callback?token=${encodeURIComponent(magicToken)}&groupId=${encodeURIComponent(payload.groupId)}`;
           const sendEmail = !member.unsubscribedFromEmail;
           const unsubscribeUrl = sendEmail
             ? await getUnsubscribeUrl(
-                await createUnsubscribeToken(
-                  member._id.toString(),
-                  groupIdStr
-                )
+                await createUnsubscribeToken(member.id, groupIdStr)
               )
             : null;
 
@@ -197,11 +169,7 @@ export async function GET(
               const me = await bot.api.getMe();
               telegramBotUsername = me.username ?? null;
               if (telegramBotUsername) {
-                const inviteToken = await createInviteLinkToken(
-                  member._id.toString(),
-                  groupIdStr,
-                  7
-                );
+                const inviteToken = await createInviteLinkToken(member.id, groupIdStr, 7);
                 telegramInviteLink = `https://t.me/${telegramBotUsername}?start=invite_${inviteToken}`;
               }
             } catch {
@@ -209,7 +177,7 @@ export async function GET(
             }
           }
 
-          const admin = await User.findById(group.admin);
+          const admin = await store.getUser(group.adminId);
           const telegramWelcomeParams = {
             memberName: member.nickname,
             groupName: group.name,
@@ -227,7 +195,6 @@ export async function GET(
             unsubscribeUrl,
             accentColor: group.service?.accentColor ?? null,
             theme: group.service?.emailTheme ?? "clean",
-            // template still uses this prop name, but it now points to the member portal
             magicLoginUrl: memberPortalUrl,
           };
           const emailHtml = buildTelegramWelcomeEmailHtml(telegramWelcomeParams);
@@ -243,7 +210,7 @@ export async function GET(
             {
               email: user.email,
               telegramChatId: null,
-              userId: user._id.toString(),
+              userId: user.id,
               preferences: { email: sendEmail, telegram: false },
             },
             {

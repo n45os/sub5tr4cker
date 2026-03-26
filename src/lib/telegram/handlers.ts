@@ -1,6 +1,6 @@
 import { Bot, Context } from "grammy";
-import { dbConnect } from "@/lib/db/mongoose";
-import { BillingPeriod, User, Group } from "@/models";
+import { db } from "@/lib/storage";
+import type { StorageGroup } from "@/lib/storage/types";
 import {
   verifyInviteLinkToken,
   createMagicLoginToken,
@@ -14,15 +14,7 @@ import { sendNotification } from "@/lib/notifications/service";
 import { buildTelegramWelcomeEmailHtml } from "@/lib/email/templates/group-invite";
 import { formatGroupPaymentDetailsPlainText } from "@/lib/telegram/payment-details-text";
 
-function buildBillingSummary(group: {
-  billing: {
-    cycleType: "monthly" | "yearly";
-    currentPrice: number;
-    currency: string;
-    mode: "equal_split" | "fixed_amount" | "variable";
-    fixedMemberAmount?: number | null;
-  };
-}): string {
+function buildBillingSummary(group: StorageGroup): string {
   const { billing } = group;
   const cycle = billing.cycleType === "yearly" ? "year" : "month";
   const price = `${billing.currentPrice} ${billing.currency}`;
@@ -111,17 +103,15 @@ async function handleMemberConfirm(
   periodId: string,
   memberId: string
 ): Promise<void> {
-  await dbConnect();
+  const store = await db();
 
-  const period = await BillingPeriod.findById(periodId);
+  const period = await store.getBillingPeriodById(periodId);
   if (!period) {
     await ctx.answerCallbackQuery({ text: "Period not found" });
     return;
   }
 
-  const payment = period.payments.find(
-    (p: { memberId: { toString: () => string } }) => p.memberId.toString() === memberId
-  );
+  const payment = period.payments.find((p) => p.memberId === memberId);
   if (!payment) {
     await ctx.answerCallbackQuery({ text: "Payment not found" });
     return;
@@ -132,9 +122,10 @@ async function handleMemberConfirm(
     return;
   }
 
-  payment.status = "member_confirmed";
-  payment.memberConfirmedAt = new Date();
-  await period.save();
+  await store.updatePaymentStatus(periodId, memberId, {
+    status: "member_confirmed",
+    memberConfirmedAt: new Date(),
+  });
 
   await ctx.answerCallbackQuery?.({ text: "Marked as paid!" });
   await ctx.editMessageText?.(
@@ -142,13 +133,13 @@ async function handleMemberConfirm(
   );
 
   // enqueue admin verification nudge (telegram when linked; email fallback)
-  const group = await Group.findById(period.group);
+  const group = await store.getGroup(period.groupId);
   if (group) {
     await enqueueTask({
       type: "admin_confirmation_request",
       runAt: new Date(),
       payload: {
-        groupId: (group._id as { toString: () => string }).toString(),
+        groupId: group.id,
         billingPeriodId: periodId,
       },
     });
@@ -157,15 +148,15 @@ async function handleMemberConfirm(
 }
 
 async function handlePayDetails(ctx: Context, periodId: string): Promise<void> {
-  await dbConnect();
+  const store = await db();
 
-  const period = await BillingPeriod.findById(periodId);
+  const period = await store.getBillingPeriodById(periodId);
   if (!period) {
     await ctx.answerCallbackQuery({ text: "Period not found" });
     return;
   }
 
-  const group = await Group.findById(period.group);
+  const group = await store.getGroup(period.groupId);
   if (!group) {
     await ctx.answerCallbackQuery({ text: "Group not found" });
     return;
@@ -198,36 +189,29 @@ async function handleAdminConfirm(
   periodId: string,
   memberId: string
 ): Promise<void> {
-  await dbConnect();
+  const store = await db();
 
-  const period = await BillingPeriod.findById(periodId);
+  const period = await store.getBillingPeriodById(periodId);
   if (!period) {
     await ctx.answerCallbackQuery({ text: "Period not found" });
     return;
   }
 
-  const payment = period.payments.find(
-    (p: { memberId: { toString: () => string } }) => p.memberId.toString() === memberId
-  );
+  const payment = period.payments.find((p) => p.memberId === memberId);
   if (!payment) {
     await ctx.answerCallbackQuery({ text: "Payment not found" });
     return;
   }
 
-  payment.status = "confirmed";
-  payment.adminConfirmedAt = new Date();
-
-  // check if all payments are confirmed
-  const allConfirmed = period.payments.every(
-    (p: { status: string }) => p.status === "confirmed" || p.status === "waived"
-  );
-  period.isFullyPaid = allConfirmed;
-
-  await period.save();
+  const updated = await store.updatePaymentStatus(periodId, memberId, {
+    status: "confirmed",
+    adminConfirmedAt: new Date(),
+  });
+  const payAfter = updated.payments.find((p) => p.memberId === memberId);
 
   await ctx.answerCallbackQuery?.({ text: "Payment confirmed!" });
   await ctx.editMessageText?.(
-    `Confirmed payment from ${payment.memberNickname} (${payment.amount.toFixed(2)}${period.currency}).`
+    `Confirmed payment from ${payAfter?.memberNickname ?? payment.memberNickname} (${payment.amount.toFixed(2)}${updated.currency}).`
   );
 }
 
@@ -236,25 +220,24 @@ async function handleAdminReject(
   periodId: string,
   memberId: string
 ): Promise<void> {
-  await dbConnect();
+  const store = await db();
 
-  const period = await BillingPeriod.findById(periodId);
+  const period = await store.getBillingPeriodById(periodId);
   if (!period) {
     await ctx.answerCallbackQuery({ text: "Period not found" });
     return;
   }
 
-  const payment = period.payments.find(
-    (p: { memberId: { toString: () => string } }) => p.memberId.toString() === memberId
-  );
+  const payment = period.payments.find((p) => p.memberId === memberId);
   if (!payment) {
     await ctx.answerCallbackQuery({ text: "Payment not found" });
     return;
   }
 
-  payment.status = "pending";
-  payment.memberConfirmedAt = null;
-  await period.save();
+  await store.updatePaymentStatus(periodId, memberId, {
+    status: "pending",
+    memberConfirmedAt: null,
+  });
 
   await ctx.answerCallbackQuery?.({ text: "Payment rejected" });
   await ctx.editMessageText?.(
@@ -266,7 +249,6 @@ async function handleAccountLink(
   ctx: Context,
   code: string
 ): Promise<void> {
-  await dbConnect();
   const chatId = ctx.chat?.id;
   const username = ctx.from?.username ?? null;
   if (!chatId) {
@@ -281,23 +263,14 @@ async function handleAccountLink(
     return;
   }
 
+  const store = await db();
   const now = new Date();
-  const user = await User.findOneAndUpdate(
-    {
-      "telegramLinkCode.code": code,
-      "telegramLinkCode.expiresAt": { $gt: now },
-    },
-    {
-      $set: {
-        "telegram.chatId": chatId,
-        "telegram.username": username,
-        "telegram.linkedAt": now,
-        "notificationPreferences.telegram": true,
-      },
-      $unset: { telegramLinkCode: "" },
-    },
-    { returnDocument: "after" }
-  );
+  const user = await store.linkTelegramAccountWithLinkCode({
+    code,
+    chatId,
+    username,
+    now,
+  });
 
   if (!user) {
     await ctx.reply(
@@ -320,7 +293,7 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
     return;
   }
 
-  await dbConnect();
+  const store = await db();
   const chatId = ctx.chat?.id;
   const username = ctx.from?.username ?? null;
   if (!chatId) {
@@ -328,23 +301,17 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
     return;
   }
 
-  let group = null;
-  if (payload.groupId) {
-    group = await Group.findById(payload.groupId);
-  } else {
-    group = await Group.findOne({
-      isActive: true,
-      "members._id": payload.memberId,
-    });
-  }
-  if (!group || !group.isActive) {
+  const group = await store.findActiveGroupForMemberInvitation({
+    groupId: payload.groupId ?? null,
+    memberId: payload.memberId,
+  });
+  if (!group) {
     await ctx.reply("This invite link is no longer valid.");
     return;
   }
 
   const member = group.members.find(
-    (m: { _id: { toString: () => string }; isActive: boolean; leftAt: unknown }) =>
-      m._id.toString() === payload.memberId && m.isActive && !m.leftAt
+    (m) => m.id === payload.memberId && m.isActive && !m.leftAt
   );
   if (!member) {
     await ctx.reply("This invite link is no longer valid.");
@@ -353,22 +320,18 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
 
   const wasAccepted = !!member.acceptedAt;
   const now = new Date();
-  const normalizedEmail = (member.email as string).toLowerCase().trim();
-  let user = member.user ? await User.findById(member.user) : null;
+  const normalizedEmail = member.email.toLowerCase().trim();
+  let user = member.userId ? await store.getUser(member.userId) : null;
   if (!user) {
-    user = await User.findOne({ email: normalizedEmail });
+    user = await store.getUserByEmail(normalizedEmail);
   }
 
   if (!user) {
-    user = await User.create({
-      name: (member.nickname as string).trim() || normalizedEmail,
+    user = await store.createUser({
+      name: member.nickname.trim() || normalizedEmail,
       email: normalizedEmail,
+      role: "user",
       hashedPassword: null,
-      telegram: {
-        chatId,
-        username,
-        linkedAt: now,
-      },
       notificationPreferences: {
         email: true,
         telegram: true,
@@ -376,56 +339,56 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
       },
     });
   } else {
-    user.telegram = {
-      chatId,
-      username,
-      linkedAt: now,
-    };
-    if (user.notificationPreferences) {
-      user.notificationPreferences.telegram = true;
-    }
-    await user.save();
+    await store.updateUser(user.id, {
+      telegram: {
+        chatId,
+        username,
+        linkedAt: now,
+      },
+      notificationPreferences: {
+        ...user.notificationPreferences,
+        telegram: true,
+      },
+    });
+    user = (await store.getUser(user.id))!;
   }
 
-  if (!member.user || member.user.toString() !== user._id.toString()) {
-    member.user = user._id;
-  }
-  if (!member.acceptedAt) {
-    member.acceptedAt = now;
-  }
-  await group.save();
-
-  // send welcome email at most once per user (atomic claim)
-  const welcomeEmailClaimed = await User.findOneAndUpdate(
-    { _id: user._id, welcomeEmailSentAt: null },
-    { $set: { welcomeEmailSentAt: now } }
+  const nextMembers = group.members.map((m) =>
+    m.id === member.id
+      ? {
+          ...m,
+          userId: user!.id,
+          acceptedAt: m.acceptedAt ?? now,
+        }
+      : m
   );
-  const shouldSendWelcomeEmail = !wasAccepted && !!welcomeEmailClaimed;
+  await store.updateGroup(group.id, { members: nextMembers });
+
+  // send welcome email at most once per user (first-claim wins)
+  const shouldSendWelcomeEmail =
+    !wasAccepted && (await store.tryClaimWelcomeEmailSentAt(user.id, now));
   if (shouldSendWelcomeEmail) {
     const appUrlSetting = await getSetting("general.appUrl");
     const baseUrl = (appUrlSetting?.trim() || "http://localhost:3054").replace(
       /\/$/,
       ""
     );
-    const magicToken = await createMagicLoginToken(user._id.toString());
-    const magicLoginUrl = `${baseUrl}/invite-callback?token=${encodeURIComponent(magicToken)}&groupId=${encodeURIComponent(group._id.toString())}`;
+    const magicToken = await createMagicLoginToken(user.id);
+    const magicLoginUrl = `${baseUrl}/invite-callback?token=${encodeURIComponent(magicToken)}&groupId=${encodeURIComponent(group.id)}`;
     const sendEmail = !member.unsubscribedFromEmail;
     const unsubscribeUrl = sendEmail
       ? await getUnsubscribeUrl(
-          await createUnsubscribeToken(
-            member._id.toString(),
-            group._id.toString()
-          )
+          await createUnsubscribeToken(member.id, group.id)
         )
       : null;
 
-    const admin = await User.findById(group.admin);
+    const adminUser = await store.getUser(group.adminId);
     const telegramWelcomeParams = {
       memberName: member.nickname,
       groupName: group.name,
-      groupId: group._id.toString(),
+      groupId: group.id,
       serviceName: group.service.name,
-      adminName: admin?.name ?? "The group admin",
+      adminName: adminUser?.name ?? "The group admin",
       billingSummary: buildBillingSummary(group),
       paymentPlatform: group.payment.platform,
       paymentLink: group.payment.link ?? null,
@@ -448,7 +411,7 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
       {
         email: user.email,
         telegramChatId: null,
-        userId: user._id.toString(),
+        userId: user.id,
         preferences: {
           email: sendEmail,
           telegram: false,
@@ -459,7 +422,7 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
         subject: `Welcome to ${group.name}`,
         emailHtml,
         telegramText: `Welcome to ${group.name}`,
-        groupId: group._id.toString(),
+        groupId: group.id,
         emailParams,
       }
     );

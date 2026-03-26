@@ -1,5 +1,4 @@
-import { dbConnect } from "@/lib/db/mongoose";
-import { BillingPeriod, Group } from "@/models";
+import { db } from "@/lib/storage";
 
 /**
  * Mark pending payments as overdue when past 14 days since period start (renewal).
@@ -7,34 +6,31 @@ import { BillingPeriod, Group } from "@/models";
  * Does not send any notifications; use enqueue-reminders for that.
  */
 export async function reconcileOverduePayments(): Promise<number> {
-  await dbConnect();
-
+  const store = await db();
   const now = new Date();
   let modifiedCount = 0;
 
-  const periods = await BillingPeriod.find({
-    isFullyPaid: false,
-    periodStart: { $lt: now },
-  });
+  const periods = await store.listUnpaidPeriodsWithStartBefore(now);
 
   for (const period of periods) {
-    const group = await Group.findById(period.group);
+    const group = await store.getGroup(period.groupId);
     if (!group || !group.isActive) continue;
 
     let modified = false;
-    for (const payment of period.payments) {
-      if (payment.status === "pending") {
-        const daysSincePeriodStart = Math.floor(
-          (now.getTime() - period.periodStart.getTime()) / (1000 * 60 * 60 * 24)
-        );
-        if (daysSincePeriodStart > 14) {
-          payment.status = "overdue";
-          modified = true;
-        }
+    const payments = period.payments.map((payment) => {
+      if (payment.status !== "pending") return payment;
+      const daysSincePeriodStart = Math.floor(
+        (now.getTime() - period.periodStart.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      if (daysSincePeriodStart > 14) {
+        modified = true;
+        return { ...payment, status: "overdue" as const };
       }
-    }
+      return payment;
+    });
+
     if (modified) {
-      await period.save();
+      await store.updateBillingPeriod(period.id, { payments });
       modifiedCount++;
     }
   }

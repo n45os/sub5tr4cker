@@ -2,12 +2,10 @@
  * @deprecated not used by the dashboard — previews use `@/lib/email/templates` and
  * `@/lib/plugins/templates` directly. Kept for potential external clients; may be removed later.
  */
-import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group } from "@/models";
 import { buildPaymentReminderEmailHtml } from "@/lib/email/templates/payment-reminder";
+import { db, isStorageId } from "@/lib/storage";
 
 export async function GET(
   request: NextRequest,
@@ -22,7 +20,7 @@ export async function GET(
   }
 
   const { groupId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId)) {
+  if (!isStorageId(groupId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group id" } },
       { status: 400 }
@@ -43,8 +41,8 @@ export async function GET(
     );
   }
 
-  await dbConnect();
-  const group = await Group.findById(groupId).lean();
+  const store = await db();
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
@@ -52,7 +50,7 @@ export async function GET(
     );
   }
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       {
         error: {

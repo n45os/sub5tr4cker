@@ -1,16 +1,16 @@
-import { Group, BillingPeriod } from "@/models";
-import type { HydratedDocument } from "mongoose";
+import { nanoid } from "nanoid";
 import {
   calculateShares,
   formatPeriodLabel,
   getPeriodDates,
 } from "@/lib/billing/calculator";
 import { getCollectionOpensAt } from "@/lib/billing/collection-window";
+import { db, type StorageGroup } from "@/lib/storage";
 import { createConfirmationToken } from "@/lib/tokens";
 
 // create the current billing period for a group if collection is open and it doesn't exist yet
 export async function createPeriodIfDue(
-  group: HydratedDocument<InstanceType<typeof Group>>,
+  group: StorageGroup,
   now: Date
 ): Promise<boolean> {
   const { cycleDay } = group.billing;
@@ -25,10 +25,8 @@ export async function createPeriodIfDue(
   const collectionOpensAt = getCollectionOpensAt(start, advance);
   if (now < collectionOpensAt) return false;
 
-  const existing = await BillingPeriod.findOne({
-    group: group._id,
-    periodStart: start,
-  });
+  const store = await db();
+  const existing = await store.getBillingPeriodByStart(group.id, start);
   if (existing) return false;
 
   const shares = calculateShares(group, undefined, start);
@@ -41,38 +39,50 @@ export async function createPeriodIfDue(
       const token = await createConfirmationToken(
         share.memberId,
         "pending",
-        group._id.toString()
+        group.id
       );
       return {
+        id: nanoid(),
         memberId: share.memberId,
         memberEmail: share.email,
         memberNickname: share.nickname,
+        adjustedAmount: null,
+        adjustmentReason: null,
         amount: share.amount,
+        memberConfirmedAt: null,
+        adminConfirmedAt: null,
         status: "pending" as const,
         confirmationToken: token,
+        notes: null,
       };
     })
   );
 
-  const period = await BillingPeriod.create({
-    group: group._id,
+  const period = await store.createBillingPeriod({
+    groupId: group.id,
     periodStart: start,
     collectionOpensAt,
     periodEnd: end,
     periodLabel,
     totalPrice: group.billing.currentPrice,
     currency: group.billing.currency,
+    priceNote: null,
     payments,
+    reminders: [],
+    isFullyPaid: false,
   });
 
-  for (const payment of period.payments) {
-    payment.confirmationToken = await createConfirmationToken(
-      payment.memberId.toString(),
-      period._id.toString(),
-      group._id.toString()
-    );
-  }
-  await period.save();
+  const updatedPayments = await Promise.all(
+    period.payments.map(async (payment) => ({
+      ...payment,
+      confirmationToken: await createConfirmationToken(
+        payment.memberId,
+        period.id,
+        group.id
+      ),
+    }))
+  );
+  await store.updateBillingPeriod(period.id, { payments: updatedPayments });
 
   return true;
 }

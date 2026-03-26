@@ -1,13 +1,12 @@
-import type { ScheduledTaskType } from "@/models/scheduled-task";
-import type { IScheduledTaskPayload } from "@/models/scheduled-task";
+import type { StorageTaskPayload, StorageTaskType } from "@/lib/storage/types";
 
 /**
  * Build a unique idempotency key for a scheduled task so we don't enqueue
  * duplicate work for the same business event and run window.
  */
 export function buildIdempotencyKey(
-  type: ScheduledTaskType,
-  payload: IScheduledTaskPayload,
+  type: StorageTaskType,
+  payload: StorageTaskPayload,
   runAt: Date
 ): string {
   const day = runAt.toISOString().slice(0, 10);

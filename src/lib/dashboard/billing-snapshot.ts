@@ -1,5 +1,4 @@
-import type { Types } from "mongoose";
-import { collectionWindowOpenFilter } from "@/lib/billing/collection-window";
+import type { StorageAdapter } from "@/lib/storage";
 
 /** payment rows that still need admin or member follow-up (open periods only, see query helper) */
 export const OUTSTANDING_PAYMENT_STATUSES = [
@@ -18,20 +17,24 @@ export type GroupOutstanding = {
   memberConfirmedCount: number;
 };
 
-/**
- * Mongo query for billing periods that can contribute to outstanding payment counts.
- * Aligns quick-status, group list unpaidCount, and notify-unpaid period selection.
- */
-export function buildOpenOutstandingPeriodsQuery(
-  groupIds: Types.ObjectId[],
+export async function getOpenOutstandingPeriods(
+  store: StorageAdapter,
+  groupIds: string[],
   now: Date
 ) {
-  return {
-    group: { $in: groupIds },
-    isFullyPaid: false,
-    ...collectionWindowOpenFilter(now),
-    "payments.status": { $in: [...OUTSTANDING_PAYMENT_STATUSES] },
-  };
+  const periods = await store.getOpenBillingPeriods({
+    groupIds,
+    asOf: now,
+    unpaidOnly: true,
+  });
+
+  return periods.filter((period) =>
+    (period.payments ?? []).some((payment) =>
+      OUTSTANDING_PAYMENT_STATUSES.includes(
+        payment.status as (typeof OUTSTANDING_PAYMENT_STATUSES)[number]
+      )
+    )
+  );
 }
 
 /**
@@ -39,7 +42,8 @@ export function buildOpenOutstandingPeriodsQuery(
  */
 export function aggregateOutstandingByGroupFromPeriods(
   periods: Array<{
-    group: { toString: () => string } | string;
+    groupId?: string;
+    group?: { toString: () => string } | string;
     payments?: Array<{ status: string }>;
   }>
 ): Map<string, GroupOutstanding> {
@@ -60,10 +64,12 @@ export function aggregateOutstandingByGroupFromPeriods(
   };
 
   for (const period of periods) {
-    const gid =
-      typeof period.group === "string"
+    const gid = period.groupId
+      ? period.groupId
+      : typeof period.group === "string"
         ? period.group
-        : period.group.toString();
+        : period.group?.toString?.();
+    if (!gid) continue;
     for (const p of period.payments ?? []) {
       if (p.status === "pending") {
         const g = bump(gid);

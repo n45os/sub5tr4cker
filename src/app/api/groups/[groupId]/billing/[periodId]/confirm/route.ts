@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import mongoose from "mongoose";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group, BillingPeriod } from "@/models";
-import type { IMemberPayment } from "@/models";
+import { db, isStorageId, type StorageMemberPayment } from "@/lib/storage";
 
 const confirmSchema = z.object({
   memberId: z.string(),
@@ -26,7 +23,7 @@ export async function POST(
   }
 
   const { groupId, periodId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(periodId)) {
+  if (!isStorageId(groupId) || !isStorageId(periodId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group or period id" } },
       { status: 400 }
@@ -47,9 +44,8 @@ export async function POST(
     );
   }
 
-  await dbConnect();
-
-  const group = await Group.findById(groupId);
+  const store = await db();
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
@@ -57,17 +53,14 @@ export async function POST(
     );
   }
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Only the admin can confirm payments" } },
       { status: 403 }
     );
   }
 
-  const period = await BillingPeriod.findOne({
-    _id: periodId,
-    group: groupId,
-  });
+  const period = await store.getBillingPeriod(periodId, groupId);
   if (!period) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Billing period not found" } },
@@ -75,15 +68,17 @@ export async function POST(
     );
   }
 
-  const payment = period.payments.find(
-    (p: IMemberPayment) => p.memberId.toString() === parsed.data.memberId
+  const payIdx = period.payments.findIndex(
+    (p: StorageMemberPayment) => p.memberId === parsed.data.memberId
   );
-  if (!payment) {
+  if (payIdx === -1) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Payment entry not found" } },
       { status: 404 }
     );
   }
+
+  const payment = { ...period.payments[payIdx]! };
 
   if (parsed.data.action === "confirm") {
     payment.status = "confirmed";
@@ -92,17 +87,18 @@ export async function POST(
     payment.status = "waived";
     payment.adminConfirmedAt = new Date();
   } else {
-    // reject: align with telegram admin_reject — clear member claim too
     payment.status = "pending";
     payment.adminConfirmedAt = null;
     payment.memberConfirmedAt = null;
   }
   if (parsed.data.notes !== undefined) payment.notes = parsed.data.notes;
 
-  period.isFullyPaid = period.payments.every(
-    (p: IMemberPayment) => p.status === "confirmed" || p.status === "waived"
+  const payments = period.payments.map((p, i) => (i === payIdx ? payment : p));
+  const isFullyPaid = payments.every(
+    (p: StorageMemberPayment) => p.status === "confirmed" || p.status === "waived"
   );
-  await period.save();
+
+  await store.updateBillingPeriod(periodId, { payments, isFullyPaid });
 
   const actorName =
     (session.user.name as string) ||
@@ -126,7 +122,7 @@ export async function POST(
 
   return NextResponse.json({
     data: {
-      memberId: payment.memberId.toString(),
+      memberId: payment.memberId,
       status: payment.status,
       adminConfirmedAt: payment.adminConfirmedAt?.toISOString() ?? null,
     },

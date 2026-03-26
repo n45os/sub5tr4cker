@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { hash } from "bcryptjs";
-import { dbConnect } from "@/lib/db/mongoose";
-import { User } from "@/models";
+import { db } from "@/lib/storage";
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -28,9 +27,9 @@ export async function POST(request: NextRequest) {
   const { email, password, name } = parsed.data;
   const normalizedEmail = email.toLowerCase().trim();
 
-  await dbConnect();
+  const store = await db();
 
-  const existing = await User.findOne({ email: normalizedEmail });
+  const existing = await store.getUserByEmail(normalizedEmail);
   if (existing) {
     return NextResponse.json(
       {
@@ -43,9 +42,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const usersCount = await User.countDocuments();
+  const usersCount = await store.countUsers();
   const hashedPassword = await hash(password, 12);
-  await User.create({
+  await store.createUser({
     name: name.trim(),
     email: normalizedEmail,
     hashedPassword,

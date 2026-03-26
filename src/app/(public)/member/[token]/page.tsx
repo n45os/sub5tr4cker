@@ -3,9 +3,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { MemberGroupView } from "@/components/features/groups/member-group-view";
 import { MemberTelegramLink } from "@/components/features/groups/member-telegram-link";
 import { verifyMemberPortalToken } from "@/lib/tokens";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group, BillingPeriod, User } from "@/models";
-import type { IGroupMember, IMemberPayment, IBillingPeriod } from "@/models";
+import { db } from "@/lib/storage";
 
 function TokenError({ message }: { message: string }) {
   return (
@@ -37,9 +35,9 @@ export default async function MemberPortalPage({
     );
   }
 
-  await dbConnect();
+  const store = await db();
 
-  const group = await Group.findById(payload.groupId);
+  const group = await store.getGroup(payload.groupId);
   if (!group || !group.isActive) {
     return (
       <TokenError message="This group is no longer available." />
@@ -47,8 +45,8 @@ export default async function MemberPortalPage({
   }
 
   const member = group.members.find(
-    (m: IGroupMember) =>
-      m._id.toString() === payload.memberId && m.isActive && !m.leftAt
+    (m) =>
+      m.id === payload.memberId && m.isActive && !m.leftAt
   );
   if (!member) {
     return (
@@ -57,26 +55,24 @@ export default async function MemberPortalPage({
   }
 
   const activeMembers = group.members.filter(
-    (m: IGroupMember) => m.isActive && !m.leftAt
+    (m) => m.isActive && !m.leftAt
   );
 
-  const periods = await BillingPeriod.find({ group: group._id })
-    .sort({ periodStart: -1 })
-    .limit(24)
-    .lean<IBillingPeriod[]>();
+  const periodRows = await store.getPeriodsForGroup(group.id);
+  const periods = periodRows.slice(0, 24);
 
   // chronological newest-first — no fancy reordering on the member portal
   const memberPeriods = periods.map((p) => ({
-    _id: p._id.toString(),
+    _id: p.id,
     periodStart: p.periodStart.toISOString().slice(0, 10),
     periodEnd: p.periodEnd.toISOString().slice(0, 10),
     periodLabel: p.periodLabel,
     totalPrice: p.totalPrice,
     isFullyPaid: p.isFullyPaid,
     payments: p.payments
-      .filter((pay: IMemberPayment) => pay.memberId.toString() === payload.memberId)
-      .map((pay: IMemberPayment) => ({
-        memberId: pay.memberId.toString(),
+      .filter((pay) => pay.memberId === payload.memberId)
+      .map((pay) => ({
+        memberId: pay.memberId,
         memberNickname: pay.memberNickname,
         amount: pay.amount,
         status: pay.status,
@@ -99,8 +95,8 @@ export default async function MemberPortalPage({
   let telegramLinked = false;
   let telegramUsername: string | null = null;
   let telegramLinkedAt: string | null = null;
-  if (member.user) {
-    const user = await User.findById(member.user).select("telegram").lean();
+  if (member.userId) {
+    const user = await store.getUser(member.userId);
     telegramLinked = Boolean(user?.telegram?.chatId);
     telegramUsername = user?.telegram?.username ?? null;
     telegramLinkedAt =
@@ -108,7 +104,7 @@ export default async function MemberPortalPage({
   }
 
   const memberViewGroup = {
-    _id: group._id.toString(),
+    _id: group.id,
     name: group.name,
     description: group.description ?? null,
     service: {
@@ -134,7 +130,7 @@ export default async function MemberPortalPage({
     },
     memberCount: activeMembers.length,
     myMembership: {
-      _id: member._id.toString(),
+      _id: member.id,
       nickname: member.nickname,
       role: member.role,
     },
@@ -174,13 +170,13 @@ export default async function MemberPortalPage({
         <MemberGroupView
           group={memberViewGroup}
           periods={memberPeriods}
-          currentMemberId={member._id.toString()}
+          currentMemberId={member.id}
           memberToken={token}
           initialPayPeriodId={initialPayPeriodId}
           initialOpenConfirm={initialOpenConfirm}
         />
 
-        {member.user && (
+        {member.userId && (
           <div className="mt-6">
             <MemberTelegramLink
               portalToken={token}

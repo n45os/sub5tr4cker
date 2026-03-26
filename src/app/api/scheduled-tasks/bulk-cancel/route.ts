@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { ScheduledTask } from "@/models";
-import type { ScheduledTaskType } from "@/models/scheduled-task";
-import {
-  buildScheduledTaskVisibilityFilter,
-  getGroupIdsWhereUserIsAdmin,
-} from "@/lib/tasks/admin-access";
+import { getGroupIdsWhereUserIsAdmin } from "@/lib/tasks/admin-access";
+import { db, type StorageScheduledTask } from "@/lib/storage";
 
-const TYPES: ScheduledTaskType[] = [
+const TYPES: StorageScheduledTask["type"][] = [
   "payment_reminder",
   "aggregated_payment_reminder",
   "admin_confirmation_request",
@@ -19,7 +14,7 @@ const bodySchema = z
   .object({
     groupId: z.string().optional(),
     memberEmail: z.string().trim().min(1).optional(),
-    type: z.enum(TYPES as [ScheduledTaskType, ...ScheduledTaskType[]]).optional(),
+    type: z.enum(TYPES as [StorageScheduledTask["type"], ...StorageScheduledTask["type"][]]).optional(),
   })
   .refine((d) => !!(d.groupId || d.memberEmail || d.type), {
     message: "provide at least one of groupId, memberEmail, or type",
@@ -73,49 +68,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await dbConnect();
-
-  const visibility = buildScheduledTaskVisibilityFilter(adminGroupIds);
-  const and: Record<string, unknown>[] = [visibility];
-
-  if (groupId) {
-    and.push({
-      $or: [
-        { "payload.groupId": groupId },
-        { "payload.payments.groupId": groupId },
-      ],
-    });
-  }
-
-  if (memberEmail) {
-    const trimmed = memberEmail.trim();
-    const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    and.push({
-      "payload.memberEmail": {
-        $regex: new RegExp(`^${escaped}$`, "i"),
-      },
-    });
-  }
-
-  if (type) {
-    and.push({ type });
-  }
-
-  const filter = {
-    status: { $in: ["pending", "locked"] as const },
-    $and: and,
-  };
-
-  const result = await ScheduledTask.updateMany(filter, {
-    $set: {
-      status: "cancelled",
-      cancelledAt: new Date(),
-      lockedAt: null,
-      lockedBy: null,
-    },
+  const store = await db();
+  const cancelled = await store.bulkCancelPendingTasksForAdmin({
+    adminGroupIds,
+    groupId,
+    memberEmail,
+    type,
   });
 
   return NextResponse.json({
-    data: { cancelled: result.modifiedCount },
+    data: { cancelled },
   });
 }

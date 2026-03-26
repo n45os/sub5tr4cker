@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
 import {
   aggregateOutstandingByGroupFromPeriods,
   buildAdminBillingSnapshot,
-  buildOpenOutstandingPeriodsQuery,
+  getOpenOutstandingPeriods,
 } from "@/lib/dashboard/billing-snapshot";
-import { BillingPeriod, Group } from "@/models";
+import { db } from "@/lib/storage";
 
 // admin-only: aggregate quick status across all groups where user is admin
 export async function GET() {
@@ -18,27 +17,22 @@ export async function GET() {
     );
   }
 
-  await dbConnect();
+  const store = await db();
 
   const adminId = session.user.id;
   const now = new Date();
 
-  const groups = await Group.find({
-    admin: adminId,
-    isActive: true,
-  })
-    .lean()
-    .exec();
+  const groups = (await store.listGroupsForUser(adminId, "")).filter(
+    (group) => group.adminId === adminId && group.isActive
+  );
 
-  const adminGroupIds = groups.map((g) => g._id.toString());
+  const adminGroupIds = groups.map((g) => g.id);
 
-  const groupIds = groups.map((g) => g._id);
+  const groupIds = groups.map((g) => g.id);
   const periods =
     groupIds.length === 0
       ? []
-      : await BillingPeriod.find(buildOpenOutstandingPeriodsQuery(groupIds, now))
-          .lean()
-          .exec();
+      : await getOpenOutstandingPeriods(store, groupIds, now);
 
   const byGroup = aggregateOutstandingByGroupFromPeriods(periods);
   const snapshot = buildAdminBillingSnapshot(adminGroupIds, byGroup);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import mongoose from "mongoose";
+import { nanoid } from "nanoid";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
 import {
@@ -8,9 +8,7 @@ import {
   recalculateEqualSplitPeriodsForGroup,
 } from "@/lib/billing/backfill";
 import { calculateShares, getNextPeriodStart } from "@/lib/billing/calculator";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group } from "@/models";
-import type { IGroupMember } from "@/models";
+import { db, isStorageId, type StorageGroupMember } from "@/lib/storage";
 
 const addMemberSchema = z.object({
   email: z.string().email(),
@@ -32,7 +30,7 @@ export async function POST(
   }
 
   const { groupId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId)) {
+  if (!isStorageId(groupId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group id" } },
       { status: 400 }
@@ -53,8 +51,8 @@ export async function POST(
     );
   }
 
-  await dbConnect();
-  const group = await Group.findById(groupId);
+  const store = await db();
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
@@ -62,7 +60,7 @@ export async function POST(
     );
   }
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Only the admin can add members" } },
       { status: 403 }
@@ -71,7 +69,7 @@ export async function POST(
 
   const { email, nickname, customAmount, billingStartsAt } = parsed.data;
   const existing = group.members.find(
-    (m: IGroupMember) =>
+    (m: StorageGroupMember) =>
       m.email.toLowerCase() === email.toLowerCase() && m.isActive && !m.leftAt
   );
   if (existing) {
@@ -86,24 +84,30 @@ export async function POST(
     );
   }
 
-  const memberData: Record<string, unknown> = {
+  let billingStartsAtDate: Date | null = null;
+  if (billingStartsAt) {
+    const d = new Date(billingStartsAt);
+    if (!Number.isNaN(d.getTime())) billingStartsAtDate = d;
+  }
+
+  const newMember: StorageGroupMember = {
+    id: nanoid(),
+    userId: null,
     email,
     nickname,
     customAmount: customAmount ?? null,
     role: "member",
     isActive: true,
     leftAt: null,
-    user: null,
+    joinedAt: new Date(),
+    acceptedAt: null,
+    unsubscribedFromEmail: false,
+    billingStartsAt: billingStartsAtDate,
   };
-  if (billingStartsAt) {
-    const d = new Date(billingStartsAt);
-    if (!Number.isNaN(d.getTime())) memberData.billingStartsAt = d;
-  }
 
-  group.members.push(memberData as never);
-  await group.save();
+  await store.updateGroup(groupId, { members: [...group.members, newMember] });
 
-  const added = group.members[group.members.length - 1];
+  const memberBillingStart = newMember.billingStartsAt ?? newMember.joinedAt;
 
   // backfill into existing periods when billing starts in the past
   let backfilledPeriods = 0;
@@ -120,15 +124,15 @@ export async function POST(
       credit: number;
     }>;
   }> = [];
-  const memberBillingStart =
-    (added.billingStartsAt as Date | null | undefined) ??
-    (added.joinedAt as Date);
+
+  const groupAfterAdd = (await store.getGroup(groupId))!;
+
   if (
     memberBillingStart &&
     !Number.isNaN(memberBillingStart.getTime()) &&
     memberBillingStart.getTime() <= Date.now()
   ) {
-    const result = await backfillMemberIntoPeriods(group, added);
+    const result = await backfillMemberIntoPeriods(groupAfterAdd, newMember);
     backfilledPeriods = result.backfilledCount;
     creditSummary = result.creditSummary;
   }
@@ -136,10 +140,10 @@ export async function POST(
   // resync all periods: drop orphan rows and align shares after roster change
   let periodsReconciled = 0;
   if (
-    group.billing.mode === "equal_split" ||
-    group.billing.mode === "variable"
+    groupAfterAdd.billing.mode === "equal_split" ||
+    groupAfterAdd.billing.mode === "variable"
   ) {
-    const fresh = await Group.findById(groupId);
+    const fresh = await store.getGroup(groupId);
     if (fresh) {
       const reconciled = await recalculateEqualSplitPeriodsForGroup(fresh);
       periodsReconciled = reconciled.periodsUpdated;
@@ -147,11 +151,11 @@ export async function POST(
   }
 
   // new per-member share for next period (for UI display)
-  const nextPeriodStart = getNextPeriodStart(group.billing.cycleDay);
-  const nextShares = calculateShares(group, undefined, nextPeriodStart);
+  const nextPeriodStart = getNextPeriodStart(groupAfterAdd.billing.cycleDay);
+  const nextShares = calculateShares(groupAfterAdd, undefined, nextPeriodStart);
   const newShareAmount =
-    nextShares.length > 0 ? nextShares[0].amount : group.billing.currentPrice;
-  const currency = group.billing.currency;
+    nextShares.length > 0 ? nextShares[0].amount : groupAfterAdd.billing.currentPrice;
+  const currency = groupAfterAdd.billing.currency;
 
   const actorName =
     (session.user.name as string) ||
@@ -162,10 +166,10 @@ export async function POST(
     actorName,
     action: "member_added",
     groupId,
-    targetMemberId: added._id.toString(),
+    targetMemberId: newMember.id,
     metadata: {
-      email: added.email,
-      nickname: added.nickname,
+      email: newMember.email,
+      nickname: newMember.nickname,
       backfilledPeriods,
       creditSummaryCount: creditSummary.length,
       periodsReconciled,
@@ -174,11 +178,11 @@ export async function POST(
 
   return NextResponse.json({
     data: {
-      _id: added._id.toString(),
-      email: added.email,
-      nickname: added.nickname,
-      role: added.role,
-      isActive: added.isActive,
+      _id: newMember.id,
+      email: newMember.email,
+      nickname: newMember.nickname,
+      role: newMember.role,
+      isActive: newMember.isActive,
       backfilledPeriods,
       creditSummary,
       periodsReconciled,

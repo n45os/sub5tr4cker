@@ -1,6 +1,4 @@
-import { User } from "@/models";
-import type { IGroup } from "@/models";
-import type { IBillingPeriod, IMemberPayment } from "@/models/billing-period";
+import { db } from "@/lib/storage";
 import { sendNotification } from "@/lib/notifications/service";
 import { paymentConfirmationKeyboard } from "@/lib/telegram/keyboards";
 import {
@@ -22,8 +20,11 @@ export interface SendAggregatedReminderResult {
 
 export type ChannelOverride = "email" | "telegram" | "both";
 
-type GroupDoc = IGroup & {
-  _id: { toString: () => string };
+type IdLike = { toString: () => string } | string;
+
+type GroupDoc = {
+  id?: string;
+  _id?: IdLike;
   name: string;
   service?: {
     name?: string;
@@ -35,21 +36,39 @@ type GroupDoc = IGroup & {
     link?: string | null;
     instructions?: string | null;
   } | null;
-  members: IGroup["members"];
+  notifications?: {
+    saveEmailParams?: boolean;
+  } | null;
 };
 
-type PeriodDoc = IBillingPeriod & {
-  _id: { toString: () => string };
+type PeriodDoc = {
+  id?: string;
+  _id?: IdLike;
   periodLabel: string;
   currency: string;
   priceNote: string | null;
-  payments: IMemberPayment[];
+  payments: PaymentDoc[];
 };
+
+type PaymentDoc = {
+  id?: string;
+  _id?: IdLike;
+  memberId: IdLike;
+  memberEmail: string;
+  memberNickname: string;
+  amount: number;
+  adjustedAmount?: number | null;
+  adjustmentReason?: string | null;
+};
+
+function asId(value: IdLike | undefined | null): string {
+  return value == null ? "" : value.toString();
+}
 
 export interface AggregatedPaymentInput {
   group: GroupDoc;
   period: PeriodDoc;
-  payment: IMemberPayment;
+  payment: PaymentDoc;
 }
 
 /** send one combined reminder for a user (same email) across multiple groups; respects user prefs */
@@ -63,13 +82,8 @@ export async function sendAggregatedReminder(
     return { emailSent: false, telegramSent: false };
   }
 
-  const { dbConnect } = await import("@/lib/db/mongoose");
-  await dbConnect();
-
-  const user = await User.findOne({ email: memberEmail })
-    .select("telegram notificationPreferences")
-    .lean()
-    .exec();
+  const store = await db();
+  const user = await store.getUserByEmail(memberEmail);
 
   const sendEmail = user?.notificationPreferences?.email ?? true;
   const sendTelegram = !!(
@@ -86,9 +100,9 @@ export async function sendAggregatedReminder(
 
   const entries: AggregatedPaymentEntry[] = [];
   for (const { group, period, payment } of payments) {
-    const periodId = period._id.toString();
-    const groupId = group._id.toString();
-    const memberId = payment.memberId.toString();
+    const periodId = period.id ?? asId(period._id);
+    const groupId = group.id ?? asId(group._id);
+    const memberId = asId(payment.memberId);
     const portalToken = await createMemberPortalToken(memberId, groupId);
     const portalUrl = await getMemberPortalUrl(portalToken);
     const confirmUrl = `${portalUrl}?pay=${periodId}&open=confirm`;
@@ -111,15 +125,15 @@ export async function sendAggregatedReminder(
   }
 
   const distinctGroupCount = new Set(
-    payments.map((i) => (i.group._id as { toString: () => string }).toString())
+    payments.map((i) => i.group.id ?? asId(i.group._id))
   ).size;
   const distinctPeriodCount = new Set(
-    payments.map((i) => (i.period._id as { toString: () => string }).toString())
+    payments.map((i) => i.period.id ?? asId(i.period._id))
   ).size;
 
   const first = payments[0];
-  const firstMemberId = (first.payment.memberId as { toString: () => string }).toString();
-  const firstGroupId = (first.group._id as { toString: () => string }).toString();
+  const firstMemberId = asId(first.payment.memberId);
+  const firstGroupId = first.group.id ?? asId(first.group._id);
   const unsubscribeUrl = wantEmail
     ? await getUnsubscribeUrl(
         await createUnsubscribeToken(firstMemberId, firstGroupId)
@@ -156,7 +170,7 @@ export async function sendAggregatedReminder(
     distinctPeriodCount,
   });
 
-  const firstPeriodId = (first.period._id as { toString: () => string }).toString();
+  const firstPeriodId = first.period.id ?? asId(first.period._id);
   const keyboard = paymentConfirmationKeyboard(firstPeriodId, firstMemberId, {
     includePayDetails: distinctGroupCount === 1,
   });
@@ -165,7 +179,7 @@ export async function sendAggregatedReminder(
     {
       email: memberEmail,
       telegramChatId: user?.telegram?.chatId ?? null,
-      userId: user?._id?.toString() ?? null,
+        userId: user?.id ?? null,
       preferences: {
         email: wantEmail,
         telegram: wantTelegram,

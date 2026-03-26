@@ -22,7 +22,7 @@ SubsTrack is an open-source web app for managing shared subscriptions. One perso
 | Layer | Technology |
 |-------|-------------|
 | Framework | Next.js 15 (App Router) |
-| Database | MongoDB + Mongoose |
+| Database | **Advanced:** MongoDB + Mongoose (via `MongooseAdapter`). **Local (`s54r`):** SQLite + `SqliteAdapter`. Both implement `StorageAdapter`; routes call `db()`. |
 | Auth | Auth.js v5 (NextAuth) |
 | Email | Resend (pluggable) |
 | Telegram | grammy |
@@ -44,20 +44,21 @@ SubsTrack is an open-source web app for managing shared subscriptions. One perso
 │  │  (billing calculator, notifications, tokens)      │   │
 │  └────────────────────┬─────────────────────────────┘   │
 │  ┌────────────────────▼─────────────────────────────┐   │
-│  │              Data layer (Mongoose)                │   │
+│  │     StorageAdapter (Mongoose or SQLite)         │   │
 │  └────────────────────┬─────────────────────────────┘   │
 └────────────────────────┼────────────────────────────────┘
                          │
          ┌───────────────┼───────────────┐
          ▼               ▼               ▼
-    MongoDB          Resend         Telegram API
+ MongoDB / SQLite    Resend         Telegram API
 ```
 
 ## Directory structure
 
 - **`src/app/`** — Next.js pages and API routes (App Router).
 - **`src/lib/`** — Core logic: `db/`, `auth`, `email/`, `telegram/`, `billing/`, `notifications/`, `tokens`.
-- **`src/models/`** — Mongoose schemas (User, Group, BillingPeriod, etc.).
+- **`src/lib/storage/`** — `StorageAdapter`, `MongooseAdapter`, `SqliteAdapter`, domain types (`src/lib/storage/types.ts`).
+- **`src/models/`** — Mongoose schemas (advanced mode only; used by `MongooseAdapter` and type definitions).
 - **`src/jobs/`** — Cron job definitions (billing periods, enqueue reminders/follow-ups, run notification worker). **`src/lib/tasks/`** — Task queue (enqueue, claim, worker).
 - **`src/components/`** — UI components.
 

@@ -13,7 +13,7 @@
 
 ## Storage Adapter Layer
 
-`StorageAdapter` interface defines all operations (groups, billing periods, payments, notifications, scheduled tasks, price history, export/import). Both adapters produce and consume the same domain types (`src/lib/storage/types.ts`). Adapter is selected lazily on first `getAdapter()` call:
+`StorageAdapter` interface defines all operations (groups, billing periods, payments, notifications, audit events, list/query helpers for activity, scheduled tasks, price history, app settings rows in advanced mode, export/import). Route handlers, jobs, telegram handlers, and settings persistence (non-local) call `db()` instead of importing Mongoose models directly. Both adapters produce and consume the same domain types (`src/lib/storage/types.ts`). Adapter is selected lazily on first `getAdapter()` call:
 
 - `SUB5TR4CKER_MODE=local` → `SqliteAdapter(~/.sub5tr4cker/data.db)`
 - `SUB5TR4CKER_MODE=advanced` (default) → `MongooseAdapter`

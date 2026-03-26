@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
 import {
   Card,
   CardContent,
@@ -13,7 +12,7 @@ import { ProfilePasswordForm } from "@/components/features/profile/profile-passw
 import { TelegramLinkCard } from "@/components/features/profile/telegram-link-card";
 import { NotificationPreferencesCard } from "@/components/features/profile/notification-preferences-card";
 import { UnsubscribeEmailCard } from "@/components/features/profile/unsubscribe-email-card";
-import { User } from "@/models";
+import { db } from "@/lib/storage";
 
 export default async function ProfilePage() {
   const session = await auth();
@@ -21,10 +20,8 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
-  await dbConnect();
-  const user = await User.findById(session.user.id)
-    .select("email telegram notificationPreferences hashedPassword")
-    .lean();
+  const store = await db();
+  const user = await store.getUser(session.user.id);
 
   const hasPassword = Boolean(user?.hashedPassword);
   const email = user?.email ?? session.user.email ?? "";
@@ -32,9 +29,7 @@ export default async function ProfilePage() {
   const notificationPreferences = user?.notificationPreferences;
   const isLinked = Boolean(telegram?.chatId);
   const telegramUsername = telegram?.username ?? null;
-  const telegramLinkedAt = telegram?.linkedAt
-    ? String(telegram.linkedAt)
-    : null;
+  const telegramLinkedAt = telegram?.linkedAt ? String(telegram.linkedAt) : null;
   const prefEmail = notificationPreferences?.email ?? true;
   const prefTelegram = notificationPreferences?.telegram ?? false;
   const prefReminderFrequency =

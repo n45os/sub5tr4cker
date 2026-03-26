@@ -1,24 +1,21 @@
 import { NextResponse } from "next/server";
-import mongoose from "mongoose";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { getSetting } from "@/lib/settings/service";
-import { Group, User } from "@/models";
-import type { IGroup, IGroupMember } from "@/models";
-import { sendNotification } from "@/lib/notifications/service";
 import {
   buildGroupInviteEmailHtml,
   buildGroupInviteTelegramText,
 } from "@/lib/email/templates/group-invite";
 import { getBot } from "@/lib/telegram/bot";
+import { sendNotification } from "@/lib/notifications/service";
 import {
   createInviteAcceptToken,
   createInviteLinkToken,
   createUnsubscribeToken,
   getUnsubscribeUrl,
 } from "@/lib/tokens";
+import { getSetting } from "@/lib/settings/service";
+import { db, isStorageId, type StorageGroup, type StorageGroupMember } from "@/lib/storage";
 
-function buildBillingSummary(group: IGroup): string {
+function buildBillingSummary(group: StorageGroup): string {
   const { billing } = group;
   const cycle = billing.cycleType === "yearly" ? "year" : "month";
   const price = `${billing.currentPrice} ${billing.currency}`;
@@ -50,7 +47,7 @@ export async function POST(
   }
 
   const { groupId, memberId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId)) {
+  if (!isStorageId(groupId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group id" } },
       { status: 400 }
@@ -63,8 +60,8 @@ export async function POST(
     );
   }
 
-  await dbConnect();
-  const group = await Group.findById(groupId);
+  const store = await db();
+  const group = await store.getGroupWithMemberUsers(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
@@ -72,7 +69,7 @@ export async function POST(
     );
   }
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       {
         error: {
@@ -85,8 +82,8 @@ export async function POST(
   }
 
   const member = group.members.find(
-    (m: IGroupMember) =>
-      m._id.toString() === memberId.trim() && m.isActive && !m.leftAt
+    (m: StorageGroupMember) =>
+      m.id === memberId.trim() && m.isActive && !m.leftAt
   );
   if (!member) {
     return NextResponse.json(
@@ -109,16 +106,16 @@ export async function POST(
     // telegram not configured or getMe failed
   }
 
-  const admin = await User.findById(group.admin);
+  const admin = await store.getUser(group.adminId);
   const adminName = admin?.name ?? "The group admin";
   const billingSummary = buildBillingSummary(group);
-  const groupIdStr = group._id.toString();
+  const groupIdStr = group.id;
   const sendEmail = !member.unsubscribedFromEmail;
 
   let telegramChatId: number | null = null;
   let preferences = { email: sendEmail, telegram: false };
-  if (member.user) {
-    const user = await User.findById(member.user);
+  if (member.userId) {
+    const user = await store.getUser(member.userId);
     if (user) {
       telegramChatId = user.telegram?.chatId ?? null;
       preferences = {
@@ -130,24 +127,16 @@ export async function POST(
 
   const unsubscribeUrl = sendEmail
     ? await getUnsubscribeUrl(
-        await createUnsubscribeToken(member._id.toString(), groupIdStr)
+        await createUnsubscribeToken(member.id, groupIdStr)
       )
     : null;
 
   let telegramInviteLink: string | null = null;
   if (telegramBotUsername) {
-    const inviteToken = await createInviteLinkToken(
-      member._id.toString(),
-      groupIdStr,
-      7
-    );
+    const inviteToken = await createInviteLinkToken(member.id, groupIdStr, 7);
     telegramInviteLink = `https://t.me/${telegramBotUsername}?start=invite_${inviteToken}`;
   }
-  const acceptInviteToken = await createInviteAcceptToken(
-    member._id.toString(),
-    groupIdStr,
-    14
-  );
+  const acceptInviteToken = await createInviteAcceptToken(member.id, groupIdStr, 14);
   const acceptInviteUrl = `${appBaseUrl.replace(/\/$/, "")}/api/invite/accept/${acceptInviteToken}`;
 
   const params = {
@@ -184,7 +173,7 @@ export async function POST(
       {
         email: member.email,
         telegramChatId,
-        userId: member.user?.toString() ?? null,
+        userId: member.userId ?? null,
         preferences,
       },
       {

@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import mongoose from "mongoose";
+import { nanoid } from "nanoid";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
-import {
-  recalculateEqualSplitPeriodsForGroup,
-} from "@/lib/billing/backfill";
+import { recalculateEqualSplitPeriodsForGroup } from "@/lib/billing/backfill";
 import { calculateShares } from "@/lib/billing/calculator";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group, BillingPeriod, PriceHistory } from "@/models";
-import type { IGroupMember, IMemberPayment } from "@/models";
-import {
-  filterGroupForMember,
-  getGroupAccess,
-  getMemberEntry,
-} from "@/lib/authorization";
+import { filterGroupForMember, getGroupAccess, getMemberEntry } from "@/lib/authorization";
 import { sendPriceChangeAnnouncements } from "@/lib/notifications/service";
+import { db, isStorageId } from "@/lib/storage";
 import { createConfirmationToken } from "@/lib/tokens";
 
 const updateGroupSchema = z
@@ -71,19 +63,15 @@ export async function GET(
   }
 
   const { groupId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId)) {
+  if (!isStorageId(groupId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group id" } },
       { status: 400 }
     );
   }
 
-  await dbConnect();
-  const group = await Group.findById(groupId).populate({
-    path: "members.user",
-    model: "User",
-    select: "telegram notificationPreferences",
-  });
+  const store = await db();
+  const group = await store.getGroupWithMemberUsers(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
@@ -91,8 +79,21 @@ export async function GET(
     );
   }
 
+  const groupForAccess = {
+    ...group,
+    _id: { toString: () => group.id },
+    admin: { toString: () => group.adminId },
+    members: group.members.map((member) => ({
+      ...member,
+      _id: { toString: () => member.id },
+      user:
+        group.memberUsers.get(member.id) ??
+        (member.userId ? { toString: () => member.userId as string } : null),
+    })),
+  };
+
   const access = getGroupAccess(
-    group,
+    groupForAccess,
     session.user.id,
     (session.user.email as string) || ""
   );
@@ -104,7 +105,7 @@ export async function GET(
   }
 
   const memberEntry = getMemberEntry(
-    group,
+    groupForAccess,
     session.user.id,
     (session.user.email as string) || ""
   );
@@ -117,7 +118,7 @@ export async function GET(
     );
   }
 
-  const payload = filterGroupForMember(group, memberEntry, access);
+  const payload = filterGroupForMember(groupForAccess, memberEntry, access);
 
   return NextResponse.json({ data: payload });
 }
@@ -135,7 +136,7 @@ export async function PATCH(
   }
 
   const { groupId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId)) {
+  if (!isStorageId(groupId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group id" } },
       { status: 400 }
@@ -156,8 +157,8 @@ export async function PATCH(
     );
   }
 
-  await dbConnect();
-  const group = await Group.findById(groupId);
+  const store = await db();
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
@@ -165,7 +166,7 @@ export async function PATCH(
     );
   }
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Only the admin can update the group" } },
       { status: 403 }
@@ -214,15 +215,21 @@ export async function PATCH(
       group.payment.instructions = body.payment.instructions ?? null;
   }
 
-  await group.save();
+  const updatedGroup = await store.updateGroup(groupId, {
+    name: group.name,
+    description: group.description,
+    service: group.service,
+    billing: group.billing,
+    payment: group.payment,
+  });
 
   const adminIncludedInSplitChanged =
     body.billing?.adminIncludedInSplit !== undefined &&
-    previousAdminIncludedInSplit !== group.billing.adminIncludedInSplit;
+    previousAdminIncludedInSplit !== updatedGroup.billing.adminIncludedInSplit;
 
   if (adminIncludedInSplitChanged) {
     try {
-      await recalculateEqualSplitPeriodsForGroup(group);
+      await recalculateEqualSplitPeriodsForGroup(updatedGroup);
     } catch (error) {
       console.error(
         "recalculate billing periods after adminIncludedInSplit change failed:",
@@ -240,21 +247,21 @@ export async function PATCH(
     actorName,
     action: "group_edited",
     groupId,
-    metadata: { name: group.name },
+    metadata: { name: updatedGroup.name },
   });
 
   const priceChanged =
     body.billing?.currentPrice !== undefined &&
-    previousPrice !== group.billing.currentPrice;
+    previousPrice !== updatedGroup.billing.currentPrice;
 
   // record price history
   if (priceChanged) {
     try {
-      await PriceHistory.create({
-        group: groupId,
-        price: group.billing.currentPrice,
+      await store.createPriceHistory({
+        groupId,
+        price: updatedGroup.billing.currentPrice,
         previousPrice,
-        currency: group.billing.currency,
+        currency: updatedGroup.billing.currency,
         effectiveFrom: new Date(),
         createdBy: session.user.id,
       });
@@ -265,15 +272,15 @@ export async function PATCH(
 
   if (
     priceChanged &&
-    (group.notifications?.priceChangeEnabled ??
-      group.announcements?.notifyOnPriceChange)
+    (updatedGroup.notifications?.priceChangeEnabled ??
+      updatedGroup.announcements?.notifyOnPriceChange)
   ) {
     try {
-      await sendPriceChangeAnnouncements(group, {
+      await sendPriceChangeAnnouncements(updatedGroup, {
         previousPrice,
-        newPrice: group.billing.currentPrice,
-        currency: group.billing.currency,
-        serviceName: group.service.name,
+        newPrice: updatedGroup.billing.currentPrice,
+        currency: updatedGroup.billing.currency,
+        serviceName: updatedGroup.service.name,
       });
     } catch (error) {
       console.error("price-change announcements failed:", error);
@@ -283,52 +290,56 @@ export async function PATCH(
   // adjust future pre-paid periods when price increases
   if (priceChanged) {
     try {
-      const futurePeriods = await BillingPeriod.find({
-        group: groupId,
-        periodStart: { $gt: new Date() },
-      });
+      const futurePeriods = await store.getFuturePeriods(groupId, new Date());
 
       for (const period of futurePeriods) {
-        const newShares = calculateShares(group, group.billing.currentPrice, period.periodStart);
+        const newShares = calculateShares(updatedGroup, updatedGroup.billing.currentPrice, period.periodStart);
 
         for (const payment of period.payments) {
-          const typedPayment = payment as IMemberPayment;
           const newShare = newShares.find(
-            (s) => s.memberId === typedPayment.memberId.toString(),
+            (s) => s.memberId === payment.memberId,
           );
           if (!newShare) continue;
 
-          const currentEffective = typedPayment.adjustedAmount ?? typedPayment.amount;
+          const currentEffective = payment.adjustedAmount ?? payment.amount;
           if (newShare.amount === currentEffective) continue;
 
-          if (typedPayment.status === "confirmed") {
+          if (payment.status === "confirmed") {
             // pre-paid: add a supplementary payment entry for the diff
             const diff = newShare.amount - currentEffective;
             if (diff > 0) {
               const token = await createConfirmationToken(
-                typedPayment.memberId.toString(),
-                period._id.toString(),
+                payment.memberId,
+                period.id,
                 groupId,
               );
               period.payments.push({
-                memberId: typedPayment.memberId,
-                memberEmail: typedPayment.memberEmail,
-                memberNickname: typedPayment.memberNickname,
+                id: nanoid(),
+                memberId: payment.memberId,
+                memberEmail: payment.memberEmail,
+                memberNickname: payment.memberNickname,
                 amount: diff,
-                adjustmentReason: `price updated from ${previousPrice} to ${group.billing.currentPrice} ${group.billing.currency}`,
+                adjustedAmount: null,
+                adjustmentReason: `price updated from ${previousPrice} to ${updatedGroup.billing.currentPrice} ${updatedGroup.billing.currency}`,
                 status: "pending",
+                memberConfirmedAt: null,
+                adminConfirmedAt: null,
                 confirmationToken: token,
-              } as never);
+                notes: null,
+              });
               period.isFullyPaid = false;
             }
           } else {
             // not yet paid: update the amount directly
-            typedPayment.adjustedAmount = newShare.amount;
-            typedPayment.adjustmentReason = `price updated from ${previousPrice} to ${group.billing.currentPrice} ${group.billing.currency}`;
+            payment.adjustedAmount = newShare.amount;
+            payment.adjustmentReason = `price updated from ${previousPrice} to ${updatedGroup.billing.currentPrice} ${updatedGroup.billing.currency}`;
           }
         }
 
-        await period.save();
+        await store.updateBillingPeriod(period.id, {
+          payments: period.payments,
+          isFullyPaid: period.isFullyPaid,
+        });
       }
     } catch (error) {
       console.error("future period price adjustment failed:", error);
@@ -337,13 +348,13 @@ export async function PATCH(
 
   return NextResponse.json({
     data: {
-      _id: group._id.toString(),
-      name: group.name,
-      description: group.description,
-      service: group.service,
-      billing: group.billing,
-      payment: group.payment,
-      notifications: group.notifications,
+      _id: updatedGroup.id,
+      name: updatedGroup.name,
+      description: updatedGroup.description,
+      service: updatedGroup.service,
+      billing: updatedGroup.billing,
+      payment: updatedGroup.payment,
+      notifications: updatedGroup.notifications,
     },
   });
 }
@@ -361,15 +372,15 @@ export async function DELETE(
   }
 
   const { groupId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId)) {
+  if (!isStorageId(groupId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group id" } },
       { status: 400 }
     );
   }
 
-  await dbConnect();
-  const group = await Group.findById(groupId);
+  const store = await db();
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
@@ -377,15 +388,14 @@ export async function DELETE(
     );
   }
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Only the admin can delete the group" } },
       { status: 403 }
     );
   }
 
-  group.isActive = false;
-  await group.save();
+  await store.softDeleteGroup(groupId);
 
   return NextResponse.json({ data: { success: true } });
 }

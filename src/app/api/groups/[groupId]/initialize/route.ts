@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
-import mongoose from "mongoose";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
 import { getSetting } from "@/lib/settings/service";
-import { Group, User } from "@/models";
-import type { IGroup, IGroupMember } from "@/models";
+import { db, isStorageId, type StorageGroup } from "@/lib/storage";
 import { sendNotification } from "@/lib/notifications/service";
 import {
   buildGroupInviteEmailHtml,
@@ -18,7 +15,7 @@ import {
   getUnsubscribeUrl,
 } from "@/lib/tokens";
 
-function buildBillingSummary(group: IGroup): string {
+function buildBillingSummary(group: StorageGroup): string {
   const { billing } = group;
   const cycle = billing.cycleType === "yearly" ? "year" : "month";
   const price = `${billing.currentPrice} ${billing.currency}`;
@@ -50,15 +47,15 @@ export async function POST(
   }
 
   const { groupId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId)) {
+  if (!isStorageId(groupId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group id" } },
       { status: 400 }
     );
   }
 
-  await dbConnect();
-  const group = await Group.findById(groupId);
+  const store = await db();
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
@@ -66,7 +63,7 @@ export async function POST(
     );
   }
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       {
         error: {
@@ -92,13 +89,13 @@ export async function POST(
     // telegram not configured or getMe failed
   }
 
-  const admin = await User.findById(group.admin);
+  const admin = await store.getUser(group.adminId);
   const adminName = admin?.name ?? "The group admin";
   const billingSummary = buildBillingSummary(group);
-  const groupIdStr = group._id.toString();
+  const groupIdStr = group.id;
 
   const activeMembers = group.members.filter(
-    (m: IGroupMember) => m.isActive && !m.leftAt
+    (m) => m.isActive && !m.leftAt
   );
   if (activeMembers.length === 0) {
     return NextResponse.json(
@@ -120,8 +117,8 @@ export async function POST(
     let preferences = { email: true, telegram: false };
     const sendEmail = !member.unsubscribedFromEmail;
 
-    if (member.user) {
-      const user = await User.findById(member.user);
+    if (member.userId) {
+      const user = await store.getUser(member.userId);
       if (user) {
         telegramChatId = user.telegram?.chatId ?? null;
         preferences = {
@@ -136,20 +133,20 @@ export async function POST(
     }
 
     const unsubscribeUrl = sendEmail
-      ? await getUnsubscribeUrl(await createUnsubscribeToken(member._id.toString(), groupIdStr))
+      ? await getUnsubscribeUrl(await createUnsubscribeToken(member.id, groupIdStr))
       : null;
 
     let telegramInviteLink: string | null = null;
     if (telegramBotUsername) {
       const inviteToken = await createInviteLinkToken(
-        member._id.toString(),
+        member.id,
         groupIdStr,
         7
       );
       telegramInviteLink = `https://t.me/${telegramBotUsername}?start=invite_${inviteToken}`;
     }
     const acceptInviteToken = await createInviteAcceptToken(
-      member._id.toString(),
+      member.id,
       groupIdStr,
       14
     );
@@ -188,7 +185,7 @@ export async function POST(
         {
           email: member.email,
           telegramChatId,
-          userId: member.user?.toString() ?? null,
+          userId: member.userId ?? null,
           preferences,
         },
         {
@@ -211,8 +208,7 @@ export async function POST(
     }
   }
 
-  group.initializedAt = new Date();
-  await group.save();
+  await store.updateGroup(groupId, { initializedAt: new Date() });
 
   return NextResponse.json({
     data: { notified, total: activeMembers.length },

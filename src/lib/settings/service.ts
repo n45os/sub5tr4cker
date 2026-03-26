@@ -1,6 +1,5 @@
 import crypto from "crypto";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Settings } from "@/models";
+import { db } from "@/lib/storage";
 import {
   getSettingsDefinition,
   settingsDefinitions,
@@ -112,10 +111,10 @@ export async function getSetting(key: string): Promise<string | null> {
   }
 
   await ensureSettingsMigrated();
-  await dbConnect();
+  const store = await db();
 
   const definition = getSettingsDefinition(key);
-  const record = await Settings.findOne({ key }).lean().exec();
+  const record = await store.getAppSettingRow(key);
   const rawValue = record?.value ?? resolveFallbackValue(key);
   const value =
     definition?.isSecret && rawValue?.startsWith("enc:")
@@ -131,11 +130,30 @@ export async function getSetting(key: string): Promise<string | null> {
 }
 
 export async function getAllSettings(category?: SettingsCategory) {
-  await ensureSettingsMigrated();
-  await dbConnect();
+  if (isLocalMode()) {
+    return settingsDefinitions
+      .filter((definition) => !category || definition.category === category)
+      .map((definition) => {
+        const value = getLocalSetting(definition.key) ?? resolveFallbackValue(definition.key);
 
-  const query = category ? { category } : {};
-  const records = await Settings.find(query).lean().sort({ category: 1, key: 1 }).exec();
+        return {
+          key: definition.key,
+          category: definition.category,
+          label: definition.label,
+          description: definition.description,
+          isSecret: definition.isSecret,
+          envVar: definition.envVar,
+          value: value ?? "",
+          maskedValue: definition.isSecret ? maskSettingValue(value) : value ?? "",
+          hasValue: !!value,
+        };
+      });
+  }
+
+  await ensureSettingsMigrated();
+  const store = await db();
+
+  const records = await store.listAppSettingRows(category);
   const recordMap = new Map(records.map((record) => [record.key, record]));
 
   return settingsDefinitions
@@ -178,7 +196,7 @@ export async function setSetting(key: string, value: string | null) {
   }
 
   await ensureSettingsMigrated();
-  await dbConnect();
+  const store = await db();
 
   const effectiveDef = definition ?? {
     category: "plugin" as const,
@@ -189,18 +207,14 @@ export async function setSetting(key: string, value: string | null) {
   const nextValue =
     value && effectiveDef.isSecret ? encryptValue(value) : value ?? null;
 
-  await Settings.findOneAndUpdate(
-    { key },
-    {
-      key,
-      value: nextValue,
-      category: effectiveDef.category,
-      isSecret: effectiveDef.isSecret,
-      label: effectiveDef.label,
-      description: effectiveDef.description,
-    },
-    { upsert: true, returnDocument: "after" }
-  );
+  await store.upsertAppSettingRow({
+    key,
+    value: nextValue,
+    category: effectiveDef.category,
+    isSecret: effectiveDef.isSecret,
+    label: effectiveDef.label,
+    description: effectiveDef.description,
+  });
 
   clearSettingsCache(key);
 }

@@ -1,13 +1,11 @@
-import { dbConnect } from "@/lib/db/mongoose";
-import { BillingPeriod, Group } from "@/models";
 import {
-  collectionWindowOpenFilter,
   getFirstReminderEligibleAt,
   resolveCollectionOpensAt,
 } from "@/lib/billing/collection-window";
 import { getSetting } from "@/lib/settings/service";
 import { normalizeMemberEmailForAggregation } from "@/lib/notifications/member-email";
 import { enqueueTask } from "@/lib/tasks/queue";
+import { db, type StorageMemberPayment } from "@/lib/storage";
 
 type PaymentRef = {
   groupId: string;
@@ -25,37 +23,37 @@ type PaymentRef = {
  * enqueue once per payment per day.
  */
 export async function enqueueReminders(): Promise<number> {
-  await dbConnect();
-
+  const store = await db();
   const now = new Date();
   const aggregateReminders =
     (await getSetting("notifications.aggregateReminders")) === "true";
   let enqueued = 0;
 
-  const periods = await BillingPeriod.find({
-    isFullyPaid: false,
-    ...collectionWindowOpenFilter(now),
-    "payments.status": { $in: ["pending", "overdue"] },
-  }).populate("group");
+  const periodsRaw = await store.getOpenBillingPeriods({
+    asOf: now,
+    unpaidOnly: true,
+  });
+
+  const periods = periodsRaw.filter((period) =>
+    period.payments.some(
+      (p: StorageMemberPayment) => p.status === "pending" || p.status === "overdue"
+    )
+  );
 
   if (aggregateReminders) {
     const byEmail = new Map<string, PaymentRef[]>();
     for (const period of periods) {
-      const group = period.group as InstanceType<typeof Group> | null;
-      if (!group || typeof group !== "object" || Array.isArray(group)) continue;
-      if (!group.isActive) continue;
+      const group = await store.getGroup(period.groupId);
+      if (!group || !group.isActive) continue;
       if (group.notifications?.remindersEnabled === false) continue;
 
       const graceDays = group.billing.gracePeriodDays ?? 3;
       const collectionOpensAt = resolveCollectionOpensAt(period);
-      const firstReminderAt = getFirstReminderEligibleAt(
-        collectionOpensAt,
-        graceDays
-      );
+      const firstReminderAt = getFirstReminderEligibleAt(collectionOpensAt, graceDays);
       if (now < firstReminderAt) continue;
 
-      const groupId = (group._id as { toString: () => string }).toString();
-      const billingPeriodId = (period._id as { toString: () => string }).toString();
+      const groupId = group.id;
+      const billingPeriodId = period.id;
 
       for (const payment of period.payments) {
         if (payment.status !== "pending" && payment.status !== "overdue") continue;
@@ -63,8 +61,8 @@ export async function enqueueReminders(): Promise<number> {
         const ref: PaymentRef = {
           groupId,
           billingPeriodId,
-          memberId: (payment.memberId as { toString: () => string }).toString(),
-          paymentId: (payment._id as { toString: () => string }).toString(),
+          memberId: payment.memberId,
+          paymentId: payment.id,
           memberEmail: payment.memberEmail,
         };
         const list = byEmail.get(bucketKey) ?? [];
@@ -92,35 +90,31 @@ export async function enqueueReminders(): Promise<number> {
   }
 
   for (const period of periods) {
-    const group = await Group.findById(period.group);
+    const group = await store.getGroup(period.groupId);
     if (!group || !group.isActive) continue;
     if (group.notifications?.remindersEnabled === false) continue;
 
     const graceDays = group.billing.gracePeriodDays ?? 3;
     const collectionOpensAt = resolveCollectionOpensAt(period);
-    const firstReminderAt = getFirstReminderEligibleAt(
-      collectionOpensAt,
-      graceDays
-    );
+    const firstReminderAt = getFirstReminderEligibleAt(collectionOpensAt, graceDays);
     if (now < firstReminderAt) continue;
 
-    const groupId = (group._id as { toString: () => string }).toString();
-    const billingPeriodId = (period._id as { toString: () => string }).toString();
+    const groupId = group.id;
+    const billingPeriodId = period.id;
 
     for (const payment of period.payments) {
       if (payment.status !== "pending" && payment.status !== "overdue") {
         continue;
       }
 
-      const paymentId = (payment._id as { toString: () => string }).toString();
       const task = await enqueueTask({
         type: "payment_reminder",
         runAt: now,
         payload: {
           groupId,
           billingPeriodId,
-          memberId: (payment.memberId as { toString: () => string }).toString(),
-          paymentId,
+          memberId: payment.memberId,
+          paymentId: payment.id,
         },
       });
       if (task) enqueued++;

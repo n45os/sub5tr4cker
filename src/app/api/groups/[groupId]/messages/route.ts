@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import mongoose from "mongoose";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group, User } from "@/models";
-import type { IGroupMember } from "@/models";
-import { verifyMemberPortalToken } from "@/lib/tokens";
 import { sendNotification } from "@/lib/notifications/service";
+import { verifyMemberPortalToken } from "@/lib/tokens";
+import { db, isStorageId, type StorageGroupMember } from "@/lib/storage";
 
 const messageSchema = z.object({
   message: z.string().min(1).max(2000),
@@ -16,13 +13,13 @@ const messageSchema = z.object({
 
 export async function POST(
   request: NextRequest,
-  context: { params: Promise<{ groupId: string }> },
+  context: { params: Promise<{ groupId: string }> }
 ) {
   const { groupId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId)) {
+  if (!isStorageId(groupId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group id" } },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
@@ -36,17 +33,17 @@ export async function POST(
           details: parsed.error.flatten(),
         },
       },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
-  await dbConnect();
+  const store = await db();
 
-  const group = await Group.findById(groupId);
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
-      { status: 404 },
+      { status: 404 }
     );
   }
 
@@ -61,16 +58,16 @@ export async function POST(
     if (!payload || payload.groupId !== groupId) {
       return NextResponse.json(
         { error: { code: "UNAUTHORIZED", message: "Invalid token" } },
-        { status: 401 },
+        { status: 401 }
       );
     }
     const member = group.members.find(
-      (m: IGroupMember) => m._id.toString() === payload.memberId && m.isActive,
+      (m: StorageGroupMember) => m.id === payload.memberId && m.isActive
     );
     if (!member) {
       return NextResponse.json(
         { error: { code: "NOT_FOUND", message: "Member not found" } },
-        { status: 404 },
+        { status: 404 }
       );
     }
     memberNickname = member.nickname;
@@ -80,18 +77,18 @@ export async function POST(
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
-        { status: 401 },
+        { status: 401 }
       );
     }
     const member = group.members.find(
-      (m: IGroupMember) =>
-        (m.user && m.user.toString() === session.user!.id) ||
-        (m.email === session.user!.email),
+      (m: StorageGroupMember) =>
+        (m.userId && m.userId === session.user!.id) ||
+        m.email === session.user!.email
     );
     if (!member) {
       return NextResponse.json(
         { error: { code: "FORBIDDEN", message: "You are not a member of this group" } },
-        { status: 403 },
+        { status: 403 }
       );
     }
     memberNickname = member.nickname;
@@ -99,11 +96,11 @@ export async function POST(
   }
 
   // load admin to send notification
-  const admin = await User.findById(group.admin).lean();
+  const admin = await store.getUser(group.adminId);
   if (!admin) {
     return NextResponse.json(
       { error: { code: "INTERNAL_ERROR", message: "Admin not found" } },
-      { status: 500 },
+      { status: 500 }
     );
   }
 
@@ -133,20 +130,13 @@ export async function POST(
     `Group: <b>${group.name}</b>\n\n` +
     `${message}`;
 
-  type AdminUser = {
-    email?: string;
-    telegram?: { chatId?: number | null };
-    notificationPreferences?: { email?: boolean; telegram?: boolean };
-  };
-  const typedAdmin = admin as AdminUser;
-
   await sendNotification(
     {
-      email: typedAdmin.email || "",
-      telegramChatId: typedAdmin.telegram?.chatId ?? null,
+      email: admin.email || "",
+      telegramChatId: admin.telegram?.chatId ?? null,
       preferences: {
-        email: typedAdmin.notificationPreferences?.email ?? true,
-        telegram: typedAdmin.notificationPreferences?.telegram ?? false,
+        email: admin.notificationPreferences?.email ?? true,
+        telegram: admin.notificationPreferences?.telegram ?? false,
       },
     },
     {
@@ -155,7 +145,7 @@ export async function POST(
       emailHtml,
       telegramText,
       groupId,
-    },
+    }
   );
 
   return NextResponse.json({

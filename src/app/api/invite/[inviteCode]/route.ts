@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group } from "@/models";
+import { db } from "@/lib/storage";
 
 /**
  * Public endpoint: resolve invite code and return group preview + join availability.
@@ -24,8 +23,8 @@ export async function GET(
     );
   }
 
-  await dbConnect();
-  const group = await Group.findOne({ inviteCode: code }).lean();
+  const store = await db();
+  const group = await store.findGroupByInviteCode(code);
   if (!group) {
     return NextResponse.json(
       {
@@ -55,7 +54,7 @@ export async function GET(
 
   return NextResponse.json({
     data: {
-      groupId: group._id.toString(),
+      groupId: group.id,
       name: group.name,
       description: group.description,
       service: group.service,

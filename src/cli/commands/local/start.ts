@@ -40,23 +40,32 @@ export async function runStartCommand(options: { port?: number } = {}): Promise<
     NEXTAUTH_URL: `http://localhost:${port}`,
   };
 
-  // prefer standalone server (works after global install / npx)
-  // fall back to `next start` for dev clones where static assets weren't copied
+  // local mode loads better-sqlite3 (native addon). Next's `output: standalone` bundle
+  // copies JS into `.next/standalone/node_modules` but not compiled `.node` bindings,
+  // so `node .next/standalone/server.js` breaks with "Could not locate the bindings file".
+  // Prefer `next start` from the package root whenever the CLI is present — that resolves
+  // better-sqlite3 from the real `node_modules` tree (after `pnpm install`).
+  // Fall back to standalone only when `next` is missing (e.g. some minimal global installs).
+  const nextBin = path.join(pkgRoot, "node_modules", ".bin", "next");
   let child: ReturnType<typeof spawn>;
 
-  if (existsSync(standaloneServer)) {
+  if (existsSync(nextBin)) {
+    child = spawn(nextBin, ["start", "--port", String(port)], {
+      env,
+      stdio: "inherit",
+      cwd: pkgRoot,
+    });
+  } else if (existsSync(standaloneServer)) {
     child = spawn("node", [standaloneServer], {
       env,
       stdio: "inherit",
       cwd: path.join(pkgRoot, ".next", "standalone"),
     });
   } else {
-    const nextBin = path.join(pkgRoot, "node_modules", ".bin", "next");
-    child = spawn(nextBin, ["start", "--port", String(port)], {
-      env,
-      stdio: "inherit",
-      cwd: pkgRoot,
-    });
+    p.log.error(
+      "No Next.js start path found. Install dependencies (pnpm install) and run s54r init / pnpm build."
+    );
+    process.exit(1);
   }
 
   child.on("error", (e) => {

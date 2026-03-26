@@ -1,34 +1,24 @@
 import { NextResponse } from "next/server";
-import mongoose from "mongoose";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group, Notification } from "@/models";
+import { db, isStorageId } from "@/lib/storage";
+import type { StorageGroup } from "@/lib/storage/types";
 import {
   buildEmailHtmlFromSavedParams,
   isValidSavedEmailParams,
 } from "@/lib/notifications/rebuild-email-from-params";
 
-type GroupLike = {
-  admin: { toString: () => string };
-  members: Array<{
-    isActive?: boolean;
-    leftAt?: Date | null;
-    user?: { toString: () => string } | null;
-    email: string;
-  }>;
-};
-
 function canAccessGroup(
-  group: GroupLike,
+  group: StorageGroup,
   userId: string,
   userEmail: string
 ): boolean {
-  if (group.admin.toString() === userId) return true;
+  if (group.adminId === userId) return true;
   return group.members.some(
     (m) =>
       m.isActive &&
       !m.leftAt &&
-      (m.user?.toString() === userId || m.email === userEmail)
+      (m.userId === userId ||
+        m.email.toLowerCase() === userEmail.toLowerCase())
   );
 }
 
@@ -45,16 +35,16 @@ export async function GET(
   }
 
   const { notificationId } = await context.params;
-  if (!mongoose.isValidObjectId(notificationId)) {
+  if (!isStorageId(notificationId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid notification id" } },
       { status: 400 }
     );
   }
 
-  await dbConnect();
+  const store = await db();
 
-  const notification = await Notification.findById(notificationId).lean();
+  const notification = await store.getNotificationById(notificationId);
   if (!notification) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Notification not found" } },
@@ -74,7 +64,7 @@ export async function GET(
     );
   }
 
-  const groupId = notification.group?.toString();
+  const groupId = notification.groupId ?? null;
   if (!groupId) {
     return NextResponse.json(
       {
@@ -88,7 +78,7 @@ export async function GET(
     );
   }
 
-  const group = await Group.findById(groupId).lean();
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
@@ -98,7 +88,7 @@ export async function GET(
 
   const userId = session.user.id;
   const userEmail = (session.user.email as string) || "";
-  if (!canAccessGroup(group as unknown as GroupLike, userId, userEmail)) {
+  if (!canAccessGroup(group, userId, userEmail)) {
     return NextResponse.json(
       { error: { code: "FORBIDDEN", message: "Access denied" } },
       { status: 403 }

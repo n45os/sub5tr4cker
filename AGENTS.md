@@ -118,6 +118,10 @@ See `docs/data-models.md`. Quick summary:
 3. Add Telegram message builder in `src/lib/telegram/send.ts`
 4. Register in `src/lib/notifications/service.ts`
 
+### Local mode and `better-sqlite3`
+
+- **`s54r start`** runs `next start` from the repo root (not only `.next/standalone/server.js`) so the native SQLite addon resolves from your real `node_modules` after `pnpm install`. If you see "Could not locate the bindings file", run `pnpm install` and rebuild (`pnpm build:standalone` or `s54r init`).
+
 ### Adding a new cron job
 
 1. For **reconciliation** (e.g. billing periods): create job in `src/jobs/<job-name>.ts`, register in `src/jobs/runner.ts`, optionally add `src/app/api/cron/<job-name>/route.ts`.

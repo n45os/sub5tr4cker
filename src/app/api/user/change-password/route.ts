@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { compare, hash } from "bcryptjs";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { User } from "@/models";
+import { db } from "@/lib/storage";
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().optional(),
@@ -35,10 +34,8 @@ export async function POST(request: NextRequest) {
 
   const { currentPassword, newPassword } = parsed.data;
 
-  await dbConnect();
-  const user = await User.findById(session.user.id)
-    .select("hashedPassword")
-    .lean();
+  const store = await db();
+  const user = await store.getUser(session.user.id);
 
   if (!user) {
     return NextResponse.json(
@@ -48,10 +45,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (user.hashedPassword) {
-    if (
-      typeof currentPassword !== "string" ||
-      currentPassword.length === 0
-    ) {
+    if (typeof currentPassword !== "string" || currentPassword.length === 0) {
       return NextResponse.json(
         {
           error: {
@@ -77,9 +71,7 @@ export async function POST(request: NextRequest) {
   }
 
   const hashedPassword = await hash(newPassword, 12);
-  await User.findByIdAndUpdate(session.user.id, {
-    $set: { hashedPassword },
-  });
+  await store.updateUser(session.user.id, { hashedPassword });
 
   return NextResponse.json({
     data: { message: "Password updated." },

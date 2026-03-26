@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { nanoid } from "nanoid";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
 import { generateUniqueInviteCode } from "@/lib/invite-code";
 import {
   aggregateOutstandingByGroupFromPeriods,
-  buildOpenOutstandingPeriodsQuery,
+  getOpenOutstandingPeriods,
 } from "@/lib/dashboard/billing-snapshot";
-import { Group, BillingPeriod } from "@/models";
 import { getNextPeriodStart } from "@/lib/billing/calculator";
 import { createPeriodIfDue } from "@/lib/billing/periods";
-import type { IGroup, IGroupMember } from "@/models";
+import { db } from "@/lib/storage";
 
 const createGroupSchema = z.object({
   name: z.string().min(1).max(200),
@@ -61,44 +60,32 @@ export async function GET() {
     );
   }
 
-  await dbConnect();
+  const store = await db();
 
   const userId = session.user.id;
   const userEmail = (session.user.email as string) || "";
 
-  // groups where user is admin or member (by user id or email)
-  const groups = await Group.find({
-    isActive: true,
-    $or: [
-      { admin: userId },
-      { "members.user": userId },
-      { "members.email": userEmail, "members.isActive": true },
-    ],
-  })
-    .lean<IGroup[]>()
-    .exec();
+  const groups = await store.listGroupsForUser(userId, userEmail);
 
   const now = new Date();
-  const groupIds = groups.map((g) => g._id);
+  const groupIds = groups.map((g) => g.id);
   const periods =
     groupIds.length === 0
       ? []
-      : await BillingPeriod.find(buildOpenOutstandingPeriodsQuery(groupIds, now))
-          .lean()
-          .exec();
+      : await getOpenOutstandingPeriods(store, groupIds, now);
 
   const outstandingByGroup = aggregateOutstandingByGroupFromPeriods(periods);
 
   const list = groups.map((g) => {
-    const role = g.admin.toString() === userId ? "admin" : "member";
+    const role = g.adminId === userId ? "admin" : "member";
     const memberCount = g.members.filter(
-      (m: IGroupMember) => m.isActive && !m.leftAt
+      (m) => m.isActive && !m.leftAt
     ).length;
     const nextBillingDate = getNextPeriodStart(g.billing.cycleDay)
       .toISOString()
       .slice(0, 10);
 
-    const gid = g._id.toString();
+    const gid = g.id;
     const unpaidCount =
       outstandingByGroup.get(gid)?.outstandingPaymentCount ?? 0;
 
@@ -145,26 +132,33 @@ export async function POST(request: NextRequest) {
   }
 
   const body = parsed.data;
-  await dbConnect();
+  const store = await db();
 
   const members = body.members.map((m) => ({
+    id: nanoid(),
+    userId: null,
     email: m.email,
     nickname: m.nickname,
     customAmount: m.customAmount ?? null,
     role: "member" as const,
+    joinedAt: new Date(),
     isActive: true,
     leftAt: null,
+    acceptedAt: null,
+    unsubscribedFromEmail: false,
+    billingStartsAt: null,
   }));
 
   // assign a unique invite code on create to avoid duplicate null in unique index
   const inviteCode = await generateUniqueInviteCode(async (c) => {
-    const existing = await Group.findOne({ inviteCode: c }).lean();
-    return !!existing;
+    const existing = await store.findGroupByInviteCode(c);
+    return existing != null;
   });
 
-  const group = await Group.create({
+  const group = await store.createGroup({
     name: body.name,
-    admin: session.user.id,
+    description: null,
+    adminId: session.user.id,
     service: {
       name: body.service.name,
       icon: body.service.icon ?? null,
@@ -196,9 +190,18 @@ export async function POST(request: NextRequest) {
       saveEmailParams: false,
     },
     members,
+    announcements: {
+      notifyOnPriceChange: true,
+      extraText: null,
+    },
+    telegramGroup: {
+      chatId: null,
+      linkedAt: null,
+    },
     isActive: true,
     inviteCode,
     inviteLinkEnabled: false,
+    initializedAt: null,
   });
 
   const actorName =
@@ -209,7 +212,7 @@ export async function POST(request: NextRequest) {
     actorId: session.user.id,
     actorName,
     action: "group_created",
-    groupId: group._id.toString(),
+    groupId: group.id,
     metadata: { name: group.name },
   });
 
@@ -222,14 +225,15 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     data: {
-      _id: group._id.toString(),
+      _id: group.id,
       name: group.name,
+      description: group.description,
       service: group.service,
       billing: group.billing,
       payment: group.payment,
       notifications: group.notifications,
-      members: group.members.map((m: IGroupMember) => ({
-        _id: m._id.toString(),
+      members: group.members.map((m) => ({
+        _id: m.id,
         email: m.email,
         nickname: m.nickname,
         role: m.role,

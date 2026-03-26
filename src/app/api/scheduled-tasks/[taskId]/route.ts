@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import mongoose from "mongoose";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { ScheduledTask } from "@/models";
-import {
-  canUserManageTask,
-  getGroupIdsWhereUserIsAdmin,
-} from "@/lib/tasks/admin-access";
+import { canUserManageTask, getGroupIdsWhereUserIsAdmin } from "@/lib/tasks/admin-access";
+import { db, isStorageId } from "@/lib/storage";
 
 const patchSchema = z.object({
   action: z.enum(["cancel", "retry"]),
@@ -25,7 +20,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   const { taskId } = await context.params;
-  if (!mongoose.isValidObjectId(taskId)) {
+  if (!isStorageId(taskId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid task id" } },
       { status: 400 }
@@ -56,8 +51,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     );
   }
 
-  await dbConnect();
-  const task = await ScheduledTask.findById(taskId).exec();
+  const store = await db();
+  const task = await store.getTaskById(taskId);
   if (!task) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Task not found" } },
@@ -88,23 +83,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         { status: 400 }
       );
     }
-    task.status = "cancelled";
-    task.cancelledAt = new Date();
-    task.lockedAt = null;
-    task.lockedBy = null;
-    await task.save();
+    await store.cancelTask(taskId);
+    const updated = await store.getTaskById(taskId);
     return NextResponse.json({
       data: {
         task: {
-          _id: task._id.toString(),
-          status: task.status,
-          cancelledAt: task.cancelledAt?.toISOString() ?? null,
+          _id: taskId,
+          status: updated?.status ?? "cancelled",
+          cancelledAt: updated?.cancelledAt?.toISOString() ?? null,
         },
       },
     });
   }
 
-  // retry
   if (task.status !== "failed") {
     return NextResponse.json(
       {
@@ -116,22 +107,16 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       { status: 400 }
     );
   }
-  task.status = "pending";
-  task.runAt = new Date();
-  task.attempts = 0;
-  task.lastError = null;
-  task.lockedAt = null;
-  task.lockedBy = null;
-  task.completedAt = null;
-  await task.save();
+  await store.retryFailedTask(taskId);
+  const updated = await store.getTaskById(taskId);
 
   return NextResponse.json({
     data: {
       task: {
-        _id: task._id.toString(),
-        status: task.status,
-        runAt: task.runAt.toISOString(),
-        attempts: task.attempts,
+        _id: taskId,
+        status: updated?.status ?? "pending",
+        runAt: updated?.runAt.toISOString() ?? new Date().toISOString(),
+        attempts: updated?.attempts ?? 0,
       },
     },
   });

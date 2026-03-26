@@ -1,5 +1,5 @@
-import { BillingPeriod } from "@/models";
-import type { IGroup, IGroupMember, IMemberPayment } from "@/models";
+import { nanoid } from "nanoid";
+import { db, type StorageGroup, type StorageGroupMember, type StorageMemberPayment } from "@/lib/storage";
 import { createConfirmationToken } from "@/lib/tokens";
 import { calculateShares } from "./calculator";
 
@@ -35,24 +35,24 @@ export interface RemovalRecalcResult {
   }>;
 }
 
-function shouldRecalculateExistingPayments(group: IGroup): boolean {
+function shouldRecalculateExistingPayments(group: StorageGroup): boolean {
   return group.billing.mode === "equal_split" || group.billing.mode === "variable";
 }
 
 // automatic price-change rows from PATCH /groups/[id]; safe to replace on roster/split recalc
-function isPriceSyncAdjustment(payment: IMemberPayment): boolean {
+function isPriceSyncAdjustment(payment: StorageMemberPayment): boolean {
   const r = payment.adjustmentReason;
   if (r == null || r === "") return false;
   return r.startsWith("price updated from");
 }
 
-function hasManualAmountOverride(payment: IMemberPayment): boolean {
+function hasManualAmountOverride(payment: StorageMemberPayment): boolean {
   return payment.adjustedAmount != null && !isPriceSyncAdjustment(payment);
 }
 
 function recalculatePeriodPayments(
-  period: { payments: IMemberPayment[] },
-  group: IGroup,
+  period: { payments: StorageMemberPayment[] },
+  group: StorageGroup,
   totalPrice: number,
   periodStart: Date,
 ) {
@@ -65,11 +65,11 @@ function recalculatePeriodPayments(
   // drop rows for active members who are not in this period's split (e.g. billing
   // starts mid-year but a bogus row exists from an old fallback). keep former members
   // and manual admin overrides.
-  period.payments = period.payments.filter((p: IMemberPayment) => {
+  period.payments = period.payments.filter((p: StorageMemberPayment) => {
     if (hasManualAmountOverride(p)) return true;
-    const mid = p.memberId.toString();
+    const mid = p.memberId;
     if (owedMemberIds.has(mid)) return true;
-    const m = group.members.find((x) => x._id.toString() === mid);
+    const m = group.members.find((x) => x.id === mid);
     if (!m) return false;
     if (!m.isActive || m.leftAt) return true;
     return false;
@@ -78,7 +78,7 @@ function recalculatePeriodPayments(
   for (const payment of period.payments) {
     if (hasManualAmountOverride(payment)) continue;
 
-    const nextAmount = shareByMemberId.get(payment.memberId.toString());
+    const nextAmount = shareByMemberId.get(payment.memberId);
     if (nextAmount == null) continue;
 
     payment.amount = nextAmount;
@@ -92,23 +92,27 @@ function recalculatePeriodPayments(
 
 // re-run equal/variable shares for every period (e.g. admin included-in-split toggled)
 export async function recalculateEqualSplitPeriodsForGroup(
-  group: IGroup,
+  group: StorageGroup,
 ): Promise<{ periodsUpdated: number }> {
   if (!shouldRecalculateExistingPayments(group)) {
     return { periodsUpdated: 0 };
   }
 
-  const periods = await BillingPeriod.find({ group: group._id }).sort({
-    periodStart: 1,
-  });
+  const store = await db();
+  const periods = (await store.getPeriodsForGroup(group.id)).sort(
+    (a, b) => a.periodStart.getTime() - b.periodStart.getTime()
+  );
 
   let periodsUpdated = 0;
   for (const period of periods) {
     recalculatePeriodPayments(period, group, period.totalPrice, period.periodStart);
     period.isFullyPaid = period.payments.every(
-      (p: IMemberPayment) => p.status === "confirmed" || p.status === "waived",
+      (p: StorageMemberPayment) => p.status === "confirmed" || p.status === "waived",
     );
-    await period.save();
+    await store.updateBillingPeriod(period.id, {
+      payments: period.payments,
+      isFullyPaid: period.isFullyPaid,
+    });
     periodsUpdated++;
   }
 
@@ -117,9 +121,9 @@ export async function recalculateEqualSplitPeriodsForGroup(
 
 // recompute shares for one period from current group rules (equal_split / variable)
 export function recalculateSinglePeriodFromGroupRules(
-  group: IGroup,
+  group: StorageGroup,
   period: {
-    payments: IMemberPayment[];
+    payments: StorageMemberPayment[];
     totalPrice: number;
     periodStart: Date;
   },
@@ -141,16 +145,16 @@ export function recalculateSinglePeriodFromGroupRules(
 // is not already present. returns backfilled count and credit summary for
 // existing members who overpaid (confirmed status) on affected periods.
 export async function backfillMemberIntoPeriods(
-  group: IGroup,
-  member: IGroupMember,
+  group: StorageGroup,
+  member: StorageGroupMember,
 ): Promise<BackfillResult> {
   const billingStart = member.billingStartsAt ?? member.joinedAt;
   if (!billingStart) return { backfilledCount: 0, creditSummary: [] };
 
-  const periods = await BillingPeriod.find({
-    group: group._id,
-    periodStart: { $gte: billingStart },
-  }).sort({ periodStart: 1 });
+  const store = await db();
+  const periods = (await store.getPeriodsForGroup(group.id))
+    .filter((period) => period.periodStart >= billingStart)
+    .sort((a, b) => a.periodStart.getTime() - b.periodStart.getTime());
 
   let backfilledCount = 0;
   const creditByMemberId = new Map<
@@ -160,23 +164,23 @@ export async function backfillMemberIntoPeriods(
 
   for (const period of periods) {
     const alreadyIncluded = period.payments.some(
-      (p: IMemberPayment) => p.memberId.toString() === member._id.toString(),
+      (p: StorageMemberPayment) => p.memberId === member.id,
     );
     if (alreadyIncluded) continue;
 
     // capture old effective amounts for confirmed payments before we recalculate
     const oldAmounts = new Map<string, number>();
     for (const p of period.payments) {
-      const typed = p as IMemberPayment;
+      const typed = p as StorageMemberPayment;
       if (typed.status !== "confirmed" && typed.status !== "waived") continue;
       const effective = typed.adjustedAmount ?? typed.amount;
-      oldAmounts.set(typed.memberId.toString(), effective);
+      oldAmounts.set(typed.memberId, effective);
     }
 
     // calculate what this member should owe for this period
     const shares = calculateShares(group, period.totalPrice, period.periodStart);
     const memberShare = shares.find(
-      (s) => s.memberId === member._id.toString(),
+      (s) => s.memberId === member.id,
     );
 
     // member is not valid for this period's split (billing start after period start)
@@ -187,19 +191,25 @@ export async function backfillMemberIntoPeriods(
     if (amount <= 0) continue;
 
     const token = await createConfirmationToken(
-      member._id.toString(),
-      period._id.toString(),
-      group._id.toString(),
+      member.id,
+      period.id,
+      group.id,
     );
 
     period.payments.push({
-      memberId: member._id,
+      id: nanoid(),
+      memberId: member.id,
       memberEmail: member.email,
       memberNickname: member.nickname,
       amount,
+      adjustedAmount: null,
+      adjustmentReason: null,
       status: "pending",
+      memberConfirmedAt: null,
+      adminConfirmedAt: null,
       confirmationToken: token,
-    } as never);
+      notes: null,
+    });
 
     if (shouldRecalculateExistingPayments(group)) {
       recalculatePeriodPayments(period, group, period.totalPrice, period.periodStart);
@@ -208,8 +218,8 @@ export async function backfillMemberIntoPeriods(
     // build credit entries for members who overpaid (confirmed/waived)
     for (const [mid, oldAmount] of oldAmounts) {
       const payment = period.payments.find(
-        (p: IMemberPayment) => p.memberId.toString() === mid,
-      ) as IMemberPayment | undefined;
+        (p: StorageMemberPayment) => p.memberId === mid,
+      ) as StorageMemberPayment | undefined;
       if (!payment) continue;
       const newAmount = payment.adjustedAmount ?? payment.amount;
       const credit = Math.round((oldAmount - newAmount) * 100) / 100;
@@ -217,7 +227,7 @@ export async function backfillMemberIntoPeriods(
 
       const existing = creditByMemberId.get(mid);
       const entry: MemberCreditPeriod = {
-        periodId: period._id.toString(),
+        periodId: period.id,
         periodLabel: period.periodLabel,
         oldAmount,
         newAmount,
@@ -235,7 +245,10 @@ export async function backfillMemberIntoPeriods(
     }
 
     period.isFullyPaid = false;
-    await period.save();
+    await store.updateBillingPeriod(period.id, {
+      payments: period.payments,
+      isFullyPaid: period.isFullyPaid,
+    });
     backfilledCount++;
   }
 
@@ -257,15 +270,15 @@ export async function backfillMemberIntoPeriods(
 // so calculateShares excludes them. leaves the removed member's own
 // payment entries untouched for manual admin handling.
 export async function recalculatePeriodsOnMemberRemoval(
-  group: IGroup,
-  removedMember: IGroupMember,
+  group: StorageGroup,
+  removedMember: StorageGroupMember,
 ): Promise<RemovalRecalcResult> {
-  const memberId = removedMember._id.toString();
+  const memberId = removedMember.id;
 
-  const periods = await BillingPeriod.find({
-    group: group._id,
-    "payments.memberId": removedMember._id,
-  }).sort({ periodStart: 1 });
+  const store = await db();
+  const periods = (await store.getPeriodsForGroup(group.id))
+    .filter((period) => period.payments.some((payment) => payment.memberId === memberId))
+    .sort((a, b) => a.periodStart.getTime() - b.periodStart.getTime());
 
   let recalculatedCount = 0;
   let latestNewShare = 0;
@@ -273,8 +286,8 @@ export async function recalculatePeriodsOnMemberRemoval(
 
   for (const period of periods) {
     const removedPayment = period.payments.find(
-      (p: IMemberPayment) => p.memberId.toString() === memberId,
-    ) as IMemberPayment | undefined;
+      (p: StorageMemberPayment) => p.memberId === memberId,
+    ) as StorageMemberPayment | undefined;
 
     // collect the removed member's pending/overdue payments for the admin summary
     if (
@@ -282,7 +295,7 @@ export async function recalculatePeriodsOnMemberRemoval(
       (removedPayment.status === "pending" || removedPayment.status === "overdue")
     ) {
       removedMemberPendingPeriods.push({
-        periodId: period._id.toString(),
+        periodId: period.id,
         periodLabel: period.periodLabel,
         amount: removedPayment.adjustedAmount ?? removedPayment.amount,
         status: removedPayment.status,
@@ -291,8 +304,8 @@ export async function recalculatePeriodsOnMemberRemoval(
 
     // only recalculate periods that have at least one pending/overdue remaining member
     const hasPendingRemaining = period.payments.some(
-      (p: IMemberPayment) =>
-        p.memberId.toString() !== memberId &&
+      (p: StorageMemberPayment) =>
+        p.memberId !== memberId &&
         (p.status === "pending" || p.status === "overdue"),
     );
     if (!hasPendingRemaining) continue;
@@ -303,14 +316,14 @@ export async function recalculatePeriodsOnMemberRemoval(
 
     // track the latest new share amount for the response
     const anyRemainingPayment = period.payments.find(
-      (p: IMemberPayment) =>
-        p.memberId.toString() !== memberId && p.adjustedAmount == null,
-    ) as IMemberPayment | undefined;
+      (p: StorageMemberPayment) =>
+        p.memberId !== memberId && p.adjustedAmount == null,
+    ) as StorageMemberPayment | undefined;
     if (anyRemainingPayment) {
       latestNewShare = anyRemainingPayment.amount;
     }
 
-    await period.save();
+    await store.updateBillingPeriod(period.id, { payments: period.payments });
     recalculatedCount++;
   }
 

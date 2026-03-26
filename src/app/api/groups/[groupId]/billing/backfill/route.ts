@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import mongoose from "mongoose";
+import { nanoid } from "nanoid";
 import { auth } from "@/lib/auth";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group, BillingPeriod } from "@/models";
 import {
   calculateShares,
   formatPeriodLabel,
   getPeriodDates,
 } from "@/lib/billing/calculator";
-import { createConfirmationToken } from "@/lib/tokens";
 import { getCollectionOpensAt } from "@/lib/billing/collection-window";
+import { createConfirmationToken } from "@/lib/tokens";
+import { db, isStorageId } from "@/lib/storage";
 
 const backfillSchema = z.object({
   monthsBack: z.number().int().min(1).max(12),
@@ -18,21 +17,21 @@ const backfillSchema = z.object({
 
 export async function POST(
   request: NextRequest,
-  context: { params: Promise<{ groupId: string }> },
+  context: { params: Promise<{ groupId: string }> }
 ) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json(
       { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
-      { status: 401 },
+      { status: 401 }
     );
   }
 
   const { groupId } = await context.params;
-  if (!mongoose.isValidObjectId(groupId)) {
+  if (!isStorageId(groupId)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "Invalid group id" } },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
@@ -46,21 +45,20 @@ export async function POST(
           details: parsed.error.flatten(),
         },
       },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
-  await dbConnect();
-
-  const group = await Group.findById(groupId);
+  const store = await db();
+  const group = await store.getGroup(groupId);
   if (!group || !group.isActive) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Group not found" } },
-      { status: 404 },
+      { status: 404 }
     );
   }
 
-  if (group.admin.toString() !== session.user.id) {
+  if (group.adminId !== session.user.id) {
     return NextResponse.json(
       {
         error: {
@@ -68,7 +66,7 @@ export async function POST(
           message: "Only the admin can create previous periods",
         },
       },
-      { status: 403 },
+      { status: 403 }
     );
   }
 
@@ -82,18 +80,19 @@ export async function POST(
     paymentsCount: number;
   }> = [];
 
-  // anchor: earliest existing period start, or current period start if none
-  const earliest = await BillingPeriod.findOne({ group: groupId })
-    .sort({ periodStart: 1 })
-    .select("periodStart")
-    .lean()
-    .exec();
+  const existingPeriods = await store.getPeriodsForGroup(groupId);
+  const earliestRow =
+    existingPeriods.length > 0
+      ? [...existingPeriods].sort(
+          (a, b) => a.periodStart.getTime() - b.periodStart.getTime()
+        )[0]
+      : null;
 
   let anchorYear: number;
   let anchorMonth: number;
 
-  if (earliest?.periodStart) {
-    const d = new Date(earliest.periodStart);
+  if (earliestRow) {
+    const d = new Date(earliestRow.periodStart);
     anchorYear = d.getFullYear();
     anchorMonth = d.getMonth();
   } else {
@@ -117,30 +116,27 @@ export async function POST(
     const { start, end } = getPeriodDates(adjustedYear, adjustedMonth, cycleDay);
     const label = formatPeriodLabel(start);
 
-    const existing = await BillingPeriod.findOne({
-      group: groupId,
-      periodStart: start,
-    });
+    const existing = await store.getBillingPeriodByStart(groupId, start);
     if (existing) continue;
 
-    // use current active members for past periods so we always create the period;
-    // admin can then record or import history (members who joined later can be waived)
     const shares = calculateShares(group, undefined, undefined);
     if (shares.length === 0) continue;
 
-    const payments = await Promise.all(
+    const paymentRows = await Promise.all(
       shares.map(async (share) => ({
+        id: nanoid(),
         memberId: share.memberId,
         memberEmail: share.email,
         memberNickname: share.nickname,
         amount: share.amount,
+        adjustedAmount: null as number | null,
+        adjustmentReason: null as string | null,
         status: "pending" as const,
-        confirmationToken: await createConfirmationToken(
-          share.memberId,
-          "",
-          groupId,
-        ),
-      })),
+        memberConfirmedAt: null as Date | null,
+        adminConfirmedAt: null as Date | null,
+        confirmationToken: await createConfirmationToken(share.memberId, "", groupId),
+        notes: null as string | null,
+      }))
     );
 
     const collectionOpensAt = getCollectionOpensAt(
@@ -148,28 +144,37 @@ export async function POST(
       group.billing.paymentInAdvanceDays ?? 0
     );
 
-    const period = await BillingPeriod.create({
-      group: groupId,
+    const created = await store.createBillingPeriod({
+      groupId,
       periodStart: start,
       collectionOpensAt,
       periodEnd: end,
       periodLabel: label,
       totalPrice: group.billing.currentPrice,
       currency: group.billing.currency,
-      payments,
+      priceNote: null,
+      payments: paymentRows,
+      reminders: [],
+      isFullyPaid: false,
     });
 
-    for (const payment of period.payments) {
-      payment.confirmationToken = await createConfirmationToken(
-        payment.memberId.toString(),
-        period._id.toString(),
-        groupId,
-      );
-    }
-    await period.save();
+    const paymentsWithTokens = await Promise.all(
+      created.payments.map(async (payment) => ({
+        ...payment,
+        confirmationToken: await createConfirmationToken(
+          payment.memberId,
+          created.id,
+          groupId
+        ),
+      }))
+    );
+
+    await store.updateBillingPeriod(created.id, { payments: paymentsWithTokens });
+
+    const period = (await store.getBillingPeriod(created.id, groupId))!;
 
     createdPeriods.push({
-      _id: period._id.toString(),
+      _id: period.id,
       periodLabel: period.periodLabel,
       periodStart: period.periodStart.toISOString().slice(0, 10),
       totalPrice: period.totalPrice,

@@ -1,6 +1,4 @@
-import { User } from "@/models";
-import type { IGroup } from "@/models";
-import type { IBillingPeriod, IMemberPayment } from "@/models/billing-period";
+import { db, type StorageBillingPeriod, type StorageGroup, type StorageMemberPayment } from "@/lib/storage";
 import { sendNotification } from "@/lib/notifications/service";
 import { getReminderEligibility, type PaymentLike } from "@/lib/notifications/reminder-targeting";
 import { paymentConfirmationKeyboard } from "@/lib/telegram/keyboards";
@@ -20,10 +18,14 @@ export interface SendReminderResult {
   telegramSent: boolean;
 }
 
-type GroupDoc = IGroup & { _id: { toString: () => string }; members: IGroup["members"] };
-type PeriodDoc = IBillingPeriod & { _id: { toString: () => string }; periodLabel: string; currency: string };
+type GroupDoc = StorageGroup;
+type PeriodDoc = StorageBillingPeriod;
 
 export type ChannelOverride = "email" | "telegram" | "both";
+
+function asId(value: { toString: () => string } | string): string {
+  return value.toString();
+}
 
 /** send a single payment reminder (respects eligibility; no-op if no channel reachable) */
 export async function sendReminderForPayment(
@@ -42,14 +44,14 @@ export async function sendReminderForPayment(
   }
 
   const member = group.members.find(
-    (m: { _id: { toString: () => string } }) =>
-      m._id.toString() === payment.memberId.toString()
+    (m) => m.id === asId(payment.memberId)
   );
-  const user = member?.user ? await User.findById(member.user) : null;
+  const store = await db();
+  const user = member?.userId ? await store.getUser(member.userId) : null;
 
-  const periodId = (period._id as { toString: () => string }).toString();
-  const groupId = (group._id as { toString: () => string }).toString();
-  const memberId = payment.memberId.toString();
+  const periodId = period.id;
+  const groupId = group.id;
+  const memberId = asId(payment.memberId);
   const portalToken = await createMemberPortalToken(memberId, groupId);
   const portalUrl = await getMemberPortalUrl(portalToken);
   const confirmUrl = `${portalUrl}?pay=${periodId}&open=confirm`;
@@ -57,16 +59,16 @@ export async function sendReminderForPayment(
   const paymentLink = group.payment?.link ?? null;
   const currency = period.currency || "€";
   const effectiveAmount =
-    (payment as IMemberPayment).adjustedAmount ?? payment.amount;
-  const adjustmentReason = (payment as IMemberPayment).adjustmentReason ?? null;
-  const priceNote = (period as IBillingPeriod).priceNote ?? null;
+    (payment as StorageMemberPayment).adjustedAmount ?? payment.amount;
+  const adjustmentReason = (payment as StorageMemberPayment).adjustmentReason ?? null;
+  const priceNote = period.priceNote ?? null;
 
   const unsubscribeUrl =
     sendEmail && member
       ? await getUnsubscribeUrl(
           await createUnsubscribeToken(
-            payment.memberId.toString(),
-            (group._id as { toString: () => string }).toString()
+            asId(payment.memberId),
+            group.id
           )
         )
       : null;
@@ -101,15 +103,15 @@ export async function sendReminderForPayment(
       : undefined;
 
   const keyboard = paymentConfirmationKeyboard(
-    (period._id as { toString: () => string }).toString(),
-    payment.memberId.toString()
+    period.id,
+    asId(payment.memberId)
   );
 
   const result = await sendNotification(
     {
       email: payment.memberEmail,
       telegramChatId: user?.telegram?.chatId,
-      userId: user?._id?.toString(),
+      userId: user?.id,
       preferences: {
         email: sendEmail,
         telegram: sendTelegram,
@@ -130,7 +132,7 @@ export async function sendReminderForPayment(
         priceNote,
       }),
       telegramKeyboard: keyboard,
-      groupId: (group._id as { toString: () => string }).toString(),
+      groupId: group.id,
       billingPeriodId: periodId,
       emailParams,
     }

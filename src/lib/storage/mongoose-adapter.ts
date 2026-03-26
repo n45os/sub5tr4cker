@@ -4,9 +4,11 @@ import {
   Group,
   BillingPeriod,
   Notification,
+  AuditEvent,
   ScheduledTask,
   PriceHistory,
   User,
+  Settings,
 } from "@/models";
 import type { IGroup, IGroupMember } from "@/models/group";
 import type { IBillingPeriod, IMemberPayment } from "@/models/billing-period";
@@ -14,6 +16,8 @@ import type { INotification } from "@/models/notification";
 import type { IScheduledTask } from "@/models/scheduled-task";
 import type { IPriceHistory } from "@/models/price-history";
 import type { IUser } from "@/models/user";
+import type { ISettings } from "@/models/settings";
+import { settingsDefinitions } from "@/lib/settings/definitions";
 import { collectionWindowOpenFilter } from "@/lib/billing/collection-window";
 import type { StorageAdapter } from "./adapter";
 import type {
@@ -25,6 +29,7 @@ import type {
   StorageMemberPayment,
   StorageReminderEntry,
   StorageNotification,
+  StorageAuditEvent,
   StorageScheduledTask,
   StoragePriceHistory,
   CreateGroupInput,
@@ -33,11 +38,15 @@ import type {
   UpdateBillingPeriodInput,
   PaymentStatusUpdate,
   CreateNotificationInput,
+  CreateAuditEventInput,
   CreateTaskInput,
   CreatePriceHistoryInput,
+  CreateUserInput,
   OpenPeriodsFilter,
   ExportBundle,
   ImportResult,
+  StorageNotificationType,
+  StorageAppSettingRow,
 } from "./types";
 
 // ── conversion helpers ────────────────────────────────────────────────────────
@@ -215,6 +224,30 @@ function notificationToStorage(n: INotification): StorageNotification {
   };
 }
 
+function auditEventToStorage(event: {
+  _id: unknown;
+  actor: unknown;
+  actorName: string;
+  action: string;
+  group?: unknown;
+  billingPeriod?: unknown;
+  targetMember?: unknown;
+  metadata?: Record<string, unknown>;
+  createdAt: Date;
+}): StorageAuditEvent {
+  return {
+    id: toId(event._id),
+    actorId: toId(event.actor),
+    actorName: event.actorName,
+    action: event.action as StorageAuditEvent["action"],
+    groupId: toIdOrNull(event.group),
+    billingPeriodId: toIdOrNull(event.billingPeriod),
+    targetMemberId: toIdOrNull(event.targetMember),
+    metadata: event.metadata ?? {},
+    createdAt: event.createdAt,
+  };
+}
+
 function taskToStorage(t: IScheduledTask): StorageScheduledTask {
   return {
     id: toId(t._id),
@@ -292,6 +325,72 @@ export class MongooseAdapter implements StorageAdapter {
     const updated = await User.findByIdAndUpdate(id, { $set: data }, { new: true }).lean<IUser>();
     if (!updated) throw new Error(`user not found: ${id}`);
     return userToStorage(updated);
+  }
+
+  async createUser(data: CreateUserInput): Promise<StorageUser> {
+    await dbConnect();
+    const u = await User.create({
+      name: data.name.trim(),
+      email: data.email.toLowerCase().trim(),
+      role: data.role,
+      hashedPassword: data.hashedPassword,
+      notificationPreferences: data.notificationPreferences,
+    });
+    const lean = await User.findById(u._id).lean<IUser>();
+    if (!lean) throw new Error("user create failed");
+    return userToStorage(lean);
+  }
+
+  async countUsers(): Promise<number> {
+    await dbConnect();
+    return User.countDocuments();
+  }
+
+  async getAdminUserCount(): Promise<number> {
+    await dbConnect();
+    return User.countDocuments({ role: "admin" });
+  }
+
+  async promoteOldestUserToAdmin(): Promise<void> {
+    await dbConnect();
+    const oldest = await User.findOne().sort({ createdAt: 1 }).select("_id").lean<IUser>();
+    if (!oldest?._id) return;
+    await User.updateOne({ _id: oldest._id }, { $set: { role: "admin" } });
+  }
+
+  async linkTelegramAccountWithLinkCode(params: {
+    code: string;
+    chatId: number;
+    username: string | null;
+    now: Date;
+  }): Promise<StorageUser | null> {
+    await dbConnect();
+    const { code, chatId, username, now } = params;
+    const user = await User.findOneAndUpdate(
+      {
+        "telegramLinkCode.code": code,
+        "telegramLinkCode.expiresAt": { $gt: now },
+      },
+      {
+        $set: {
+          telegram: { chatId, username, linkedAt: now },
+          "notificationPreferences.telegram": true,
+        },
+        $unset: { telegramLinkCode: "" },
+      },
+      { new: true }
+    ).lean<IUser | null>();
+    return user ? userToStorage(user) : null;
+  }
+
+  async tryClaimWelcomeEmailSentAt(userId: string, at: Date): Promise<boolean> {
+    await dbConnect();
+    const prev = await User.findOneAndUpdate(
+      { _id: userId, welcomeEmailSentAt: null },
+      { $set: { welcomeEmailSentAt: at } },
+      { new: false }
+    ).lean<IUser | null>();
+    return prev != null;
   }
 
   // ── groups ─────────────────────────────────────────────────────────────────
@@ -386,6 +485,12 @@ export class MongooseAdapter implements StorageAdapter {
     return groups.map(groupToStorage);
   }
 
+  async listAllActiveGroups(): Promise<StorageGroup[]> {
+    await dbConnect();
+    const groups = await Group.find({ isActive: true }).lean<IGroup[]>();
+    return groups.map(groupToStorage);
+  }
+
   async updateGroup(id: string, data: UpdateGroupInput): Promise<StorageGroup> {
     await dbConnect();
     // build a flat $set to only update provided fields
@@ -434,6 +539,31 @@ export class MongooseAdapter implements StorageAdapter {
     return g ? groupToStorage(g) : null;
   }
 
+  async findActiveGroupForMemberInvitation(params: {
+    groupId?: string | null;
+    memberId: string;
+  }): Promise<StorageGroup | null> {
+    await dbConnect();
+    const { groupId, memberId } = params;
+    if (groupId) {
+      const g = await Group.findOne({ _id: groupId, isActive: true }).lean<IGroup>();
+      if (!g) return null;
+      const storage = groupToStorage(g);
+      const m = storage.members.find(
+        (mm) => mm.id === memberId && mm.isActive && !mm.leftAt
+      );
+      return m ? storage : null;
+    }
+    if (Types.ObjectId.isValid(memberId)) {
+      const g = await Group.findOne({
+        isActive: true,
+        "members._id": new Types.ObjectId(memberId),
+      }).lean<IGroup>();
+      return g ? groupToStorage(g) : null;
+    }
+    return null;
+  }
+
   // ── billing periods ────────────────────────────────────────────────────────
 
   async createBillingPeriod(data: CreateBillingPeriodInput): Promise<StorageBillingPeriod> {
@@ -479,6 +609,12 @@ export class MongooseAdapter implements StorageAdapter {
     return p ? periodToStorage(p) : null;
   }
 
+  async getBillingPeriodById(id: string): Promise<StorageBillingPeriod | null> {
+    await dbConnect();
+    const p = await BillingPeriod.findById(id).lean<IBillingPeriod>();
+    return p ? periodToStorage(p) : null;
+  }
+
   async getOpenBillingPeriods(filter: OpenPeriodsFilter): Promise<StorageBillingPeriod[]> {
     await dbConnect();
     const query: Record<string, unknown> = {
@@ -496,6 +632,16 @@ export class MongooseAdapter implements StorageAdapter {
     await dbConnect();
     const periods = await BillingPeriod.find({ group: groupId })
       .sort({ periodStart: -1 })
+      .lean<IBillingPeriod[]>();
+    return periods.map(periodToStorage);
+  }
+
+  async listUnpaidPeriodsWithStartBefore(asOf: Date): Promise<StorageBillingPeriod[]> {
+    await dbConnect();
+    const periods = await BillingPeriod.find({
+      isFullyPaid: false,
+      periodStart: { $lt: asOf },
+    })
       .lean<IBillingPeriod[]>();
     return periods.map(periodToStorage);
   }
@@ -621,6 +767,87 @@ export class MongooseAdapter implements StorageAdapter {
     return ns.map(notificationToStorage);
   }
 
+  async getNotificationById(id: string): Promise<StorageNotification | null> {
+    await dbConnect();
+    const n = await Notification.findById(id).lean<INotification>();
+    return n ? notificationToStorage(n) : null;
+  }
+
+  async listNotifications(options: {
+    groupIds: string[];
+    type?: StorageNotificationType;
+    channel?: "email" | "telegram";
+    limit?: number;
+    offset?: number;
+  }): Promise<{ notifications: StorageNotification[]; total: number }> {
+    await dbConnect();
+    const { groupIds, type, channel, limit, offset } = options;
+    if (!groupIds.length) {
+      return { notifications: [], total: 0 };
+    }
+    const filter: Record<string, unknown> = {
+      group: { $in: groupIds.map((gid) => new Types.ObjectId(gid)) },
+    };
+    if (type) filter.type = type;
+    if (channel) filter.channel = channel;
+
+    let query = Notification.find(filter).sort({ createdAt: -1 });
+    if (offset !== undefined) query = query.skip(offset);
+    if (limit !== undefined) query = query.limit(limit);
+
+    const [total, rows] = await Promise.all([
+      Notification.countDocuments(filter),
+      query.lean<INotification[]>(),
+    ]);
+    return { total, notifications: rows.map(notificationToStorage) };
+  }
+
+  async logAudit(data: CreateAuditEventInput): Promise<StorageAuditEvent> {
+    await dbConnect();
+    const event = await AuditEvent.create({
+      actor: new Types.ObjectId(data.actorId),
+      actorName: data.actorName,
+      action: data.action,
+      group: data.groupId ? new Types.ObjectId(data.groupId) : undefined,
+      billingPeriod: data.billingPeriodId ? new Types.ObjectId(data.billingPeriodId) : undefined,
+      targetMember: data.targetMemberId ? data.targetMemberId : undefined,
+      metadata: data.metadata ?? {},
+    });
+    return auditEventToStorage(event.toObject());
+  }
+
+  async listAuditEvents(options: {
+    groupIds?: string[];
+    limit?: number;
+    offset?: number;
+    unbounded?: boolean;
+  } = {}): Promise<{ events: StorageAuditEvent[]; total: number }> {
+    await dbConnect();
+    const filter: Record<string, unknown> = {};
+    if (options.groupIds?.length) {
+      filter.group = { $in: options.groupIds.map((id) => new Types.ObjectId(id)) };
+    }
+
+    const unbounded = options.unbounded === true;
+    const limit = unbounded ? undefined : (options.limit ?? 50);
+    const offset = unbounded ? undefined : (options.offset ?? 0);
+    let findQuery = AuditEvent.find(filter).sort({ createdAt: -1 });
+    if (offset !== undefined) findQuery = findQuery.skip(offset);
+    if (limit !== undefined) findQuery = findQuery.limit(limit);
+
+    const [total, rows] = await Promise.all([
+      AuditEvent.countDocuments(filter),
+      findQuery.lean(),
+    ]);
+
+    return {
+      total,
+      events: rows.map((row) =>
+        auditEventToStorage(row as unknown as Parameters<typeof auditEventToStorage>[0])
+      ),
+    };
+  }
+
   // ── scheduled tasks ────────────────────────────────────────────────────────
 
   async enqueueTask(data: CreateTaskInput): Promise<StorageScheduledTask | null> {
@@ -711,8 +938,82 @@ export class MongooseAdapter implements StorageAdapter {
   async cancelTask(taskId: string): Promise<void> {
     await dbConnect();
     await ScheduledTask.findByIdAndUpdate(taskId, {
-      $set: { status: "cancelled", cancelledAt: new Date() },
+      $set: {
+        status: "cancelled",
+        cancelledAt: new Date(),
+        lockedAt: null,
+        lockedBy: null,
+      },
     });
+  }
+
+  async getTaskById(taskId: string): Promise<StorageScheduledTask | null> {
+    await dbConnect();
+    const t = await ScheduledTask.findById(taskId).lean<IScheduledTask>();
+    return t ? taskToStorage(t) : null;
+  }
+
+  async retryFailedTask(taskId: string): Promise<void> {
+    await dbConnect();
+    await ScheduledTask.findByIdAndUpdate(taskId, {
+      $set: {
+        status: "pending",
+        runAt: new Date(),
+        attempts: 0,
+        lastError: null,
+        lockedAt: null,
+        lockedBy: null,
+        completedAt: null,
+      },
+    });
+  }
+
+  async bulkCancelPendingTasksForAdmin(filter: {
+    adminGroupIds: string[];
+    groupId?: string;
+    memberEmail?: string;
+    type?: StorageScheduledTask["type"];
+  }): Promise<number> {
+    await dbConnect();
+    if (filter.adminGroupIds.length === 0) return 0;
+    const visibility = {
+      $or: [
+        { "payload.groupId": { $in: filter.adminGroupIds } },
+        { "payload.payments.groupId": { $in: filter.adminGroupIds } },
+      ],
+    };
+    const and: Record<string, unknown>[] = [visibility];
+    if (filter.groupId) {
+      and.push({
+        $or: [
+          { "payload.groupId": filter.groupId },
+          { "payload.payments.groupId": filter.groupId },
+        ],
+      });
+    }
+    if (filter.memberEmail) {
+      const trimmed = filter.memberEmail.trim();
+      const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      and.push({
+        "payload.memberEmail": { $regex: new RegExp(`^${escaped}$`, "i") },
+      });
+    }
+    if (filter.type) {
+      and.push({ type: filter.type });
+    }
+    const q = {
+      status: { $in: ["pending", "locked"] as const },
+      $and: and,
+    };
+    const result = await ScheduledTask.updateMany(q, {
+      $set: {
+        status: "cancelled",
+        cancelledAt: new Date(),
+        lockedAt: null,
+        lockedBy: null,
+      },
+    });
+    return result.modifiedCount;
   }
 
   async getTaskCounts(): Promise<{ pending: number; locked: number; completed: number; failed: number; cancelled: number }> {
@@ -731,6 +1032,7 @@ export class MongooseAdapter implements StorageAdapter {
     status?: StorageScheduledTask["status"];
     type?: StorageScheduledTask["type"];
     groupId?: string;
+    anyGroupIdIn?: string[];
     limit?: number;
     offset?: number;
   } = {}): Promise<{ tasks: StorageScheduledTask[]; total: number }> {
@@ -739,10 +1041,16 @@ export class MongooseAdapter implements StorageAdapter {
     if (options.status) query.status = options.status;
     if (options.type) query.type = options.type;
     if (options.groupId) query["payload.groupId"] = options.groupId;
+    if (options.anyGroupIdIn?.length) {
+      query.$or = [
+        { "payload.groupId": { $in: options.anyGroupIdIn } },
+        { "payload.payments.groupId": { $in: options.anyGroupIdIn } },
+      ];
+    }
     const limit = options.limit ?? 50;
     const offset = options.offset ?? 0;
     const [tasks, total] = await Promise.all([
-      ScheduledTask.find(query).sort({ createdAt: -1 }).skip(offset).limit(limit).lean<IScheduledTask[]>(),
+      ScheduledTask.find(query).sort({ runAt: -1 }).skip(offset).limit(limit).lean<IScheduledTask[]>(),
       ScheduledTask.countDocuments(query),
     ]);
     return { tasks: tasks.map(taskToStorage), total };
@@ -771,6 +1079,68 @@ export class MongooseAdapter implements StorageAdapter {
       .sort({ effectiveFrom: -1 })
       .lean<IPriceHistory[]>();
     return records.map(priceHistoryToStorage);
+  }
+
+  // ── app settings (MongoDB only) ─────────────────────────────────────────────
+
+  private appSettingToStorage(row: ISettings): StorageAppSettingRow {
+    return {
+      key: row.key,
+      value: row.value,
+      category: row.category,
+      isSecret: row.isSecret,
+      label: row.label,
+      description: row.description,
+    };
+  }
+
+  async ensureAppSettingsSeeded(): Promise<void> {
+    await dbConnect();
+    for (const definition of settingsDefinitions) {
+      const existing = await Settings.findOne({ key: definition.key }).lean<ISettings | null>();
+      if (existing) continue;
+      const envValue = process.env[definition.envVar];
+      const value = envValue ?? definition.defaultValue ?? null;
+      await Settings.create({
+        key: definition.key,
+        value,
+        category: definition.category,
+        isSecret: definition.isSecret,
+        label: definition.label,
+        description: definition.description,
+      });
+    }
+  }
+
+  async getAppSettingRow(key: string): Promise<StorageAppSettingRow | null> {
+    await dbConnect();
+    const record = await Settings.findOne({ key }).lean<ISettings | null>();
+    return record ? this.appSettingToStorage(record) : null;
+  }
+
+  async listAppSettingRows(category?: string): Promise<StorageAppSettingRow[]> {
+    await dbConnect();
+    const query = category ? { category } : {};
+    const records = await Settings.find(query)
+      .sort({ category: 1, key: 1 })
+      .lean<ISettings[]>();
+    return records.map((r) => this.appSettingToStorage(r));
+  }
+
+  async upsertAppSettingRow(input: StorageAppSettingRow): Promise<void> {
+    await dbConnect();
+    await Settings.findOneAndUpdate(
+      { key: input.key },
+      {
+        key: input.key,
+        value: input.value,
+        category: input.category as ISettings["category"],
+        isSecret: input.isSecret,
+        label: input.label,
+        description: input.description,
+      },
+      { upsert: true, new: true }
+    );
   }
 
   // ── data portability ───────────────────────────────────────────────────────

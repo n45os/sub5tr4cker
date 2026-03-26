@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyUnsubscribeToken } from "@/lib/tokens";
-import { dbConnect } from "@/lib/db/mongoose";
-import { Group, User } from "@/models";
 import { sendAdminUnsubscribeNotification } from "@/lib/telegram/send";
 import { getSetting } from "@/lib/settings/service";
+import { db, type StorageGroupMember } from "@/lib/storage";
 
 export async function GET(
   _request: NextRequest,
@@ -15,38 +14,34 @@ export async function GET(
     (await getSetting("general.appUrl")) || new URL(_request.url).origin;
 
   if (!payload) {
-    return NextResponse.redirect(
-      new URL("/unsubscribed?error=invalid", appUrl)
-    );
+    return NextResponse.redirect(new URL("/unsubscribed?error=invalid", appUrl));
   }
 
-  await dbConnect();
+  const store = await db();
 
-  const group = await Group.findById(payload.groupId);
+  const group = await store.getGroup(payload.groupId);
   if (!group || !group.isActive) {
-    return NextResponse.redirect(
-      new URL("/unsubscribed?error=not_found", appUrl)
-    );
+    return NextResponse.redirect(new URL("/unsubscribed?error=not_found", appUrl));
   }
 
-  const member = group.members.find(
-    (m: { _id: { toString: () => string } }) => m._id.toString() === payload.memberId
+  const memberIndex = group.members.findIndex(
+    (m: StorageGroupMember) => m.id === payload.memberId
   );
-  if (!member) {
-    return NextResponse.redirect(
-      new URL("/unsubscribed?error=not_found", appUrl)
-    );
+  if (memberIndex === -1) {
+    return NextResponse.redirect(new URL("/unsubscribed?error=not_found", appUrl));
   }
 
-  member.unsubscribedFromEmail = true;
-  await group.save();
+  const memberBefore = group.members[memberIndex]!;
+  const members = group.members.map((m, i) =>
+    i === memberIndex ? { ...m, unsubscribedFromEmail: true } : m
+  );
+  await store.updateGroup(group.id, { members });
 
-  const memberNickname = member.nickname;
-  const memberEmail = member.email;
+  const memberNickname = memberBefore.nickname;
+  const memberEmail = memberBefore.email;
   const groupName = group.name;
 
-  // notify admin via Telegram
-  const admin = await User.findById(group.admin);
+  const admin = await store.getUser(group.adminId);
   if (admin?.telegram?.chatId) {
     await sendAdminUnsubscribeNotification(
       admin.telegram.chatId,

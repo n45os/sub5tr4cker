@@ -54,7 +54,14 @@ src/
 | File | Purpose |
 |------|---------|
 | `src/lib/db/mongoose.ts` | MongoDB connection with caching for serverless |
-| `src/lib/auth.ts` | Auth.js v5 config (providers, adapter, callbacks) |
+| `src/lib/auth.ts` | Auth.js v5 config + local-mode auth wrapper (`auth()`) |
+| `src/lib/auth/local.ts` | Local-mode token generation, cookie validation, synthetic session |
+| `src/lib/config/manager.ts` | Config manager for `~/.sub5tr4cker/config.json` (local mode settings) |
+| `src/lib/storage/adapter.ts` | `StorageAdapter` interface — all data operations |
+| `src/lib/storage/types.ts` | Domain types (no Mongoose, no ObjectId) used by both adapters |
+| `src/lib/storage/mongoose-adapter.ts` | Wraps Mongoose calls behind `StorageAdapter` |
+| `src/lib/storage/sqlite-adapter.ts` | SQLite adapter for local mode (better-sqlite3, JSON columns) |
+| `src/lib/storage/index.ts` | Adapter factory — selects SQLite or Mongoose from `SUB5TR4CKER_MODE` |
 | `src/models/group.ts` | Group schema — the central data model |
 | `src/models/billing-period.ts` | Billing period with per-member payment tracking |
 | `src/lib/billing/calculator.ts` | Cost splitting logic (equal, fixed, variable) |
@@ -62,8 +69,12 @@ src/
 | `src/lib/notifications/service.ts` | Dispatches notifications across email + Telegram |
 | `src/lib/telegram/bot.ts` | grammy bot instance and setup |
 | `src/lib/telegram/handlers.ts` | Telegram callback handlers (payment confirmations) |
+| `src/lib/telegram/polling.ts` | `pollOnce()` (cron) and `startPolling()` (server) for local mode |
 | `src/lib/tokens.ts` | HMAC token generation/verification for email links |
 | `src/jobs/runner.ts` | node-cron scheduler entry point |
+| `src/cli/index.ts` | `s54r` CLI entry point — all local + advanced commands |
+| `src/cli/commands/local/init.ts` | `s54r init` guided setup wizard |
+| `src/cli/commands/local/notify.ts` | `s54r notify` standalone cron script |
 | `src/components/features/groups/group-detail-admin-actions.tsx` | Group header: Edit + **⋯** menu (initialize, import, delete) |
 | `src/components/features/groups/delete-group-button.tsx` | Admin soft-delete group (calls `DELETE /api/groups/[groupId]`) |
 | `src/lib/tasks/worker.ts` | Executes scheduled notification tasks (skips if payment no longer unpaid) |

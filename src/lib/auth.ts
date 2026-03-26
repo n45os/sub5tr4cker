@@ -7,6 +7,9 @@ import { compare } from "bcryptjs";
 import { dbConnect } from "@/lib/db/mongoose";
 import { User } from "@/models";
 import { verifyMagicLoginToken } from "@/lib/tokens";
+import { isLocalMode } from "@/lib/config/manager";
+import { buildLocalSession, validateAuthToken, LOCAL_AUTH_COOKIE } from "@/lib/auth/local";
+import { cookies } from "next/headers";
 
 let clientPromise: Promise<MongoClient> | null = null;
 
@@ -21,7 +24,12 @@ function getMongoClientPromise(): Promise<MongoClient> {
 // 30 days in seconds — persistent session so cookie is shared across tabs
 const SESSION_MAX_AGE = 30 * 24 * 60 * 60;
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+const {
+  handlers: nextAuthHandlers,
+  auth: nextAuth,
+  signIn,
+  signOut,
+} = NextAuth({
   trustHost: true,
   secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || (process.env.NODE_ENV === "development" ? "dev-secret-change-in-production" : undefined),
   adapter: MongoDBAdapter(getMongoClientPromise),
@@ -142,3 +150,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
 });
+
+/**
+ * auth() wrapper — in local mode returns the synthetic local admin session
+ * if the auth cookie is valid, otherwise returns null.
+ * In advanced mode delegates to NextAuth.
+ */
+async function localAuth() {
+  if (!isLocalMode()) return nextAuth();
+
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(LOCAL_AUTH_COOKIE)?.value;
+    if (!token || !validateAuthToken(token)) return null;
+    return buildLocalSession();
+  } catch {
+    // cookies() throws outside of a request context (e.g. in cron scripts)
+    return buildLocalSession();
+  }
+}
+
+export { localAuth as auth, nextAuthHandlers as handlers, signIn, signOut };

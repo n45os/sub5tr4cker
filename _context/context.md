@@ -1,5 +1,5 @@
 <!-- context-status: active -->
-<!-- last-updated: 2026-03-24 -->
+<!-- last-updated: 2026-03-26 -->
 
 # SubsTrack — Project Context
 
@@ -7,10 +7,10 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 
 ## Quick Facts
 
-- **Stack**: Next.js 15 (App Router), MongoDB/Mongoose, Auth.js v5, Resend, grammy, node-cron, persisted notification task queue (ScheduledTask)
+- **Stack**: Next.js 15 (App Router), MongoDB/Mongoose **or SQLite (local mode)**, Auth.js v5, Resend, grammy, node-cron, persisted notification task queue (ScheduledTask)
 - **UI**: Tailwind CSS + shadcn/ui with a sidebar dashboard shell, richer cards, tabs, and settings surfaces
 - **Origin**: Migrated from a Google Sheets + Apps Script setup (see `docs/legacy/`)
-- **Phase**: Core MVP plus dashboard refresh (including an admin “subscriptions you pay for” table), editable groups with soft-delete from the UI, DB-backed app settings, notification previews, **scheduled tasks** page for admins to cancel/retry queued reminders, per-group email accent + style presets with live preview, shared themed email templates, aggregated reminders by user (optional), profile email/Telegram toggles, optional per-group **save email params** for Activity sent-email preview
+- **Phase**: Core MVP plus dashboard refresh (including an admin "subscriptions you pay for" table), editable groups with soft-delete from the UI, DB-backed app settings, notification previews, **scheduled tasks** page for admins to cancel/retry queued reminders, per-group email accent + style presets with live preview, shared themed email templates, aggregated reminders by user (optional), profile email/Telegram toggles, optional per-group **save email params** for Activity sent-email preview. **Local-first mode** via `s54r` CLI (SQLite, no MongoDB, auto-login, Telegram polling, OS-native cron, export/import/migrate).
 
 ## Key Directories
 
@@ -19,8 +19,12 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 - `src/app/(dashboard)/` — dashboard home, group detail/edit/new, notification previews, scheduled tasks (queue), activity, settings
 - `src/app/api/` — groups CRUD, group notification toggles, billing, notifications, scheduled tasks (queue admin), settings, confirm, telegram webhook/link, cron, register
 - `src/lib/` — db, auth, settings service, tokens (confirmation + link), email, telegram, billing calculator, notifications, tasks (queue + worker)
+- `src/lib/storage/` — `StorageAdapter` interface, `MongooseAdapter`, `SqliteAdapter`, domain types, adapter factory
+- `src/lib/config/` — `ConfigManager` (reads/writes `~/.sub5tr4cker/config.json`), local-mode setting helpers
+- `src/lib/auth/local.ts` — local-mode auth token generation and cookie validation
 - `src/models/` — Mongoose schemas (User, Group, BillingPeriod, PriceHistory, Notification, Settings, ScheduledTask)
 - `src/jobs/` — check-billing-periods, enqueue-reminders, enqueue-follow-ups, reconcile-overdue, send-follow-ups, run-notification-tasks, runner
+- `src/cli/` — Commander CLI (`s54r` / `substrack`), local commands (init, start, notify, export, import, migrate, cron-install, uninstall)
 - `src/components/features/groups/` — GroupCard, group form, delete-group flow, and group UI
 - `docs/` — architecture plan, data models, API design
 
@@ -33,6 +37,15 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 5. Admin confirms in dashboard or via Telegram → status confirmed
 
 **Reminder paths:** Cron enqueues `ScheduledTask` rows (`payment_reminder`, `aggregated_payment_reminder`, `admin_confirmation_request` only). Manual dashboard **Notify unpaid** sends aggregated reminders **without** the queue (see `docs/api-design.md` Flows).
+
+## Operating Modes
+
+| Mode | Storage | Auth | Telegram | Setup |
+|------|---------|------|----------|-------|
+| **local** | SQLite (`~/.sub5tr4cker/data.db`) | Token cookie (auto-login) | Polling | `s54r init` |
+| **advanced** | MongoDB | Auth.js v5 / NextAuth | Webhook | `s54r setup` or env vars |
+
+Switch: `SUB5TR4CKER_MODE=local` (set by `s54r start`).
 
 ## Implemented APIs (see docs/api-design.md)
 

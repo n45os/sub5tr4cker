@@ -7,6 +7,7 @@ import {
   type SettingsCategory,
 } from "@/lib/settings/definitions";
 import { ensureSettingsMigrated } from "@/lib/settings/migrate";
+import { isLocalMode, getLocalSetting, setLocalSetting } from "@/lib/config/manager";
 
 const CACHE_TTL_MS = 60_000;
 
@@ -100,6 +101,11 @@ export function maskSettingValue(value: string | null) {
 }
 
 export async function getSetting(key: string): Promise<string | null> {
+  // in local mode, read from config.json instead of MongoDB
+  if (isLocalMode()) {
+    return getLocalSetting(key);
+  }
+
   const cached = settingsCache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.value;
@@ -159,6 +165,12 @@ export async function getAllSettings(category?: SettingsCategory) {
 const PLUGIN_KEY_REGEX = /^plugin\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+$/;
 
 export async function setSetting(key: string, value: string | null) {
+  // in local mode, write to config.json instead of MongoDB
+  if (isLocalMode()) {
+    setLocalSetting(key, value);
+    return;
+  }
+
   const definition = getSettingsDefinition(key);
   const isPluginKey = PLUGIN_KEY_REGEX.test(key);
   if (!definition && !isPluginKey) {

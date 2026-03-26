@@ -1,8 +1,9 @@
 {
   "name": "sub5tr4cker",
-  "version": "0.33.0",
+  "version": "0.34.0",
   "private": true,
   "bin": {
+    "s54r": "./dist/cli/index.js",
     "substrack": "./dist/cli/index.js"
   },
   "scripts": {
@@ -15,6 +16,7 @@
     "cron": "tsx src/jobs/runner.ts",
     "cron:billing": "tsx -e \"import('./src/jobs/check-billing-periods').then(m => m.checkBillingPeriods())\"",
     "cron:reminders": "tsx -e \"import('./src/jobs/enqueue-reminders').then(m => m.enqueueReminders()).then(n => { console.log('Enqueued:', n); return import('./src/jobs/run-notification-tasks'); }).then(m => m.runNotificationTasks()).then(r => console.log('Worker:', r))\"",
+    "s54r": "tsx src/cli/index.ts",
     "setup": "tsx src/cli/index.ts setup",
     "configure": "tsx src/cli/index.ts configure",
     "seed": "tsx scripts/seed.ts"
@@ -24,6 +26,7 @@
     "@base-ui/react": "^1.3.0",
     "@clack/prompts": "^1.1.0",
     "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.8.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "commander": "^14.0.3",
@@ -33,6 +36,7 @@
     "lucide-react": "^0.577.0",
     "mongodb": "^6.21.0",
     "mongoose": "^9.3.1",
+    "nanoid": "^5.1.7",
     "next": "16.1.7",
     "next-auth": "^5.0.0-beta.30",
     "next-themes": "^0.4.6",
@@ -50,6 +54,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/node-cron": "^3.0.11",

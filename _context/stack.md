@@ -10,8 +10,9 @@
 
 ## Database
 
-- MongoDB 7 (via Docker or Atlas)
-- Mongoose 8 ODM
+- **Advanced mode**: MongoDB 7 (via Docker or Atlas), Mongoose 8 ODM
+- **Local mode**: SQLite (via `better-sqlite3`), zero-config, stored in `~/.sub5tr4cker/data.db`
+- `StorageAdapter` interface + `MongooseAdapter` / `SqliteAdapter` in `src/lib/storage/`
 
 ## Auth
 
@@ -27,7 +28,8 @@
 ## Telegram
 
 - grammy (Telegram bot framework)
-- Polling mode for dev, webhook for prod
+- Local mode: polling (`pollOnce` for cron, `bot.start()` for server)
+- Advanced mode: webhook (`/api/telegram/webhook`)
 
 ## Cron and task queue
 

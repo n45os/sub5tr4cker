@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.34.0] - 2026-03-26
+
+### Added
+
+- **Local-first mode (`s54r`)** — New `s54r` CLI command (bin alias added alongside `substrack`). Run `npx s54r init` for a guided terminal setup wizard (notification channel, admin email, auth token). `s54r start` launches the web UI on `localhost:3054` in foreground mode; `s54r notify` is a standalone cron script that polls Telegram and sends due reminders without the web server running.
+- **SQLite storage adapter** — `SqliteAdapter` (`src/lib/storage/sqlite-adapter.ts`) provides a fully embedded, zero-config data store backed by `better-sqlite3`. Stores all documents as JSON columns with extracted indexed fields. Implements the complete `StorageAdapter` interface.
+- **Storage adapter layer** — `StorageAdapter` interface (`src/lib/storage/adapter.ts`) with domain-agnostic types (`src/lib/storage/types.ts`). `MongooseAdapter` wraps the existing Mongoose calls behind the same interface. Adapter factory (`src/lib/storage/index.ts`) selects SQLite or Mongoose based on `SUB5TR4CKER_MODE` env var.
+- **Adapter conformance tests** — 20 tests in `src/lib/storage/__tests__/adapter-conformance.test.ts` validate all storage operations (groups, billing periods, payments, notifications, scheduled tasks, price history, export/import round-trip).
+- **Config manager** — `src/lib/config/manager.ts` reads/writes `~/.sub5tr4cker/config.json` with Zod validation. Provides `getAppMode()`, `getLocalSetting()`, `setLocalSetting()` and data directory helpers.
+- **Settings service local branch** — `getSetting()` / `setSetting()` now short-circuit to `config.json` in local mode, skipping MongoDB entirely.
+- **Local auth** — `src/lib/auth/local.ts` generates and validates a token cookie (`sub5tr4cker-local-auth`). `auth()` in `src/lib/auth.ts` returns a synthetic admin session in local mode. Middleware auto-sets the cookie on localhost requests.
+- **Export / import** — `s54r export` produces a versioned `ExportBundle` JSON file. `s54r import <file>` imports it into the active adapter (idempotent — skips existing IDs). `s54r migrate` exports SQLite data, imports it into MongoDB, and switches config mode.
+- **OS-native cron** — `s54r cron-install` installs `s54r notify` as a scheduled task: `crontab` on Linux, `launchd` on macOS (plist written to `~/Library/LaunchAgents/`), PowerShell instructions on Windows.
+- **Uninstall flow** — `s54r uninstall` prompts for backup export, then removes `~/.sub5tr4cker/` and cron entries.
+- **Telegram polling** — `src/lib/telegram/polling.ts` adds `pollOnce()` (one-shot for cron) and `startPolling()` (grammy long-poll loop for `s54r start`). Polling offset is persisted in `config.json` to avoid re-processing.
+
 ## [0.33.0] - 2026-03-24
 
 ### Added

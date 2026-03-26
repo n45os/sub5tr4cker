@@ -69,25 +69,28 @@ const tabs: Array<{
   {
     id: "general",
     label: "General",
-    description: "Public runtime values shared across the app.",
+    description:
+      "Values every feature depends on: the public URL of this install so generated links and Telegram’s webhook point at the right host.",
     categoryKeys: ["general"],
   },
   {
     id: "notifications",
     label: "Notifications",
-    description: "Email (Resend) and Telegram bot configuration for reminders and follow-ups.",
+    description:
+      "Outbound channels: Resend for email, your Telegram bot for DMs. Test sends and webhook registration live under Quick actions.",
     categoryKeys: ["email", "telegram", "notifications"],
   },
   {
     id: "security",
     label: "Security & automation",
-    description: "Secrets for confirmation links, Telegram account linking, and protected cron endpoints.",
+    description:
+      "HMAC secrets so member-facing links (payment confirm, Telegram link, invites) cannot be forged, plus a shared bearer for /api/cron/* so only your scheduler can run automated jobs.",
     categoryKeys: ["security", "cron"],
   },
   {
     id: "plugins",
     label: "Plugins",
-    description: "Installed plugins and their configuration.",
+    description: "Optional extensions: enable, configure, or review installed plugins.",
     categoryKeys: ["plugins"],
   },
 ];
@@ -371,6 +374,34 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
                   </div>
                 </CardHeader>
                 <CardContent className="grid gap-4">
+                  {tab.id === "security" ? (
+                    <div className="rounded-lg border border-border/80 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                      <p className="font-medium text-foreground">
+                        How these secrets work
+                      </p>
+                      <ul className="mt-2 list-disc space-y-2 pl-5">
+                        <li>
+                          Confirmation token secret signs URLs in email (and
+                          related flows) so only this server could have created
+                          them. Rotating it invalidates old links still in
+                          inboxes.
+                        </li>
+                        <li>
+                          Telegram link secret does the same for “link my
+                          account” style URLs. Empty means the confirmation
+                          secret is reused.
+                        </li>
+                        <li>
+                          Cron secret is sent as the{" "}
+                          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                            x-cron-secret
+                          </code>{" "}
+                          header on POSTs to protected cron routes; match it in
+                          your external scheduler config.
+                        </li>
+                      </ul>
+                    </div>
+                  ) : null}
                   {tab.settings.map((setting) => (
                     <div
                       key={setting.key}

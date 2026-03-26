@@ -1,5 +1,7 @@
 import Database from "better-sqlite3";
 import { nanoid } from "nanoid";
+import { readConfig } from "@/lib/config/manager";
+import { LOCAL_ADMIN_USER_ID } from "@/lib/auth/local";
 import type { StorageAdapter } from "./adapter";
 import type {
   StorageUser,
@@ -131,52 +133,52 @@ const PH_DATE_KEYS = ["effectiveFrom", "createdAt"];
 const USER_DATE_KEYS = ["emailVerified", "welcomeEmailSentAt", "createdAt", "updatedAt", "linkedAt", "expiresAt"];
 
 function hydrateGroup(data: Record<string, unknown>): StorageGroup {
-  const g = parseDates(data, ["initializedAt", "createdAt", "updatedAt"]) as StorageGroup;
+  const g = parseDates(data, ["initializedAt", "createdAt", "updatedAt"]) as unknown as StorageGroup;
   if (Array.isArray(g.members)) {
     g.members = g.members.map((m: StorageGroupMember) =>
-      parseDates(m as unknown as Record<string, unknown>, ["joinedAt", "leftAt", "acceptedAt", "billingStartsAt"]) as StorageGroupMember
+      parseDates(m as unknown as Record<string, unknown>, ["joinedAt", "leftAt", "acceptedAt", "billingStartsAt"]) as unknown as StorageGroupMember
     );
   }
   if (g.telegramGroup) {
-    g.telegramGroup = parseDates(g.telegramGroup as unknown as Record<string, unknown>, ["linkedAt"]) as StorageGroup["telegramGroup"];
+    g.telegramGroup = parseDates(g.telegramGroup as unknown as Record<string, unknown>, ["linkedAt"]) as unknown as StorageGroup["telegramGroup"];
   }
   return g;
 }
 
 function hydratePeriod(data: Record<string, unknown>): StorageBillingPeriod {
-  const p = parseDates(data, ["periodStart", "collectionOpensAt", "periodEnd", "createdAt", "updatedAt"]) as StorageBillingPeriod;
+  const p = parseDates(data, ["periodStart", "collectionOpensAt", "periodEnd", "createdAt", "updatedAt"]) as unknown as StorageBillingPeriod;
   if (Array.isArray(p.payments)) {
     p.payments = p.payments.map((pay) =>
-      parseDates(pay as unknown as Record<string, unknown>, ["memberConfirmedAt", "adminConfirmedAt"]) as typeof pay
+      parseDates(pay as unknown as Record<string, unknown>, ["memberConfirmedAt", "adminConfirmedAt"]) as unknown as typeof pay
     );
   }
   if (Array.isArray(p.reminders)) {
     p.reminders = p.reminders.map((r) =>
-      parseDates(r as unknown as Record<string, unknown>, ["sentAt"]) as typeof r
+      parseDates(r as unknown as Record<string, unknown>, ["sentAt"]) as unknown as typeof r
     );
   }
   return p;
 }
 
 function hydrateTask(data: Record<string, unknown>): StorageScheduledTask {
-  return parseDates(data, ["runAt", "lockedAt", "completedAt", "cancelledAt", "createdAt", "updatedAt"]) as StorageScheduledTask;
+  return parseDates(data, ["runAt", "lockedAt", "completedAt", "cancelledAt", "createdAt", "updatedAt"]) as unknown as StorageScheduledTask;
 }
 
 function hydrateNotification(data: Record<string, unknown>): StorageNotification {
-  return parseDates(data, ["deliveredAt", "createdAt"]) as StorageNotification;
+  return parseDates(data, ["deliveredAt", "createdAt"]) as unknown as StorageNotification;
 }
 
 function hydratePriceHistory(data: Record<string, unknown>): StoragePriceHistory {
-  return parseDates(data, ["effectiveFrom", "createdAt"]) as StoragePriceHistory;
+  return parseDates(data, ["effectiveFrom", "createdAt"]) as unknown as StoragePriceHistory;
 }
 
 function hydrateUser(data: Record<string, unknown>): StorageUser {
-  const u = parseDates(data, ["emailVerified", "welcomeEmailSentAt", "createdAt", "updatedAt"]) as StorageUser;
+  const u = parseDates(data, ["emailVerified", "welcomeEmailSentAt", "createdAt", "updatedAt"]) as unknown as StorageUser;
   if (u.telegram) {
-    u.telegram = parseDates(u.telegram as unknown as Record<string, unknown>, ["linkedAt"]) as StorageUser["telegram"];
+    u.telegram = parseDates(u.telegram as unknown as Record<string, unknown>, ["linkedAt"]) as unknown as StorageUser["telegram"];
   }
   if (u.telegramLinkCode) {
-    u.telegramLinkCode = parseDates(u.telegramLinkCode as unknown as Record<string, unknown>, ["expiresAt"]) as StorageUser["telegramLinkCode"];
+    u.telegramLinkCode = parseDates(u.telegramLinkCode as unknown as Record<string, unknown>, ["expiresAt"]) as unknown as StorageUser["telegramLinkCode"];
   }
   return u;
 }
@@ -212,6 +214,43 @@ export class SqliteAdapter implements StorageAdapter {
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("foreign_keys = ON");
     this.db.exec(SCHEMA_SQL);
+    this.seedLocalAdmin();
+  }
+
+  // ensure the local admin user row exists (reads email/name from config)
+  private seedLocalAdmin(): void {
+    try {
+      const config = readConfig();
+      if (!config) return;
+
+      const existing = this.db
+        .prepare("SELECT id FROM users WHERE id = ?")
+        .get(LOCAL_ADMIN_USER_ID) as { id: string } | undefined;
+
+      const ts = new Date();
+      const user: StorageUser = {
+        id: LOCAL_ADMIN_USER_ID,
+        name: config.adminName ?? "Admin",
+        email: config.adminEmail ?? "admin@localhost",
+        role: "admin",
+        emailVerified: null,
+        image: null,
+        hashedPassword: null,
+        telegram: null,
+        telegramLinkCode: null,
+        notificationPreferences: {
+          email: !!config.notifications?.channels?.email,
+          telegram: !!config.notifications?.channels?.telegram,
+          reminderFrequency: "once",
+        },
+        welcomeEmailSentAt: null,
+        createdAt: existing ? ts : ts,
+        updatedAt: ts,
+      };
+      this.upsertUser(user);
+    } catch {
+      // config not available yet (e.g. during init) — skip silently
+    }
   }
 
   async close(): Promise<void> {

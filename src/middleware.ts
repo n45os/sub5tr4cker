@@ -1,27 +1,49 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { LOCAL_AUTH_COOKIE } from "@/lib/auth/local";
+
+const LOCAL_AUTH_COOKIE = "sub5tr4cker-local-auth";
 
 /** set pathname header so dashboard layout can redirect to login with callbackUrl */
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // in local mode: auto-authenticate by setting the auth cookie if the
-  // request comes from localhost and the SUB5TR4CKER_MODE env is "local"
+  // in local mode: auto-authenticate by setting the auth cookie
   if (process.env.SUB5TR4CKER_MODE === "local") {
     const authToken = process.env.SUB5TR4CKER_AUTH_TOKEN;
     if (authToken) {
       const existingToken = request.cookies.get(LOCAL_AUTH_COOKIE)?.value;
       if (!existingToken || existingToken !== authToken) {
-        // set the auth cookie on the first visit so the app is auto-logged in
+        // redirect once so the next request includes the cookie
+        if (!pathname.startsWith("/api/")) {
+          const url = request.nextUrl.clone();
+          const res = NextResponse.redirect(url);
+          res.headers.set("x-pathname", pathname);
+          res.cookies.set(LOCAL_AUTH_COOKIE, authToken, {
+            httpOnly: true,
+            sameSite: "lax",
+            path: "/",
+          });
+          return res;
+        }
+
         const res = NextResponse.next();
         res.headers.set("x-pathname", pathname);
         res.cookies.set(LOCAL_AUTH_COOKIE, authToken, {
           httpOnly: true,
           sameSite: "lax",
           path: "/",
-          // no expiry — session cookie that persists as long as the browser is open
         });
+        return res;
+      }
+
+      // keep auth screens out of the way in local single-user mode
+      if (pathname === "/login" || pathname === "/register") {
+        const url = request.nextUrl.clone();
+        const callbackUrl = url.searchParams.get("callbackUrl");
+        url.pathname = callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : "/dashboard";
+        url.search = "";
+        const res = NextResponse.redirect(url);
+        res.headers.set("x-pathname", pathname);
         return res;
       }
     }
@@ -33,5 +55,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/api/:path*"],
+  matcher: ["/", "/login", "/register", "/dashboard/:path*", "/api/:path*"],
 };

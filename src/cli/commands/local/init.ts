@@ -57,14 +57,16 @@ export async function runInitCommand(): Promise<void> {
     const apiKey = await p.text({
       message: "Resend API key",
       placeholder: "re_...",
-      validate: (v) => (v.startsWith("re_") ? undefined : "Resend API keys start with 're_'"),
+      validate: (v) =>
+        (v ?? "").startsWith("re_") ? undefined : "Resend API keys start with 're_'",
     });
     if (p.isCancel(apiKey)) { p.cancel("Setup cancelled."); process.exit(0); }
 
     const fromAddress = await p.text({
       message: "From address (e.g. Sub5tr4cker <noreply@yourdomain.com>)",
       placeholder: "Sub5tr4cker <noreply@example.com>",
-      validate: (v) => (v.includes("@") ? undefined : "Enter a valid email address or 'Name <email>'"),
+      validate: (v) =>
+        (v ?? "").includes("@") ? undefined : "Enter a valid email address or 'Name <email>'",
     });
     if (p.isCancel(fromAddress)) { p.cancel("Setup cancelled."); process.exit(0); }
 
@@ -84,7 +86,8 @@ export async function runInitCommand(): Promise<void> {
     const botToken = await p.text({
       message: "Telegram bot token",
       placeholder: "1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ",
-      validate: (v) => (v.includes(":") ? undefined : "Paste the full bot token from @BotFather"),
+      validate: (v) =>
+        (v ?? "").includes(":") ? undefined : "Paste the full bot token from @BotFather",
     });
     if (p.isCancel(botToken)) { p.cancel("Setup cancelled."); process.exit(0); }
 
@@ -95,7 +98,7 @@ export async function runInitCommand(): Promise<void> {
   const adminEmail = await p.text({
     message: "Your email address (used as the admin account)",
     placeholder: "you@example.com",
-    validate: (v) => (v.includes("@") ? undefined : "Enter a valid email address"),
+    validate: (v) => ((v ?? "").includes("@") ? undefined : "Enter a valid email address"),
   });
   if (p.isCancel(adminEmail)) { p.cancel("Setup cancelled."); process.exit(0); }
 

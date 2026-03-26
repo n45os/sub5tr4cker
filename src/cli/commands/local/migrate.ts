@@ -31,7 +31,9 @@ export async function runMigrateCommand(): Promise<void> {
     message: "MongoDB connection string",
     placeholder: "mongodb+srv://user:pass@cluster.mongodb.net/sub5tr4cker",
     validate: (v) =>
-      v.startsWith("mongodb") ? undefined : "Must start with mongodb:// or mongodb+srv://",
+      (v ?? "").startsWith("mongodb")
+        ? undefined
+        : "Must start with mongodb:// or mongodb+srv://",
   });
   if (p.isCancel(mongoUri)) { p.cancel("Migration cancelled."); process.exit(0); }
 

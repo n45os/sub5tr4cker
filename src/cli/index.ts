@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "fs";
+import { join } from "path";
 import { Command } from "commander";
 import { runConfigureCommand } from "@/cli/commands/configure";
 import {
@@ -15,6 +17,18 @@ import { runExportCommand, runImportCommand } from "@/cli/commands/local/export-
 import { runMigrateCommand } from "@/cli/commands/local/migrate";
 import { runCronInstallCommand } from "@/cli/commands/local/cron-install";
 import { runUninstallCommand } from "@/cli/commands/local/uninstall";
+import { getPackageRoot } from "@/cli/lib/pkg-root";
+
+function getVersion(): string {
+  // prefer the env var set by npm/pnpm run, fall back to reading package.json
+  if (process.env.npm_package_version) return process.env.npm_package_version;
+  try {
+    const pkg = JSON.parse(readFileSync(join(getPackageRoot(), "package.json"), "utf-8"));
+    return pkg.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
 
 async function main() {
   const program = new Command();
@@ -22,7 +36,7 @@ async function main() {
   program
     .name("s54r")
     .description("sub5tr4cker — manage shared subscriptions locally or self-hosted")
-    .version(process.env.npm_package_version ?? "0.0.0");
+    .version(getVersion());
 
   // ── local-first commands ───────────────────────────────────────────────────
 

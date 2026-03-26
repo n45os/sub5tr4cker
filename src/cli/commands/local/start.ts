@@ -32,6 +32,9 @@ export async function runStartCommand(options: { port?: number } = {}): Promise<
     SUB5TR4CKER_MODE: "local",
     SUB5TR4CKER_DATA_PATH: getDbPath(),
     SUB5TR4CKER_AUTH_TOKEN: config.authToken ?? "",
+    // Auth.js requires a secret even in local mode (where we bypass it);
+    // reuse the existing auth token so it never throws MissingSecret
+    AUTH_SECRET: config.authToken ?? "sub5tr4cker-local-fallback",
     PORT: String(port),
     HOSTNAME: "localhost",
     NEXTAUTH_URL: `http://localhost:${port}`,

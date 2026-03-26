@@ -26,7 +26,7 @@ export function getAdapter(): StorageAdapter {
     _adapter = new MongooseAdapter();
   }
 
-  return _adapter;
+  return _adapter!;
 }
 
 /**

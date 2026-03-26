@@ -47,6 +47,7 @@ export function buildLocalSession() {
       id: LOCAL_ADMIN_USER_ID,
       email: config?.adminEmail ?? "admin@localhost",
       name: config?.adminName ?? "Admin",
+      image: null,
       role: "admin" as const,
     },
     expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),

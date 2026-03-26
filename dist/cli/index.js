@@ -4138,6 +4138,16 @@ var init_types = __esm({
   }
 });
 
+// src/lib/auth/local.ts
+var LOCAL_ADMIN_USER_ID;
+var init_local = __esm({
+  "src/lib/auth/local.ts"() {
+    "use strict";
+    init_manager();
+    LOCAL_ADMIN_USER_ID = "local-admin";
+  }
+});
+
 // src/lib/storage/sqlite-adapter.ts
 var sqlite_adapter_exports = {};
 __export(sqlite_adapter_exports, {
@@ -4211,6 +4221,8 @@ var init_sqlite_adapter = __esm({
     "use strict";
     import_better_sqlite3 = __toESM(require("better-sqlite3"));
     import_nanoid = require("nanoid");
+    init_manager();
+    init_local();
     SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS groups (
     id TEXT PRIMARY KEY,
@@ -4302,6 +4314,37 @@ var init_sqlite_adapter = __esm({
         this.db.pragma("journal_mode = WAL");
         this.db.pragma("foreign_keys = ON");
         this.db.exec(SCHEMA_SQL);
+        this.seedLocalAdmin();
+      }
+      // ensure the local admin user row exists (reads email/name from config)
+      seedLocalAdmin() {
+        try {
+          const config = readConfig();
+          if (!config) return;
+          const existing = this.db.prepare("SELECT id FROM users WHERE id = ?").get(LOCAL_ADMIN_USER_ID);
+          const ts = /* @__PURE__ */ new Date();
+          const user = {
+            id: LOCAL_ADMIN_USER_ID,
+            name: config.adminName ?? "Admin",
+            email: config.adminEmail ?? "admin@localhost",
+            role: "admin",
+            emailVerified: null,
+            image: null,
+            hashedPassword: null,
+            telegram: null,
+            telegramLinkCode: null,
+            notificationPreferences: {
+              email: !!config.notifications?.channels?.email,
+              telegram: !!config.notifications?.channels?.telegram,
+              reminderFrequency: "once"
+            },
+            welcomeEmailSentAt: null,
+            createdAt: existing ? ts : ts,
+            updatedAt: ts
+          };
+          this.upsertUser(user);
+        } catch {
+        }
       }
       async close() {
         this.db?.close();
@@ -5066,6 +5109,8 @@ var init_enqueue_reminders = __esm({
 });
 
 // src/cli/index.ts
+var import_fs11 = require("fs");
+var import_path12 = require("path");
 var import_commander = require("commander");
 
 // src/cli/commands/configure.ts
@@ -5723,7 +5768,7 @@ async function runInitCommand() {
     const apiKey = await p.text({
       message: "Resend API key",
       placeholder: "re_...",
-      validate: (v) => v.startsWith("re_") ? void 0 : "Resend API keys start with 're_'"
+      validate: (v) => (v ?? "").startsWith("re_") ? void 0 : "Resend API keys start with 're_'"
     });
     if (p.isCancel(apiKey)) {
       p.cancel("Setup cancelled.");
@@ -5732,7 +5777,7 @@ async function runInitCommand() {
     const fromAddress = await p.text({
       message: "From address (e.g. Sub5tr4cker <noreply@yourdomain.com>)",
       placeholder: "Sub5tr4cker <noreply@example.com>",
-      validate: (v) => v.includes("@") ? void 0 : "Enter a valid email address or 'Name <email>'"
+      validate: (v) => (v ?? "").includes("@") ? void 0 : "Enter a valid email address or 'Name <email>'"
     });
     if (p.isCancel(fromAddress)) {
       p.cancel("Setup cancelled.");
@@ -5748,7 +5793,7 @@ async function runInitCommand() {
     const botToken2 = await p.text({
       message: "Telegram bot token",
       placeholder: "1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ",
-      validate: (v) => v.includes(":") ? void 0 : "Paste the full bot token from @BotFather"
+      validate: (v) => (v ?? "").includes(":") ? void 0 : "Paste the full bot token from @BotFather"
     });
     if (p.isCancel(botToken2)) {
       p.cancel("Setup cancelled.");
@@ -5759,7 +5804,7 @@ async function runInitCommand() {
   const adminEmail = await p.text({
     message: "Your email address (used as the admin account)",
     placeholder: "you@example.com",
-    validate: (v) => v.includes("@") ? void 0 : "Enter a valid email address"
+    validate: (v) => (v ?? "").includes("@") ? void 0 : "Enter a valid email address"
   });
   if (p.isCancel(adminEmail)) {
     p.cancel("Setup cancelled.");
@@ -5876,6 +5921,9 @@ async function runStartCommand(options = {}) {
     SUB5TR4CKER_MODE: "local",
     SUB5TR4CKER_DATA_PATH: getDbPath(),
     SUB5TR4CKER_AUTH_TOKEN: config.authToken ?? "",
+    // Auth.js requires a secret even in local mode (where we bypass it);
+    // reuse the existing auth token so it never throws MissingSecret
+    AUTH_SECRET: config.authToken ?? "sub5tr4cker-local-fallback",
     PORT: String(port),
     HOSTNAME: "localhost",
     NEXTAUTH_URL: `http://localhost:${port}`
@@ -6103,7 +6151,7 @@ async function runMigrateCommand() {
   const mongoUri = await p4.text({
     message: "MongoDB connection string",
     placeholder: "mongodb+srv://user:pass@cluster.mongodb.net/sub5tr4cker",
-    validate: (v) => v.startsWith("mongodb") ? void 0 : "Must start with mongodb:// or mongodb+srv://"
+    validate: (v) => (v ?? "").startsWith("mongodb") ? void 0 : "Must start with mongodb:// or mongodb+srv://"
   });
   if (p4.isCancel(mongoUri)) {
     p4.cancel("Migration cancelled.");
@@ -6468,9 +6516,18 @@ Are you sure?`,
 }
 
 // src/cli/index.ts
+function getVersion() {
+  if (process.env.npm_package_version) return process.env.npm_package_version;
+  try {
+    const pkg = JSON.parse((0, import_fs11.readFileSync)((0, import_path12.join)(getPackageRoot(), "package.json"), "utf-8"));
+    return pkg.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
 async function main() {
   const program = new import_commander.Command();
-  program.name("s54r").description("sub5tr4cker \u2014 manage shared subscriptions locally or self-hosted").version(process.env.npm_package_version ?? "0.0.0");
+  program.name("s54r").description("sub5tr4cker \u2014 manage shared subscriptions locally or self-hosted").version(getVersion());
   program.command("init").description("Set up local mode (SQLite + notification channels)").action(async () => {
     await runInitCommand();
   });

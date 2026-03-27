@@ -73,7 +73,7 @@ export interface PeriodRow {
 export interface MemberColumn {
   _id: string;
   nickname: string;
-  email: string;
+  email: string | null;
 }
 
 function effectiveAmount(payment: PaymentCell): number {

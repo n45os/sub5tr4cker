@@ -2,7 +2,7 @@ import type { StorageGroup, StorageGroupMember } from "@/lib/storage";
 
 export interface MemberShare {
   memberId: string;
-  email: string;
+  email: string | null;
   nickname: string;
   amount: number;
 }

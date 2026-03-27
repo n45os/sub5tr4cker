@@ -12,6 +12,10 @@ import {
   buildAggregatedPaymentReminderEmailHtml,
   buildAggregatedPaymentReminderTelegramText,
 } from "@/lib/email/templates/aggregated-payment-reminder";
+import {
+  getRecipientKey,
+  getRecipientLabel,
+} from "@/lib/notifications/member-email";
 
 export interface SendAggregatedReminderResult {
   emailSent: boolean;
@@ -54,7 +58,7 @@ type PaymentDoc = {
   id?: string;
   _id?: IdLike;
   memberId: IdLike;
-  memberEmail: string;
+  memberEmail: string | null;
   memberNickname: string;
   amount: number;
   adjustedAmount?: number | null;
@@ -71,10 +75,17 @@ export interface AggregatedPaymentInput {
   payment: PaymentDoc;
 }
 
+export interface AggregatedReminderRecipient {
+  memberId: string;
+  memberUserId?: string | null;
+  memberEmail?: string | null;
+  memberName: string;
+  recipientLabel?: string;
+}
+
 /** send one combined reminder for a user (same email) across multiple groups; respects user prefs */
 export async function sendAggregatedReminder(
-  memberEmail: string,
-  memberName: string,
+  recipient: AggregatedReminderRecipient,
   payments: AggregatedPaymentInput[],
   options?: { channelOverride?: ChannelOverride }
 ): Promise<SendAggregatedReminderResult> {
@@ -83,7 +94,11 @@ export async function sendAggregatedReminder(
   }
 
   const store = await db();
-  const user = await store.getUserByEmail(memberEmail);
+  const user = recipient.memberUserId
+    ? await store.getUser(recipient.memberUserId)
+    : recipient.memberEmail
+      ? await store.getUserByEmail(recipient.memberEmail)
+      : null;
 
   const sendEmail = user?.notificationPreferences?.email ?? true;
   const sendTelegram = !!(
@@ -142,7 +157,7 @@ export async function sendAggregatedReminder(
 
   const accentColor = entries[0]?.accentColor ?? null;
   const aggregatedTemplateParams = {
-    memberName,
+    memberName: recipient.memberName,
     entries,
     distinctGroupCount,
     distinctPeriodCount,
@@ -164,7 +179,7 @@ export async function sendAggregatedReminder(
     : undefined;
 
   const telegramText = buildAggregatedPaymentReminderTelegramText({
-    memberName,
+    memberName: recipient.memberName,
     entries,
     distinctGroupCount,
     distinctPeriodCount,
@@ -177,9 +192,17 @@ export async function sendAggregatedReminder(
 
   const result = await sendNotification(
     {
-      email: memberEmail,
+      email: user?.email ?? recipient.memberEmail ?? null,
       telegramChatId: user?.telegram?.chatId ?? null,
-        userId: user?.id ?? null,
+      userId: user?.id ?? null,
+      recipientLabel:
+        recipient.recipientLabel ??
+        getRecipientLabel({
+          memberId: recipient.memberId,
+          memberEmail: user?.email ?? recipient.memberEmail,
+          memberNickname: recipient.memberName,
+          memberUserId: user?.id ?? recipient.memberUserId ?? null,
+        }),
       preferences: {
         email: wantEmail,
         telegram: wantTelegram,

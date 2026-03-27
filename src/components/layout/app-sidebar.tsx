@@ -45,14 +45,15 @@ import { ThemeToggle } from "@/components/theme-toggle";
 const NAV_ITEMS = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Groups", href: "/dashboard/groups", icon: Users },
-  { title: "Activity", href: "/dashboard/activity", icon: Activity },
+  { title: "Delivery log", href: "/dashboard/activity", icon: Activity },
   {
-    title: "Scheduled tasks",
+    title: "Scheduled sends",
     href: "/dashboard/scheduled-tasks",
     icon: CalendarClock,
   },
   { title: "Payments", href: "/dashboard/payments", icon: Wallet },
   { title: "Notifications", href: "/dashboard/notifications", icon: Bell },
+  { title: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
 function isActive(pathname: string, href: string) {

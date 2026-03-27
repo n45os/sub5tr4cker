@@ -12,6 +12,7 @@ import {
   buildPaymentReminderEmailHtml,
   buildPaymentReminderTelegramText,
 } from "@/lib/email/templates/payment-reminder";
+import { getRecipientLabel } from "@/lib/notifications/member-email";
 
 export interface SendReminderResult {
   emailSent: boolean;
@@ -112,6 +113,12 @@ export async function sendReminderForPayment(
       email: payment.memberEmail,
       telegramChatId: user?.telegram?.chatId,
       userId: user?.id,
+      recipientLabel: getRecipientLabel({
+        memberId,
+        memberEmail: payment.memberEmail,
+        memberNickname: payment.memberNickname,
+        memberUserId: user?.id ?? member?.userId ?? null,
+      }),
       preferences: {
         email: sendEmail,
         telegram: sendTelegram,

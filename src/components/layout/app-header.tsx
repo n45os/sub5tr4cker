@@ -38,9 +38,9 @@ function getHeaderMeta(pathname: string) {
 
   if (pathname.startsWith("/dashboard/activity")) {
     return {
-      title: "Activity log",
+      title: "Delivery log",
       description:
-        "Sent notifications and scheduled reminder and follow-up runs.",
+        "Sent notifications, delivery history, and admin actions across your groups.",
     };
   }
 
@@ -53,8 +53,9 @@ function getHeaderMeta(pathname: string) {
 
   if (pathname.startsWith("/dashboard/notifications")) {
     return {
-      title: "Notification templates",
-      description: "Preview every email and Telegram touchpoint before it is sent.",
+      title: "Notifications hub",
+      description:
+        "Configure email and Telegram, preview templates, and jump to delivery tooling.",
     };
   }
 
@@ -74,8 +75,8 @@ function getHeaderMeta(pathname: string) {
 
   if (pathname.startsWith("/dashboard/scheduled-tasks")) {
     return {
-      title: "Scheduled tasks",
-      description: "Queued notification delivery — cancel, retry, or bulk cancel.",
+      title: "Scheduled sends",
+      description: "Queued notification delivery that you can review, retry, or cancel.",
     };
   }
 
@@ -97,7 +98,7 @@ function getBreadcrumbs(
   }
 
   if (parts[1] === "activity") {
-    breadcrumbs.push({ label: "Activity", href: "/dashboard/activity" });
+    breadcrumbs.push({ label: "Delivery log", href: "/dashboard/activity" });
   }
 
   if (parts[1] === "payments") {
@@ -106,14 +107,14 @@ function getBreadcrumbs(
 
   if (parts[1] === "scheduled-tasks") {
     breadcrumbs.push({
-      label: "Scheduled tasks",
+      label: "Scheduled sends",
       href: "/dashboard/scheduled-tasks",
     });
   }
 
   if (parts[1] === "notifications") {
     breadcrumbs.push({
-      label: "Notifications",
+      label: "Notifications hub",
       href: "/dashboard/notifications",
     });
   }

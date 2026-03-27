@@ -282,7 +282,7 @@ export default async function PaymentsPage({ searchParams }: PaymentsPageProps) 
                       <TableCell>
                         <span className="font-medium">{row.memberNickname}</span>
                         <span className="ml-1 text-muted-foreground">
-                          ({row.memberEmail})
+                          ({row.memberEmail || "Telegram only"})
                         </span>
                       </TableCell>
                       <TableCell className="text-right tabular-nums">

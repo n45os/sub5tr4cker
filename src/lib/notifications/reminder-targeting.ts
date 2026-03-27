@@ -10,7 +10,7 @@ export type SkipReason =
 export interface ReminderEligibility {
   paymentId: string;
   memberId: string;
-  memberEmail: string;
+  memberEmail: string | null;
   memberNickname: string;
   groupId: string;
   groupName: string;
@@ -57,7 +57,7 @@ export type PaymentLike = {
   id?: string;
   _id?: IdLike;
   memberId: IdLike;
-  memberEmail: string;
+  memberEmail: string | null;
   memberNickname: string;
   amount: number;
   status: string;
@@ -105,7 +105,10 @@ export async function getReminderEligibility(params: {
     user = u ? { telegram: u.telegram, notificationPreferences: u.notificationPreferences } : null;
   }
 
-  const sendEmail = !member?.unsubscribedFromEmail && (user?.notificationPreferences?.email ?? true);
+  const sendEmail =
+    !!payment.memberEmail &&
+    !member?.unsubscribedFromEmail &&
+    (user?.notificationPreferences?.email ?? true);
   const sendTelegram = !!(user?.telegram?.chatId && (user.notificationPreferences?.telegram ?? false));
   const skipReasons = getSkipReasons(member ?? undefined, user, sendEmail, sendTelegram);
 

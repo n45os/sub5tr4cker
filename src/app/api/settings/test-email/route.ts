@@ -13,6 +13,18 @@ export async function POST() {
     );
   }
 
+  if ((await getSetting("email.enabled")) === "false") {
+    return NextResponse.json(
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Email is disabled for this workspace",
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   const appUrl = (await getSetting("general.appUrl")) || "http://localhost:3054";
   const result = await sendEmail({
     to: session.user.email,

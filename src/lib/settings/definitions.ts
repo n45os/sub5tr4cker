@@ -29,6 +29,16 @@ export const settingsDefinitions: SettingsDefinition[] = [
     defaultValue: "http://localhost:3054",
   },
   {
+    key: "email.enabled",
+    category: "email",
+    label: "Enable email notifications",
+    description:
+      "Master switch for the email channel. Turn this off when this workspace should not send invites, reminders, or tests by email.",
+    isSecret: false,
+    envVar: "EMAIL_ENABLED",
+    defaultValue: "true",
+  },
+  {
     key: "email.apiKey",
     category: "email",
     label: "Resend API key",
@@ -55,6 +65,16 @@ export const settingsDefinitions: SettingsDefinition[] = [
       "Optional. When set, replies from members go here instead of the From address. Leave empty if you do not want a separate reply inbox.",
     isSecret: false,
     envVar: "EMAIL_REPLY_TO",
+  },
+  {
+    key: "telegram.enabled",
+    category: "telegram",
+    label: "Enable Telegram notifications",
+    description:
+      "Master switch for the Telegram channel. Turn this off when this workspace should not send Telegram reminders, nudges, or tests.",
+    isSecret: false,
+    envVar: "TELEGRAM_ENABLED",
+    defaultValue: "true",
   },
   {
     key: "telegram.botToken",

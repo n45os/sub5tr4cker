@@ -39,7 +39,8 @@ type SentItem =
       status: string;
       subject: string | null;
       preview: string;
-      recipientEmail: string;
+      recipientEmail: string | null;
+      recipientLabel: string;
       externalId: string | null;
       hasEmailParams: boolean;
       groupId: string | null;
@@ -385,7 +386,7 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps) 
                             </div>
                             <div className="flex flex-wrap items-baseline gap-2 text-sm">
                               <span className="text-muted-foreground">
-                                {item.recipientEmail}
+                                {item.recipientLabel}
                               </span>
                               {item.groupId && (
                                 <Link

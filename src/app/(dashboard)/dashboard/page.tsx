@@ -1,6 +1,15 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { Bell, CreditCard, Users } from "lucide-react";
+import {
+  Bell,
+  CalendarClock,
+  CreditCard,
+  Mail,
+  MessageCircle,
+  Settings2,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { AdminServicesTable } from "@/components/features/dashboard/admin-services-table";
 import { GroupCard } from "@/components/features/groups/GroupCard";
 import { AllGroupsQuickStatus } from "@/components/features/dashboard/all-groups-quick-status";
@@ -57,7 +66,7 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 overflow-x-hidden">
       <section className="grid gap-4 lg:grid-cols-[1.5fr_repeat(3,1fr)] *:min-w-0">
-        <Card className="border-border/70 bg-gradient-to-br from-card via-card to-muted/40 shadow-sm">
+        <Card className="border-border/70 bg-linear-to-br from-card via-card to-muted/40 shadow-sm">
           <CardHeader>
             <Badge variant="outline" className="w-fit">
               Ops snapshot
@@ -109,6 +118,106 @@ export default async function DashboardPage() {
           <AdminServicesTable groups={adminGroups} />
         </section>
       ) : null}
+
+      <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr] *:min-w-0">
+        <Card>
+          <CardHeader>
+            <CardTitle>Common admin actions</CardTitle>
+            <CardDescription>
+              Jump straight to the tasks you do most often without digging through the
+              sidebar.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {[
+              {
+                href: "/dashboard/groups/new",
+                title: "Create group",
+                description: "Add a new subscription and invite members",
+                icon: CreditCard,
+              },
+              {
+                href: "/dashboard/payments",
+                title: "Review payments",
+                description: "Check open balances and payment state",
+                icon: Wallet,
+              },
+              {
+                href: "/dashboard/activity",
+                title: "Open delivery log",
+                description: "See sent notifications and recent actions",
+                icon: Mail,
+              },
+              {
+                href: "/dashboard/scheduled-tasks",
+                title: "Scheduled sends",
+                description: "Inspect queued reminders and follow-ups",
+                icon: CalendarClock,
+              },
+              {
+                href: "/dashboard/notifications",
+                title: "Notifications hub",
+                description: "Manage email, Telegram, and templates",
+                icon: MessageCircle,
+              },
+              {
+                href: "/dashboard/settings",
+                title: "Workspace settings",
+                description: "Open app URL, secrets, cron, and plugins",
+                icon: Settings2,
+              },
+            ].map((item) => (
+              <Link key={item.href} href={item.href} className="block">
+                <div className="flex h-full flex-col gap-2 rounded-2xl border border-border/70 bg-muted/20 p-4 transition-colors hover:bg-muted/35">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <item.icon className="size-4 text-muted-foreground" />
+                    {item.title}
+                  </div>
+                  <p className="text-sm text-muted-foreground">{item.description}</p>
+                </div>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Hidden no more</CardTitle>
+            <CardDescription>
+              The parts of the workspace admins kept having to hunt for.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <Link
+              href="/dashboard/activity"
+              className="rounded-2xl border border-border/70 bg-background/80 p-4 transition-colors hover:bg-muted/25"
+            >
+              <p className="text-sm font-medium">Delivery log</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Sent notifications, failures, previews, and admin actions.
+              </p>
+            </Link>
+            <Link
+              href="/dashboard/scheduled-tasks"
+              className="rounded-2xl border border-border/70 bg-background/80 p-4 transition-colors hover:bg-muted/25"
+            >
+              <p className="text-sm font-medium">Scheduled sends</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Review upcoming or stuck reminder tasks before they become invisible.
+              </p>
+            </Link>
+            <Link
+              href="/dashboard/notifications"
+              className="rounded-2xl border border-border/70 bg-background/80 p-4 transition-colors hover:bg-muted/25"
+            >
+              <p className="text-sm font-medium">Notifications hub</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Configure channels and preview templates from one screen.
+              </p>
+            </Link>
+          </CardContent>
+        </Card>
+      </section>
 
       <section>
         <AllGroupsQuickStatus />

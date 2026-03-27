@@ -11,7 +11,7 @@ import { calculateShares, getNextPeriodStart } from "@/lib/billing/calculator";
 import { db, isStorageId, type StorageGroupMember } from "@/lib/storage";
 
 const addMemberSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().email().nullable(),
   nickname: z.string().min(1).max(100),
   customAmount: z.number().positive().optional().nullable(),
   billingStartsAt: z.string().optional().nullable(),
@@ -68,10 +68,16 @@ export async function POST(
   }
 
   const { email, nickname, customAmount, billingStartsAt } = parsed.data;
-  const existing = group.members.find(
-    (m: StorageGroupMember) =>
-      m.email.toLowerCase() === email.toLowerCase() && m.isActive && !m.leftAt
-  );
+  const normalizedEmail = email?.trim().toLowerCase() || null;
+  const existing = normalizedEmail
+    ? group.members.find(
+        (m: StorageGroupMember) =>
+          !!m.email &&
+          m.email.toLowerCase() === normalizedEmail &&
+          m.isActive &&
+          !m.leftAt
+      )
+    : null;
   if (existing) {
     return NextResponse.json(
       {
@@ -93,7 +99,7 @@ export async function POST(
   const newMember: StorageGroupMember = {
     id: nanoid(),
     userId: null,
-    email,
+    email: normalizedEmail,
     nickname,
     customAmount: customAmount ?? null,
     role: "member",
@@ -114,7 +120,7 @@ export async function POST(
   let creditSummary: Array<{
     memberId: string;
     memberNickname: string;
-    memberEmail: string;
+    memberEmail: string | null;
     totalCredit: number;
     periods: Array<{
       periodId: string;

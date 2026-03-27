@@ -104,6 +104,7 @@ export async function POST(
     );
   }
 
+  const senderLabel = memberEmail || "Telegram-only member";
   const subjectLine = subject || `Message from ${memberNickname}`;
   const emailHtml = `
     <!DOCTYPE html>
@@ -115,9 +116,9 @@ export async function POST(
           <h1 style="margin: 0; font-size: 20px;">Message from member</h1>
         </div>
         <div style="padding: 24px;">
-          <p><strong>${memberNickname}</strong> (${memberEmail}) sent a message about <strong>${group.name}</strong>:</p>
+          <p><strong>${memberNickname}</strong> (${senderLabel}) sent a message about <strong>${group.name}</strong>:</p>
           <div style="background: #f8fafc; border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 4px; margin: 16px 0; white-space: pre-wrap;">${message}</div>
-          <p style="color: #94a3b8; font-size: 12px;">Reply directly to this member at ${memberEmail}.</p>
+          <p style="color: #94a3b8; font-size: 12px;">${memberEmail ? `Reply directly to this member at ${memberEmail}.` : "This member does not have an email address on file."}</p>
         </div>
       </div>
     </body>
@@ -126,7 +127,7 @@ export async function POST(
 
   const telegramText =
     `📩 <b>Member message</b>\n\n` +
-    `<b>${memberNickname}</b> (${memberEmail})\n` +
+    `<b>${memberNickname}</b> (${senderLabel})\n` +
     `Group: <b>${group.name}</b>\n\n` +
     `${message}`;
 

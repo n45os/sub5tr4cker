@@ -42,7 +42,7 @@ const createGroupSchema = z.object({
   members: z
     .array(
       z.object({
-        email: z.string().email(),
+        email: z.string().trim().email().nullable(),
         nickname: z.string().min(1).max(100),
         customAmount: z.number().positive().optional().nullable(),
       })
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
   const members = body.members.map((m) => ({
     id: nanoid(),
     userId: null,
-    email: m.email,
+    email: m.email?.trim().toLowerCase() || null,
     nickname: m.nickname,
     customAmount: m.customAmount ?? null,
     role: "member" as const,

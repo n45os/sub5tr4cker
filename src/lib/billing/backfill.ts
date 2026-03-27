@@ -14,7 +14,7 @@ export interface MemberCreditPeriod {
 export interface MemberCredit {
   memberId: string;
   memberNickname: string;
-  memberEmail: string;
+  memberEmail: string | null;
   totalCredit: number;
   periods: MemberCreditPeriod[];
 }
@@ -159,7 +159,7 @@ export async function backfillMemberIntoPeriods(
   let backfilledCount = 0;
   const creditByMemberId = new Map<
     string,
-    { memberNickname: string; memberEmail: string; periods: MemberCreditPeriod[] }
+    { memberNickname: string; memberEmail: string | null; periods: MemberCreditPeriod[] }
   >();
 
   for (const period of periods) {

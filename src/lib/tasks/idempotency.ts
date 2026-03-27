@@ -14,7 +14,7 @@ export function buildIdempotencyKey(
     case "payment_reminder":
       return `payment_reminder:${payload.billingPeriodId}:${payload.paymentId}:${day}`;
     case "aggregated_payment_reminder":
-      return `aggregated_payment_reminder:${payload.memberEmail ?? ""}:${day}`;
+      return `aggregated_payment_reminder:${payload.recipientKey ?? payload.memberEmail ?? payload.memberId ?? ""}:${day}`;
     case "admin_confirmation_request":
       return `admin_confirmation_request:${payload.groupId}:${payload.billingPeriodId}:${day}`;
     default: {

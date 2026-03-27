@@ -29,7 +29,7 @@ User ──┬── owns ──── Group ──── has many ──── 
 
 ## BillingPeriod
 
-- **Fields**: group (ref), periodStart, collectionOpensAt (when unpaid tracking opens; legacy rows may omit — treat as periodStart), periodEnd, periodLabel, totalPrice, currency, payments (array of { memberId, memberEmail, memberNickname, amount, status, memberConfirmedAt, adminConfirmedAt, confirmationToken, notes }), reminders (array of { sentAt, channel, recipientCount, type }), isFullyPaid, timestamps.
+- **Fields**: group (ref), periodStart, collectionOpensAt (when unpaid tracking opens; legacy rows may omit — treat as periodStart), periodEnd, periodLabel, totalPrice, currency, payments (array of { memberId, memberEmail?: string | null, memberNickname, amount, status, memberConfirmedAt, adminConfirmedAt, confirmationToken, notes }), reminders (array of { sentAt, channel, recipientCount, type }), isFullyPaid, timestamps.
 - **Payment statuses**: pending, member_confirmed, confirmed, overdue, waived.
 - **Indexes**: (group, periodStart) unique, payments.status, payments.confirmationToken (sparse).
 
@@ -40,14 +40,14 @@ User ──┬── owns ──── Group ──── has many ──── 
 
 ## Notification
 
-- **Fields**: recipient (ref User), recipientEmail, group (ref), billingPeriod (ref), type, channel (email | telegram), status (sent | failed | pending), subject, preview, emailParams (optional Mixed; template args when the group has saveEmailParams for activity email preview), externalId, error, deliveredAt, timestamps.
+- **Fields**: recipient (ref User), recipientEmail (nullable), recipientLabel, group (ref), billingPeriod (ref), type, channel (email | telegram), status (sent | failed | pending), subject, preview, emailParams (optional Mixed; template args when the group has saveEmailParams for activity email preview), externalId, error, deliveredAt, timestamps.
 - **Types**: payment_reminder, payment_confirmed, admin_confirmation_request, price_change, price_adjustment, announcement, invite, follow_up, member_message.
 
 ## ScheduledTask
 
 Queue for notification delivery. Producers enqueue tasks; a worker claims and executes them.
 
-- **Fields**: type (`payment_reminder` | `aggregated_payment_reminder` | `admin_confirmation_request` only), status (pending | locked | completed | failed | cancelled), runAt, lockedAt, lockedBy, attempts, maxAttempts, lastError, completedAt, cancelledAt, idempotencyKey, payload (groupId, billingPeriodId, memberId, paymentId; for aggregated_payment_reminder: memberEmail, payments[]), timestamps.
+- **Fields**: type (`payment_reminder` | `aggregated_payment_reminder` | `admin_confirmation_request` only), status (pending | locked | completed | failed | cancelled), runAt, lockedAt, lockedBy, attempts, maxAttempts, lastError, completedAt, cancelledAt, idempotencyKey, payload (groupId, billingPeriodId, memberId, paymentId; for aggregated_payment_reminder: memberEmail?, recipientKey, recipientLabel, payments[]), timestamps.
 - **Lifecycle**: pending → locked (on claim) → completed or failed; failed tasks retry with backoff; admins can set cancelled; worker skips sends if payment is no longer unpaid at execution time.
 
 ## Confirmation token

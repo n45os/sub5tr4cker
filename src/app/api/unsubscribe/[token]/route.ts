@@ -38,7 +38,7 @@ export async function GET(
   await store.updateGroup(group.id, { members });
 
   const memberNickname = memberBefore.nickname;
-  const memberEmail = memberBefore.email;
+  const memberEmail = memberBefore.email ?? "no email";
   const groupName = group.name;
 
   const admin = await store.getUser(group.adminId);

@@ -26,7 +26,7 @@ export interface PaymentRow {
   groupName: string;
   memberId: string;
   memberNickname: string;
-  memberEmail: string;
+  memberEmail: string | null;
   amount: number;
   currency: string;
   status: PaymentStatus;

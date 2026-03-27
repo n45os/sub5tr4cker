@@ -24,7 +24,7 @@ import { getServerBaseUrl } from "@/lib/server-url";
 
 interface MemberRow {
   _id: string;
-  email: string;
+  email: string | null;
   nickname: string;
   role: string;
   customAmount: number | null;
@@ -96,7 +96,7 @@ interface NotificationItem {
   status: string;
   subject: string | null;
   preview: string;
-  recipientEmail: string;
+  recipientLabel: string;
   createdAt: string;
 }
 
@@ -244,7 +244,9 @@ export default async function GroupDetailPage({
           groupName={group.name}
           memberCount={memberCount}
           initializedAt={group.initializedAt}
-          memberEmails={members.map((m) => m.email)}
+          memberEmails={members
+            .map((m) => m.email)
+            .filter((email): email is string => Boolean(email))}
           currency={group.billing.currency}
         />
       </div>
@@ -348,6 +350,13 @@ export default async function GroupDetailPage({
         </div>
       )}
 
+      <CollapsibleNotificationsPanel
+        groupId={groupId}
+        isAdmin
+        initialPreferences={group.notifications}
+        recentNotifications={notifications}
+      />
+
       <GroupMembersPanel
         groupId={groupId}
         members={members}
@@ -444,12 +453,6 @@ export default async function GroupDetailPage({
         <InviteLinkCard groupId={groupId} />
       </section>
 
-      <CollapsibleNotificationsPanel
-        groupId={groupId}
-        isAdmin
-        initialPreferences={group.notifications}
-        recentNotifications={notifications}
-      />
     </div>
   );
 }

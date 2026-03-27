@@ -457,7 +457,7 @@ var init_group = __esm({
     import_mongoose3 = __toESM(require("mongoose"));
     groupMemberSchema = new import_mongoose3.Schema({
       user: { type: import_mongoose3.Schema.Types.ObjectId, ref: "User", default: null },
-      email: { type: String, required: true },
+      email: { type: String, default: null },
       nickname: { type: String, required: true },
       role: { type: String, enum: ["member", "admin"], default: "member" },
       joinedAt: { type: Date, default: Date.now },
@@ -551,7 +551,7 @@ var init_billing_period = __esm({
     import_mongoose4 = __toESM(require("mongoose"));
     memberPaymentSchema = new import_mongoose4.Schema({
       memberId: { type: import_mongoose4.Schema.Types.ObjectId, required: true },
-      memberEmail: { type: String, required: true },
+      memberEmail: { type: String, default: null },
       memberNickname: { type: String, required: true },
       amount: { type: Number, required: true },
       adjustedAmount: { type: Number, default: null },
@@ -635,7 +635,8 @@ var init_notification = __esm({
           ref: "User",
           default: null
         },
-        recipientEmail: { type: String, required: true },
+        recipientEmail: { type: String, default: null },
+        recipientLabel: { type: String, required: true },
         group: { type: import_mongoose6.Schema.Types.ObjectId, ref: "Group", default: null },
         billingPeriod: {
           type: import_mongoose6.Schema.Types.ObjectId,
@@ -834,16 +835,25 @@ var init_definitions = __esm({
         key: "general.appUrl",
         category: "general",
         label: "App URL",
-        description: "Base URL used for links in emails, redirects, and callbacks.",
+        description: "Public base URL of this deployment (scheme + host, no trailing slash). Used for links in emails, Telegram deep links, redirects, and Telegram webhook registration. Wrong value means broken links or callbacks for users.",
         isSecret: false,
         envVar: "APP_URL",
         defaultValue: "http://localhost:3054"
       },
       {
+        key: "email.enabled",
+        category: "email",
+        label: "Enable email notifications",
+        description: "Master switch for the email channel. Turn this off when this workspace should not send invites, reminders, or tests by email.",
+        isSecret: false,
+        envVar: "EMAIL_ENABLED",
+        defaultValue: "true"
+      },
+      {
         key: "email.apiKey",
         category: "email",
         label: "Resend API key",
-        description: "API key used to send transactional emails through Resend.",
+        description: "Resend API key for sending transactional mail (reminders, confirmations, invites). Required for email channel; without it, email sends fail.",
         isSecret: true,
         envVar: "RESEND_API_KEY"
       },
@@ -851,7 +861,7 @@ var init_definitions = __esm({
         key: "email.fromAddress",
         category: "email",
         label: "From address",
-        description: "Sender address shown on outgoing emails (e.g. SubsTrack <noreply@yourdomain.com>).",
+        description: "Sender shown on outgoing mail (e.g. SubsTrack <noreply@yourdomain.com>). Must be a domain or address Resend lets you send from.",
         isSecret: false,
         envVar: "EMAIL_FROM",
         defaultValue: "sub5tr4cker <noreply@example.com>"
@@ -860,15 +870,24 @@ var init_definitions = __esm({
         key: "email.replyToAddress",
         category: "email",
         label: "Reply-to address",
-        description: "Optional reply-to address so recipients can reply to a specific inbox.",
+        description: "Optional. When set, replies from members go here instead of the From address. Leave empty if you do not want a separate reply inbox.",
         isSecret: false,
         envVar: "EMAIL_REPLY_TO"
+      },
+      {
+        key: "telegram.enabled",
+        category: "telegram",
+        label: "Enable Telegram notifications",
+        description: "Master switch for the Telegram channel. Turn this off when this workspace should not send Telegram reminders, nudges, or tests.",
+        isSecret: false,
+        envVar: "TELEGRAM_ENABLED",
+        defaultValue: "true"
       },
       {
         key: "telegram.botToken",
         category: "telegram",
         label: "Telegram bot token",
-        description: "BotFather token used to receive webhook updates and send messages.",
+        description: "Token from @BotFather. The app uses it to call Telegram (send messages, set webhook). Treat like a password; anyone with it can impersonate your bot.",
         isSecret: true,
         envVar: "TELEGRAM_BOT_TOKEN"
       },
@@ -876,7 +895,7 @@ var init_definitions = __esm({
         key: "telegram.webhookSecret",
         category: "telegram",
         label: "Telegram webhook secret",
-        description: "Secret token used to validate webhook calls from Telegram.",
+        description: "Optional but recommended in production. Telegram sends this on webhook requests; the app checks it so random clients cannot POST fake updates to your webhook URL.",
         isSecret: true,
         envVar: "TELEGRAM_WEBHOOK_SECRET"
       },
@@ -884,7 +903,7 @@ var init_definitions = __esm({
         key: "notifications.aggregateReminders",
         category: "notifications",
         label: "Aggregate automated reminders by user",
-        description: "When enabled, cron reminders group members by email (one notification per user). Dashboard 'Notify all unpaid' always sends one combined reminder per member email.",
+        description: "When on, cron-driven reminders group all unpaid lines per member email into one message. Dashboard \u201CNotify all unpaid\u201D always sends one combined reminder per member email regardless of this toggle.",
         isSecret: false,
         envVar: "AGGREGATE_REMINDERS",
         defaultValue: "false"
@@ -893,7 +912,7 @@ var init_definitions = __esm({
         key: "security.confirmationSecret",
         category: "security",
         label: "Confirmation token secret",
-        description: "Secret used to sign member payment confirmation links.",
+        description: "Server-only key used to HMAC-sign payment confirmation and related links (e.g. \u201CI paid\u201D, magic login, invite accept). Keeps tokens unforgeable. If you change it, tokens already sent in old emails stop validating.",
         isSecret: true,
         envVar: "CONFIRMATION_SECRET"
       },
@@ -901,7 +920,7 @@ var init_definitions = __esm({
         key: "security.telegramLinkSecret",
         category: "security",
         label: "Telegram link secret",
-        description: "Secret used to sign Telegram account-link tokens.",
+        description: "Signs short-lived tokens in \u201Clink my Telegram\u201D and similar URLs. If unset, the app falls back to the confirmation secret so one secret can cover both. Rotate independently if you want Telegram link URLs invalidated without touching email confirmation links.",
         isSecret: true,
         envVar: "TELEGRAM_LINK_SECRET"
       },
@@ -909,7 +928,7 @@ var init_definitions = __esm({
         key: "security.cronSecret",
         category: "cron",
         label: "Cron secret",
-        description: "Shared secret required by protected cron endpoints.",
+        description: "Your scheduler (cron, GitHub Actions, etc.) must send header x-cron-secret with this value when POSTing to /api/cron/* routes. Stops anonymous internet traffic from running billing, reminder enqueue, or the notification worker.",
         isSecret: true,
         envVar: "CRON_SECRET"
       }
@@ -985,7 +1004,7 @@ function memberToStorage(m) {
   return {
     id: toId(m._id),
     userId: toIdOrNull(m.user),
-    email: m.email,
+    email: m.email ?? null,
     nickname: m.nickname,
     role: m.role,
     joinedAt: m.joinedAt,
@@ -1054,7 +1073,7 @@ function paymentToStorage(p7) {
   return {
     id: toId(p7._id),
     memberId: toId(p7.memberId),
-    memberEmail: p7.memberEmail,
+    memberEmail: p7.memberEmail ?? null,
     memberNickname: p7.memberNickname,
     amount: p7.amount,
     adjustedAmount: p7.adjustedAmount,
@@ -1093,7 +1112,8 @@ function notificationToStorage(n) {
   return {
     id: toId(n._id),
     recipientId: toIdOrNull(n.recipient),
-    recipientEmail: n.recipientEmail,
+    recipientEmail: n.recipientEmail ?? null,
+    recipientLabel: n.recipientLabel,
     groupId: toIdOrNull(n.group),
     billingPeriodId: toIdOrNull(n.billingPeriod),
     type: n.type,
@@ -1324,12 +1344,12 @@ var init_mongoose_adapter = __esm({
             { "members.user": userId },
             { "members.email": email, "members.isActive": true }
           ]
-        }).lean();
+        }).lean().exec();
         return groups.map(groupToStorage);
       }
       async listAllActiveGroups() {
         await dbConnect();
-        const groups = await Group.find({ isActive: true }).lean();
+        const groups = await Group.find({ isActive: true }).lean().exec();
         return groups.map(groupToStorage);
       }
       async updateGroup(id, data) {
@@ -1550,7 +1570,8 @@ var init_mongoose_adapter = __esm({
         await dbConnect();
         const n = await Notification.create({
           recipient: data.recipientId ? new import_mongoose10.Types.ObjectId(data.recipientId) : null,
-          recipientEmail: data.recipientEmail,
+          recipientEmail: data.recipientEmail ?? null,
+          recipientLabel: data.recipientLabel,
           group: data.groupId ? new import_mongoose10.Types.ObjectId(data.groupId) : null,
           billingPeriod: data.billingPeriodId ? new import_mongoose10.Types.ObjectId(data.billingPeriodId) : null,
           type: data.type,
@@ -2495,7 +2516,7 @@ var init_sqlite_adapter = __esm({
         return groups.filter((g) => {
           if (g.adminId === userId) return true;
           return g.members.some(
-            (m) => m.isActive && (m.userId === userId || m.email.toLowerCase() === email.toLowerCase())
+            (m) => m.isActive && (m.userId === userId || !!m.email && m.email.toLowerCase() === email.toLowerCase())
           );
         });
       }
@@ -2707,7 +2728,8 @@ var init_sqlite_adapter = __esm({
         const notif = {
           id,
           recipientId: data.recipientId ?? null,
-          recipientEmail: data.recipientEmail,
+          recipientEmail: data.recipientEmail ?? null,
+          recipientLabel: data.recipientLabel,
           groupId: data.groupId ?? null,
           billingPeriodId: data.billingPeriodId ?? null,
           type: data.type,
@@ -3447,6 +3469,49 @@ var init_tokens = __esm({
   }
 });
 
+// src/lib/public-app-url.ts
+function normalizeAppUrl(appUrl) {
+  const value = appUrl?.trim();
+  return value ? value.replace(/\/$/, "") : null;
+}
+function isPrivateIpv4(hostname) {
+  const parts = hostname.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return false;
+  }
+  const [a, b] = parts;
+  if (a === 10 || a === 127) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  return a === 0;
+}
+function isLocalHostname(hostname) {
+  const normalized = hostname.trim().toLowerCase();
+  if (!normalized) return true;
+  if (normalized === "localhost" || normalized === "::1" || normalized === "[::1]") {
+    return true;
+  }
+  if (normalized.endsWith(".local")) {
+    return true;
+  }
+  return isPrivateIpv4(normalized);
+}
+function isPublicAppUrl(appUrl) {
+  const normalized = normalizeAppUrl(appUrl);
+  if (!normalized) return false;
+  try {
+    const url = new URL(normalized);
+    return !isLocalHostname(url.hostname);
+  } catch {
+    return false;
+  }
+}
+var init_public_app_url = __esm({
+  "src/lib/public-app-url.ts"() {
+    "use strict";
+  }
+});
+
 // src/lib/tasks/idempotency.ts
 function buildIdempotencyKey(type, payload, runAt) {
   const day = runAt.toISOString().slice(0, 10);
@@ -3454,7 +3519,7 @@ function buildIdempotencyKey(type, payload, runAt) {
     case "payment_reminder":
       return `payment_reminder:${payload.billingPeriodId}:${payload.paymentId}:${day}`;
     case "aggregated_payment_reminder":
-      return `aggregated_payment_reminder:${payload.memberEmail ?? ""}:${day}`;
+      return `aggregated_payment_reminder:${payload.recipientKey ?? payload.memberEmail ?? payload.memberId ?? ""}:${day}`;
     case "admin_confirmation_request":
       return `admin_confirmation_request:${payload.groupId}:${payload.billingPeriodId}:${day}`;
     default: {
@@ -3479,6 +3544,9 @@ __export(queue_exports, {
   getTaskCounts: () => getTaskCounts,
   releaseTask: () => releaseTask
 });
+function taskIdOf(task) {
+  return task.id ?? task._id ?? "";
+}
 async function enqueueTask(input) {
   const store = await db();
   const idempotencyKey = buildIdempotencyKey(
@@ -3504,18 +3572,18 @@ async function claimTasks(workerId, options = {}) {
 }
 async function completeTask(task) {
   const store = await db();
-  await store.completeTask(task.id);
+  await store.completeTask(taskIdOf(task));
 }
 async function failTask(task, error) {
   const errMessage = error instanceof Error ? error.message : String(error);
   const attempts = (task.attempts ?? 0) + 1;
   const maxAttempts = task.maxAttempts ?? 5;
   const store = await db();
-  await store.failTask(task.id, errMessage, attempts, maxAttempts);
+  await store.failTask(taskIdOf(task), errMessage, attempts, maxAttempts);
 }
 async function releaseTask(task) {
   const store = await db();
-  await store.releaseTask(task.id);
+  await store.releaseTask(taskIdOf(task));
 }
 async function getTaskCounts() {
   const store = await db();
@@ -3912,7 +3980,8 @@ function createEmailChannel() {
     name: "Email",
     isBuiltIn: true,
     async send(target, message) {
-      if (!target.email || target.preferences?.email === false) {
+      const enabled = await getSetting("email.enabled") !== "false";
+      if (!enabled || !target.email || target.preferences?.email === false) {
         return { sent: false, skipped: true };
       }
       const result = await sendEmail({
@@ -3930,7 +3999,7 @@ function createTelegramChannel() {
     name: "Telegram",
     isBuiltIn: true,
     async send(target, message) {
-      const enabled = await isTelegramEnabled();
+      const enabled = await getSetting("telegram.enabled") !== "false" && await isTelegramEnabled();
       if (!enabled || !target.telegramChatId || target.preferences?.telegram === false) {
         return { sent: false, skipped: true };
       }
@@ -4007,6 +4076,37 @@ var init_channels = __esm({
   }
 });
 
+// src/lib/notifications/member-email.ts
+function normalizeMemberEmailForAggregation(email) {
+  return (email ?? "").trim().toLowerCase();
+}
+function getRecipientKey(identity) {
+  if (identity.memberUserId) {
+    return `user:${identity.memberUserId}`;
+  }
+  const normalizedEmail = normalizeMemberEmailForAggregation(identity.memberEmail);
+  if (normalizedEmail) {
+    return `email:${normalizedEmail}`;
+  }
+  return `member:${identity.memberId}`;
+}
+function getRecipientLabel(identity) {
+  const email = identity.memberEmail?.trim();
+  if (email) {
+    return email;
+  }
+  const nickname = identity.memberNickname?.trim();
+  if (nickname) {
+    return `${nickname} (Telegram only)`;
+  }
+  return `member ${identity.memberId}`;
+}
+var init_member_email = __esm({
+  "src/lib/notifications/member-email.ts"() {
+    "use strict";
+  }
+});
+
 // src/lib/notifications/service.ts
 async function sendNotification(target, content) {
   const result = {
@@ -4022,11 +4122,12 @@ async function sendNotification(target, content) {
     telegramKeyboard: content.telegramKeyboard
   };
   const targetPayload = {
-    email: target.email,
+    email: target.email ?? null,
     telegramChatId: target.telegramChatId ?? null,
     userId: target.userId ?? null,
     preferences: target.preferences
   };
+  const recipientLabel = target.recipientLabel ?? target.email ?? (target.telegramChatId ? `telegram:${target.telegramChatId}` : "unknown recipient");
   const context = {
     groupId: content.groupId,
     billingPeriodId: content.billingPeriodId
@@ -4040,7 +4141,8 @@ async function sendNotification(target, content) {
       result.email.id = sendResult.externalId ?? void 0;
       if (attempted) {
         await logNotification({
-          recipientEmail: target.email,
+          recipientEmail: target.email ?? null,
+          recipientLabel,
           recipientId: target.userId,
           channel: "email",
           type: content.type,
@@ -4058,7 +4160,8 @@ async function sendNotification(target, content) {
       result.telegram.messageId = sendResult.externalId ? Number(sendResult.externalId) : void 0;
       if (attempted) {
         await logNotification({
-          recipientEmail: target.email,
+          recipientEmail: target.email ?? null,
+          recipientLabel,
           recipientId: target.userId,
           channel: "telegram",
           type: content.type,
@@ -4079,7 +4182,8 @@ async function logNotification(params) {
     const store = await db();
     const input = {
       recipientId: params.recipientId ?? null,
-      recipientEmail: params.recipientEmail,
+      recipientEmail: params.recipientEmail ?? null,
+      recipientLabel: params.recipientLabel,
       groupId: params.groupId ?? null,
       billingPeriodId: params.billingPeriodId ?? null,
       type: params.type,
@@ -4104,6 +4208,7 @@ var init_service2 = __esm({
     init_storage();
     init_tokens();
     init_channels();
+    init_member_email();
   }
 });
 
@@ -4134,7 +4239,7 @@ async function getReminderEligibility(params) {
     const u = await store.getUser(memberUserId);
     user = u ? { telegram: u.telegram, notificationPreferences: u.notificationPreferences } : null;
   }
-  const sendEmail2 = !member?.unsubscribedFromEmail && (user?.notificationPreferences?.email ?? true);
+  const sendEmail2 = !!payment.memberEmail && !member?.unsubscribedFromEmail && (user?.notificationPreferences?.email ?? true);
   const sendTelegram = !!(user?.telegram?.chatId && (user.notificationPreferences?.telegram ?? false));
   const skipReasons = getSkipReasons(member ?? void 0, user, sendEmail2, sendTelegram);
   return {
@@ -4322,6 +4427,12 @@ async function sendReminderForPayment(group, period, payment, options) {
       email: payment.memberEmail,
       telegramChatId: user?.telegram?.chatId,
       userId: user?.id,
+      recipientLabel: getRecipientLabel({
+        memberId,
+        memberEmail: payment.memberEmail,
+        memberNickname: payment.memberNickname,
+        memberUserId: user?.id ?? member?.userId ?? null
+      }),
       preferences: {
         email: sendEmail2,
         telegram: sendTelegram
@@ -4361,6 +4472,7 @@ var init_reminder_send = __esm({
     init_keyboards();
     init_tokens();
     init_payment_reminder();
+    init_member_email();
   }
 });
 
@@ -4467,12 +4579,12 @@ var init_aggregated_payment_reminder = __esm({
 function asId3(value) {
   return value == null ? "" : value.toString();
 }
-async function sendAggregatedReminder(memberEmail, memberName, payments, options) {
+async function sendAggregatedReminder(recipient, payments, options) {
   if (payments.length === 0) {
     return { emailSent: false, telegramSent: false };
   }
   const store = await db();
-  const user = await store.getUserByEmail(memberEmail);
+  const user = recipient.memberUserId ? await store.getUser(recipient.memberUserId) : recipient.memberEmail ? await store.getUserByEmail(recipient.memberEmail) : null;
   const sendEmail2 = user?.notificationPreferences?.email ?? true;
   const sendTelegram = !!(user?.telegram?.chatId && (user.notificationPreferences?.telegram ?? false));
   let wantEmail = sendEmail2;
@@ -4521,7 +4633,7 @@ async function sendAggregatedReminder(memberEmail, memberName, payments, options
   ) : null;
   const accentColor = entries[0]?.accentColor ?? null;
   const aggregatedTemplateParams = {
-    memberName,
+    memberName: recipient.memberName,
     entries,
     distinctGroupCount,
     distinctPeriodCount,
@@ -4538,7 +4650,7 @@ async function sendAggregatedReminder(memberEmail, memberName, payments, options
     ...aggregatedTemplateParams
   } : void 0;
   const telegramText = buildAggregatedPaymentReminderTelegramText({
-    memberName,
+    memberName: recipient.memberName,
     entries,
     distinctGroupCount,
     distinctPeriodCount
@@ -4549,9 +4661,15 @@ async function sendAggregatedReminder(memberEmail, memberName, payments, options
   });
   const result = await sendNotification(
     {
-      email: memberEmail,
+      email: user?.email ?? recipient.memberEmail ?? null,
       telegramChatId: user?.telegram?.chatId ?? null,
       userId: user?.id ?? null,
+      recipientLabel: recipient.recipientLabel ?? getRecipientLabel({
+        memberId: recipient.memberId,
+        memberEmail: user?.email ?? recipient.memberEmail,
+        memberNickname: recipient.memberName,
+        memberUserId: user?.id ?? recipient.memberUserId ?? null
+      }),
       preferences: {
         email: wantEmail,
         telegram: wantTelegram
@@ -4581,6 +4699,7 @@ var init_aggregated_reminder_send = __esm({
     init_keyboards();
     init_tokens();
     init_aggregated_payment_reminder();
+    init_member_email();
   }
 });
 
@@ -4732,9 +4851,9 @@ async function executeTask(task) {
         break;
       }
       case "aggregated_payment_reminder": {
-        if (!payload.memberEmail || !payload.payments?.length) {
+        if (!payload.memberId || !payload.payments?.length) {
           throw new Error(
-            "aggregated_payment_reminder task missing memberEmail or payments"
+            "aggregated_payment_reminder task missing recipient or payments"
           );
         }
         const inputs = [];
@@ -4757,12 +4876,14 @@ async function executeTask(task) {
           await completeTask(task);
           return;
         }
-        const memberName = inputs[0].payment.memberNickname;
-        await sendAggregatedReminder(
-          payload.memberEmail,
-          memberName,
-          inputs
-        );
+        const recipient = {
+          memberId: payload.memberId,
+          memberUserId: payload.memberUserId ?? null,
+          memberEmail: payload.memberEmail ?? null,
+          recipientLabel: payload.recipientLabel,
+          memberName: inputs[0].payment.memberNickname
+        };
+        await sendAggregatedReminder(recipient, inputs);
         break;
       }
       case "admin_confirmation_request": {
@@ -4958,6 +5079,16 @@ var init_payment_details_text = __esm({
   }
 });
 
+// src/lib/users/placeholder-email.ts
+function getTelegramPlaceholderEmail(memberId) {
+  return `member-${memberId}@telegram.sub5tr4cker.local`;
+}
+var init_placeholder_email = __esm({
+  "src/lib/users/placeholder-email.ts"() {
+    "use strict";
+  }
+});
+
 // src/lib/telegram/handlers.ts
 function buildBillingSummary(group) {
   const { billing } = group;
@@ -4970,11 +5101,6 @@ function buildBillingSummary(group) {
     return `${billing.fixedMemberAmount} ${billing.currency} per member per ${cycle}`;
   }
   return `${price} per ${cycle} (variable)`;
-}
-function isPublicAppUrl(appUrl) {
-  if (!appUrl || !appUrl.trim()) return false;
-  const value = appUrl.trim().toLowerCase();
-  return !value.startsWith("http://localhost") && !value.startsWith("https://localhost");
 }
 function registerHandlers(bot2) {
   bot2.command("start", async (ctx) => {
@@ -5201,7 +5327,7 @@ async function handleInviteLink(ctx, token) {
   }
   const wasAccepted = !!member.acceptedAt;
   const now2 = /* @__PURE__ */ new Date();
-  const normalizedEmail = member.email.toLowerCase().trim();
+  const normalizedEmail = (member.email ?? getTelegramPlaceholderEmail(member.id)).toLowerCase().trim();
   let user = member.userId ? await store.getUser(member.userId) : null;
   if (!user) {
     user = await store.getUserByEmail(normalizedEmail);
@@ -5243,13 +5369,13 @@ async function handleInviteLink(ctx, token) {
   const shouldSendWelcomeEmail = !wasAccepted && await store.tryClaimWelcomeEmailSentAt(user.id, now2);
   if (shouldSendWelcomeEmail) {
     const appUrlSetting = await getSetting("general.appUrl");
-    const baseUrl = (appUrlSetting?.trim() || "http://localhost:3054").replace(
+    const baseUrl = (normalizeAppUrl(appUrlSetting) || "http://localhost:3054").replace(
       /\/$/,
       ""
     );
     const magicToken = await createMagicLoginToken(user.id);
     const magicLoginUrl = `${baseUrl}/invite-callback?token=${encodeURIComponent(magicToken)}&groupId=${encodeURIComponent(group.id)}`;
-    const sendEmail2 = !member.unsubscribedFromEmail;
+    const sendEmail2 = !!member.email && !member.unsubscribedFromEmail;
     const unsubscribeUrl = sendEmail2 ? await getUnsubscribeUrl(
       await createUnsubscribeToken(member.id, group.id)
     ) : null;
@@ -5265,7 +5391,7 @@ async function handleInviteLink(ctx, token) {
       paymentLink: group.payment.link ?? null,
       paymentInstructions: group.payment.instructions ?? null,
       isPublic: isPublicAppUrl(appUrlSetting),
-      appUrl: appUrlSetting?.trim() || null,
+      appUrl: normalizeAppUrl(appUrlSetting),
       telegramBotUsername: null,
       telegramInviteLink: null,
       unsubscribeUrl,
@@ -5309,11 +5435,13 @@ var init_handlers = __esm({
     init_storage();
     init_tokens();
     init_service();
+    init_public_app_url();
     init_queue();
     init_run_notification_tasks();
     init_service2();
     init_group_invite();
     init_payment_details_text();
+    init_placeholder_email();
   }
 });
 
@@ -5487,16 +5615,6 @@ var init_polling = __esm({
   }
 });
 
-// src/lib/notifications/member-email.ts
-function normalizeMemberEmailForAggregation(email) {
-  return email.trim().toLowerCase();
-}
-var init_member_email = __esm({
-  "src/lib/notifications/member-email.ts"() {
-    "use strict";
-  }
-});
-
 // src/jobs/enqueue-reminders.ts
 var enqueue_reminders_exports = {};
 __export(enqueue_reminders_exports, {
@@ -5517,7 +5635,7 @@ async function enqueueReminders() {
     )
   );
   if (aggregateReminders) {
-    const byEmail = /* @__PURE__ */ new Map();
+    const byRecipient = /* @__PURE__ */ new Map();
     for (const period of periods) {
       const group = await store.getGroup(period.groupId);
       if (!group || !group.isActive) continue;
@@ -5530,22 +5648,37 @@ async function enqueueReminders() {
       const billingPeriodId = period.id;
       for (const payment of period.payments) {
         if (payment.status !== "pending" && payment.status !== "overdue") continue;
-        const bucketKey = normalizeMemberEmailForAggregation(payment.memberEmail);
+        const member = group.members.find((entry) => entry.id === payment.memberId);
+        const recipientKey = getRecipientKey({
+          memberId: payment.memberId,
+          memberEmail: payment.memberEmail,
+          memberNickname: payment.memberNickname,
+          memberUserId: member?.userId ?? null
+        });
         const ref = {
           groupId,
           billingPeriodId,
           memberId: payment.memberId,
+          memberUserId: member?.userId ?? null,
           paymentId: payment.id,
-          memberEmail: payment.memberEmail
+          memberEmail: payment.memberEmail,
+          recipientKey,
+          recipientLabel: getRecipientLabel({
+            memberId: payment.memberId,
+            memberEmail: payment.memberEmail,
+            memberNickname: payment.memberNickname,
+            memberUserId: member?.userId ?? null
+          }),
+          memberNickname: payment.memberNickname
         };
-        const list = byEmail.get(bucketKey) ?? [];
+        const list = byRecipient.get(recipientKey) ?? [];
         list.push(ref);
-        byEmail.set(bucketKey, list);
+        byRecipient.set(recipientKey, list);
       }
     }
-    for (const [, refs] of byEmail) {
+    for (const [, refs] of byRecipient) {
       if (refs.length === 0) continue;
-      const memberEmail = refs[0].memberEmail;
+      const firstRef = refs[0];
       const payments = refs.map((r) => ({
         groupId: r.groupId,
         billingPeriodId: r.billingPeriodId,
@@ -5555,7 +5688,14 @@ async function enqueueReminders() {
       const task = await enqueueTask({
         type: "aggregated_payment_reminder",
         runAt: now2,
-        payload: { memberEmail, payments }
+        payload: {
+          memberId: firstRef.memberId,
+          memberUserId: firstRef.memberUserId,
+          memberEmail: firstRef.memberEmail,
+          recipientKey: firstRef.recipientKey,
+          recipientLabel: firstRef.recipientLabel,
+          payments
+        }
       });
       if (task) enqueued++;
     }

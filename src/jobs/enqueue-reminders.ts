@@ -3,7 +3,10 @@ import {
   resolveCollectionOpensAt,
 } from "@/lib/billing/collection-window";
 import { getSetting } from "@/lib/settings/service";
-import { normalizeMemberEmailForAggregation } from "@/lib/notifications/member-email";
+import {
+  getRecipientKey,
+  getRecipientLabel,
+} from "@/lib/notifications/member-email";
 import { enqueueTask } from "@/lib/tasks/queue";
 import { db, type StorageMemberPayment } from "@/lib/storage";
 
@@ -11,8 +14,12 @@ type PaymentRef = {
   groupId: string;
   billingPeriodId: string;
   memberId: string;
+  memberUserId: string | null;
   paymentId: string;
-  memberEmail: string;
+  memberEmail: string | null;
+  recipientKey: string;
+  recipientLabel: string;
+  memberNickname: string;
 };
 
 /**
@@ -41,7 +48,7 @@ export async function enqueueReminders(): Promise<number> {
   );
 
   if (aggregateReminders) {
-    const byEmail = new Map<string, PaymentRef[]>();
+    const byRecipient = new Map<string, PaymentRef[]>();
     for (const period of periods) {
       const group = await store.getGroup(period.groupId);
       if (!group || !group.isActive) continue;
@@ -57,22 +64,37 @@ export async function enqueueReminders(): Promise<number> {
 
       for (const payment of period.payments) {
         if (payment.status !== "pending" && payment.status !== "overdue") continue;
-        const bucketKey = normalizeMemberEmailForAggregation(payment.memberEmail);
+        const member = group.members.find((entry) => entry.id === payment.memberId);
+        const recipientKey = getRecipientKey({
+          memberId: payment.memberId,
+          memberEmail: payment.memberEmail,
+          memberNickname: payment.memberNickname,
+          memberUserId: member?.userId ?? null,
+        });
         const ref: PaymentRef = {
           groupId,
           billingPeriodId,
           memberId: payment.memberId,
+          memberUserId: member?.userId ?? null,
           paymentId: payment.id,
           memberEmail: payment.memberEmail,
+          recipientKey,
+          recipientLabel: getRecipientLabel({
+            memberId: payment.memberId,
+            memberEmail: payment.memberEmail,
+            memberNickname: payment.memberNickname,
+            memberUserId: member?.userId ?? null,
+          }),
+          memberNickname: payment.memberNickname,
         };
-        const list = byEmail.get(bucketKey) ?? [];
+        const list = byRecipient.get(recipientKey) ?? [];
         list.push(ref);
-        byEmail.set(bucketKey, list);
+        byRecipient.set(recipientKey, list);
       }
     }
-    for (const [, refs] of byEmail) {
+    for (const [, refs] of byRecipient) {
       if (refs.length === 0) continue;
-      const memberEmail = refs[0].memberEmail;
+      const firstRef = refs[0];
       const payments = refs.map((r) => ({
         groupId: r.groupId,
         billingPeriodId: r.billingPeriodId,
@@ -82,7 +104,14 @@ export async function enqueueReminders(): Promise<number> {
       const task = await enqueueTask({
         type: "aggregated_payment_reminder",
         runAt: now,
-        payload: { memberEmail, payments },
+        payload: {
+          memberId: firstRef.memberId,
+          memberUserId: firstRef.memberUserId,
+          memberEmail: firstRef.memberEmail,
+          recipientKey: firstRef.recipientKey,
+          recipientLabel: firstRef.recipientLabel,
+          payments,
+        },
       });
       if (task) enqueued++;
     }

@@ -96,7 +96,7 @@ function memberToStorage(m: IGroupMember): StorageGroupMember {
   return {
     id: toId(m._id),
     userId: toIdOrNull(m.user),
-    email: m.email,
+    email: m.email ?? null,
     nickname: m.nickname,
     role: m.role,
     joinedAt: m.joinedAt,
@@ -167,7 +167,7 @@ function paymentToStorage(p: IMemberPayment): StorageMemberPayment {
   return {
     id: toId(p._id),
     memberId: toId(p.memberId),
-    memberEmail: p.memberEmail,
+    memberEmail: p.memberEmail ?? null,
     memberNickname: p.memberNickname,
     amount: p.amount,
     adjustedAmount: p.adjustedAmount,
@@ -208,7 +208,8 @@ function notificationToStorage(n: INotification): StorageNotification {
   return {
     id: toId(n._id),
     recipientId: toIdOrNull(n.recipient),
-    recipientEmail: n.recipientEmail,
+    recipientEmail: n.recipientEmail ?? null,
+    recipientLabel: n.recipientLabel,
     groupId: toIdOrNull(n.group),
     billingPeriodId: toIdOrNull(n.billingPeriod),
     type: n.type,
@@ -481,13 +482,13 @@ export class MongooseAdapter implements StorageAdapter {
         { "members.user": userId },
         { "members.email": email, "members.isActive": true },
       ],
-    }).lean<IGroup[]>();
+    }).lean<IGroup[]>().exec();
     return groups.map(groupToStorage);
   }
 
   async listAllActiveGroups(): Promise<StorageGroup[]> {
     await dbConnect();
-    const groups = await Group.find({ isActive: true }).lean<IGroup[]>();
+    const groups = await Group.find({ isActive: true }).lean<IGroup[]>().exec();
     return groups.map(groupToStorage);
   }
 
@@ -742,7 +743,8 @@ export class MongooseAdapter implements StorageAdapter {
     await dbConnect();
     const n = await Notification.create({
       recipient: data.recipientId ? new Types.ObjectId(data.recipientId) : null,
-      recipientEmail: data.recipientEmail,
+      recipientEmail: data.recipientEmail ?? null,
+      recipientLabel: data.recipientLabel,
       group: data.groupId ? new Types.ObjectId(data.groupId) : null,
       billingPeriod: data.billingPeriodId ? new Types.ObjectId(data.billingPeriodId) : null,
       type: data.type,

@@ -35,7 +35,7 @@ import { cn } from "@/lib/utils";
 
 export interface MemberRow {
   _id: string;
-  email: string;
+  email: string | null;
   nickname: string;
   role: string;
   customAmount: number | null;
@@ -101,12 +101,12 @@ export function GroupMembersPanel({
   // when set, show dialog asking whether to send invite email to the newly added member
   const [inviteDialog, setInviteDialog] = useState<{
     memberId: string;
-    email: string;
+    email: string | null;
   } | null>(null);
   // when set (with creditSummary or not), show post-add modal: credit summary → apply credits → notify + invite
   const [postAddModal, setPostAddModal] = useState<{
     memberId: string;
-    email: string;
+    email: string | null;
     nickname: string;
     creditSummary: Array<{
       memberId: string;
@@ -144,7 +144,7 @@ export function GroupMembersPanel({
   const [removeMember, setRemoveMember] = useState<{
     _id: string;
     nickname: string;
-    email: string;
+    email: string | null;
   } | null>(null);
   const [removeLoading, setRemoveLoading] = useState(false);
   const [postRemoveModal, setPostRemoveModal] = useState<{
@@ -212,8 +212,8 @@ export function GroupMembersPanel({
     setError(null);
     const trimmedEmail = email.trim();
     const trimmedNickname = nickname.trim();
-    if (!trimmedEmail || !trimmedNickname) {
-      setError("Email and nickname are required.");
+    if (!trimmedNickname) {
+      setError("Nickname is required.");
       return;
     }
     const amount = customAmount.trim() ? Number(customAmount) : null;
@@ -225,12 +225,12 @@ export function GroupMembersPanel({
     setLoading(true);
     try {
       const body: {
-        email: string;
+        email: string | null;
         nickname: string;
         customAmount: number | null;
         billingStartsAt?: string | null;
       } = {
-        email: trimmedEmail,
+        email: trimmedEmail || null,
         nickname: trimmedNickname,
         customAmount: amount,
       };
@@ -628,8 +628,9 @@ export function GroupMembersPanel({
                     onClick={() => {
                       setPostAddStep(3);
                     }}
+                    disabled={!postAddModal.email}
                   >
-                    Send invite
+                    {postAddModal.email ? "Send invite" : "Use Telegram link"}
                   </Button>
                 </DialogFooter>
               )}
@@ -717,7 +718,7 @@ export function GroupMembersPanel({
                 <Button
                   variant="outline"
                   onClick={() => handlePostAddNotifyAndInvite({ sendInvite: true, notify: false })}
-                  disabled={notifyMembersLoading}
+                  disabled={notifyMembersLoading || !postAddModal.email}
                 >
                   {notifyMembersLoading ? (
                     <Loader2 className="size-4 animate-spin" />
@@ -730,7 +731,7 @@ export function GroupMembersPanel({
                 </Button>
                 <Button
                   onClick={() => handlePostAddNotifyAndInvite({ sendInvite: true, notify: true })}
-                  disabled={notifyMembersLoading}
+                  disabled={notifyMembersLoading || !postAddModal.email}
                 >
                   {notifyMembersLoading ? (
                     <Loader2 className="size-4 animate-spin" />
@@ -753,7 +754,9 @@ export function GroupMembersPanel({
             <DialogTitle>Member added</DialogTitle>
             <DialogDescription>
               {inviteDialog
-                ? `Send an invite email to ${inviteDialog.email}? They'll get group details, payment instructions, and how to get reminders via Telegram.`
+                ? inviteDialog.email
+                  ? `Send an invite email to ${inviteDialog.email}? They'll get group details, payment instructions, and how to get reminders via Telegram.`
+                  : "This member does not have an email address yet. Use the Telegram link instead."
                 : ""}
             </DialogDescription>
           </DialogHeader>
@@ -767,7 +770,7 @@ export function GroupMembersPanel({
             </Button>
             <Button
               onClick={handleSendInvite}
-              disabled={inviteSending}
+              disabled={inviteSending || !inviteDialog?.email}
             >
               {inviteSending ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -791,7 +794,7 @@ export function GroupMembersPanel({
             <DialogTitle>Remove member</DialogTitle>
             <DialogDescription>
               {removeMember
-                ? `Remove ${removeMember.nickname} (${removeMember.email}) from this group? They will no longer receive reminders or see this group. You can add them again later if needed.`
+                ? `Remove ${removeMember.nickname}${removeMember.email ? ` (${removeMember.email})` : ""} from this group? They will no longer receive reminders or see this group. You can add them again later if needed.`
                 : ""}
             </DialogDescription>
           </DialogHeader>
@@ -1046,7 +1049,7 @@ export function GroupMembersPanel({
             ) : null}
             <div className="grid gap-4 sm:grid-cols-[1fr_1fr_1fr_auto_auto] sm:items-end">
               <div className="grid gap-2">
-                <Label htmlFor="member-email">Email</Label>
+                <Label htmlFor="member-email">Email (optional)</Label>
                 <Input
                   id="member-email"
                   type="email"
@@ -1189,7 +1192,7 @@ export function GroupMembersPanel({
                       <TableCell className="font-medium">
                         {member.nickname}
                       </TableCell>
-                      <TableCell>{member.email}</TableCell>
+                      <TableCell>{member.email || "—"}</TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1.5">
                           {member.hasAccount === false ? (
@@ -1204,7 +1207,9 @@ export function GroupMembersPanel({
                                     size="sm"
                                     className="h-7 text-xs"
                                     onClick={() => handleResendInvite(member._id)}
-                                    disabled={resendingMemberId === member._id}
+                                    disabled={
+                                      resendingMemberId === member._id || !member.email
+                                    }
                                   >
                                     {resendingMemberId === member._id ? (
                                       <Loader2 className="size-3.5 animate-spin" />

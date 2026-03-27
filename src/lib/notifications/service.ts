@@ -15,11 +15,13 @@ import {
 } from "@/lib/storage";
 import { createUnsubscribeToken, getUnsubscribeUrl } from "@/lib/tokens";
 import { getChannels, getBuiltInChannelIds } from "@/lib/plugins/channels";
+import { getRecipientKey, getRecipientLabel } from "@/lib/notifications/member-email";
 
 interface NotificationTarget {
-  email: string;
+  email?: string | null;
   telegramChatId?: number | null;
   userId?: string | null;
+  recipientLabel?: string;
   preferences?: {
     email: boolean;
     telegram: boolean;
@@ -72,11 +74,15 @@ export async function sendNotification(
     telegramKeyboard: content.telegramKeyboard,
   };
   const targetPayload = {
-    email: target.email,
+    email: target.email ?? null,
     telegramChatId: target.telegramChatId ?? null,
     userId: target.userId ?? null,
     preferences: target.preferences,
   };
+  const recipientLabel =
+    target.recipientLabel ??
+    target.email ??
+    (target.telegramChatId ? `telegram:${target.telegramChatId}` : "unknown recipient");
   const context = {
     groupId: content.groupId,
     billingPeriodId: content.billingPeriodId,
@@ -92,7 +98,8 @@ export async function sendNotification(
       result.email.id = sendResult.externalId ?? undefined;
       if (attempted) {
         await logNotification({
-          recipientEmail: target.email,
+          recipientEmail: target.email ?? null,
+          recipientLabel,
           recipientId: target.userId,
           channel: "email",
           type: content.type,
@@ -112,7 +119,8 @@ export async function sendNotification(
         : undefined;
       if (attempted) {
         await logNotification({
-          recipientEmail: target.email,
+          recipientEmail: target.email ?? null,
+          recipientLabel,
           recipientId: target.userId,
           channel: "telegram",
           type: content.type,
@@ -131,7 +139,8 @@ export async function sendNotification(
 }
 
 async function logNotification(params: {
-  recipientEmail: string;
+  recipientEmail?: string | null;
+  recipientLabel: string;
   recipientId?: string | null;
   channel: "email" | "telegram";
   type: StorageNotificationType;
@@ -147,7 +156,8 @@ async function logNotification(params: {
     const store = await db();
     const input: CreateNotificationInput = {
       recipientId: params.recipientId ?? null,
-      recipientEmail: params.recipientEmail,
+      recipientEmail: params.recipientEmail ?? null,
+      recipientLabel: params.recipientLabel,
       groupId: params.groupId ?? null,
       billingPeriodId: params.billingPeriodId ?? null,
       type: params.type,
@@ -168,10 +178,11 @@ async function logNotification(params: {
 
 // notification target for price-change (email + optional telegram/prefs)
 type PriceChangeTarget = {
-  email: string;
+  email?: string | null;
   telegramChatId?: number | null;
   userId?: string | null;
   preferences?: { email: boolean; telegram: boolean };
+  recipientLabel?: string;
   /** set for group members; used to build unsubscribe URL and respect unsubscribedFromEmail */
   memberId?: string;
   unsubscribedFromEmail?: boolean;
@@ -208,13 +219,19 @@ export async function sendPriceChangeAnnouncements(
         email: admin.notificationPreferences?.email ?? true,
         telegram: admin.notificationPreferences?.telegram ?? false,
       },
+      recipientLabel: admin.email,
     });
   }
 
   const groupIdStr = group.id;
   for (const member of group.members) {
     if (!member.isActive || member.leftAt) continue;
-    const key = member.email.toLowerCase();
+    const key = getRecipientKey({
+      memberId: member.id,
+      memberEmail: member.email,
+      memberNickname: member.nickname,
+      memberUserId: member.userId,
+    });
     if (targets.has(key)) continue;
 
     const sendEmail = !member.unsubscribedFromEmail;
@@ -229,6 +246,12 @@ export async function sendPriceChangeAnnouncements(
             email: sendEmail && (user.notificationPreferences?.email ?? true),
             telegram: user.notificationPreferences?.telegram ?? false,
           },
+          recipientLabel: getRecipientLabel({
+            memberId: member.id,
+            memberEmail: user.email,
+            memberNickname: member.nickname,
+            memberUserId: user.id,
+          }),
           memberId: member.id,
           unsubscribedFromEmail: member.unsubscribedFromEmail,
         });
@@ -241,6 +264,12 @@ export async function sendPriceChangeAnnouncements(
       telegramChatId: null,
       userId: null,
       preferences: { email: sendEmail, telegram: false },
+      recipientLabel: getRecipientLabel({
+        memberId: member.id,
+        memberEmail: member.email,
+        memberNickname: member.nickname,
+        memberUserId: member.userId,
+      }),
       memberId: member.id,
       unsubscribedFromEmail: member.unsubscribedFromEmail,
     });
@@ -309,7 +338,7 @@ export async function sendPriceChangeAnnouncements(
       );
     } catch (error) {
       console.error(
-        `price-change notification failed for ${target.email}:`,
+        `price-change notification failed for ${target.recipientLabel ?? target.email ?? "unknown recipient"}:`,
         error
       );
     }
@@ -319,7 +348,7 @@ export async function sendPriceChangeAnnouncements(
 export interface MemberAddedCreditEntry {
   memberId: string;
   memberNickname: string;
-  memberEmail: string;
+  memberEmail: string | null;
   totalCredit: number;
   periods: Array<{
     periodId: string;
@@ -375,6 +404,7 @@ export async function sendMemberAddedNotifications(
         email: admin.notificationPreferences?.email ?? true,
         telegram: admin.notificationPreferences?.telegram ?? false,
       },
+      recipientLabel: admin.email,
       memberId: adminMember?.id,
       memberNickname: nickname,
     });
@@ -383,7 +413,12 @@ export async function sendMemberAddedNotifications(
   for (const member of group.members) {
     if (!member.isActive || member.leftAt) continue;
     if (member.id === newMemberId) continue;
-    const key = member.email.toLowerCase();
+    const key = getRecipientKey({
+      memberId: member.id,
+      memberEmail: member.email,
+      memberNickname: member.nickname,
+      memberUserId: member.userId,
+    });
     if (targets.has(key)) continue;
 
     const sendEmail = !member.unsubscribedFromEmail;
@@ -398,6 +433,12 @@ export async function sendMemberAddedNotifications(
             email: sendEmail && (user.notificationPreferences?.email ?? true),
             telegram: user.notificationPreferences?.telegram ?? false,
           },
+          recipientLabel: getRecipientLabel({
+            memberId: member.id,
+            memberEmail: user.email,
+            memberNickname: member.nickname,
+            memberUserId: user.id,
+          }),
           memberId: member.id,
           unsubscribedFromEmail: member.unsubscribedFromEmail,
           memberNickname: member.nickname,
@@ -411,6 +452,12 @@ export async function sendMemberAddedNotifications(
       telegramChatId: null,
       userId: null,
       preferences: { email: sendEmail, telegram: false },
+      recipientLabel: getRecipientLabel({
+        memberId: member.id,
+        memberEmail: member.email,
+        memberNickname: member.nickname,
+        memberUserId: member.userId,
+      }),
       memberId: member.id,
       unsubscribedFromEmail: member.unsubscribedFromEmail,
       memberNickname: member.nickname,
@@ -517,7 +564,7 @@ export async function sendMemberAddedNotifications(
       );
     } catch (error) {
       console.error(
-        `member-added notification failed for ${target.email}:`,
+        `member-added notification failed for ${target.recipientLabel ?? target.email ?? "unknown recipient"}:`,
         error
       );
     }

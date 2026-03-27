@@ -10,13 +10,13 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 - **Stack**: Next.js 15 (App Router), MongoDB/Mongoose **or SQLite (local mode)**, Auth.js v5, Resend, grammy, node-cron, persisted notification task queue (ScheduledTask)
 - **UI**: Tailwind CSS + shadcn/ui with a sidebar dashboard shell, richer cards, tabs, and settings surfaces
 - **Origin**: Migrated from a Google Sheets + Apps Script setup (see `docs/legacy/`)
-- **Phase**: Core MVP plus dashboard refresh (including an admin "subscriptions you pay for" table), editable groups with soft-delete from the UI, DB-backed app settings (Mongo via `MongooseAdapter` in advanced mode; `config.json` in local mode), notification previews, **scheduled tasks** page for admins to cancel/retry queued reminders, per-group email accent + style presets with live preview, shared themed email templates, aggregated reminders by user (optional), profile email/Telegram toggles, optional per-group **save email params** for Activity sent-email preview. **Local-first mode** via `s54r` CLI (SQLite, no MongoDB, auto-login, Telegram polling, OS-native cron, export/import/migrate). **API routes, cron jobs, Activity, member portal, and grammy handlers** use the shared `StorageAdapter` (`db()`) so local and advanced modes share one code path.
+- **Phase**: Core MVP plus dashboard refresh (including an admin "subscriptions you pay for" table), editable groups with soft-delete from the UI, DB-backed app settings (Mongo via `MongooseAdapter` in advanced mode; `config.json` in local mode), a dedicated **notifications hub** for workspace email + Telegram setup, **scheduled tasks** page for admins to cancel/retry queued reminders, per-group email accent + style presets with live preview, shared themed email templates, aggregated reminders by user (optional), profile email/Telegram toggles, optional per-group **save email params** for Activity sent-email preview, and **Telegram-only member support** where member email is optional. **Local-first mode** via `s54r` CLI (SQLite, no MongoDB, auto-login, Telegram polling, OS-native cron, export/import/migrate). **API routes, cron jobs, Activity, member portal, and grammy handlers** use the shared `StorageAdapter` (`db()`) so local and advanced modes share one code path.
 
 ## Key Directories
 
 - `src/app/` — pages + API routes (auth, dashboard, groups, billing, telegram, cron)
 - `src/app/(auth)/` — login, register
-- `src/app/(dashboard)/` — dashboard home, group detail/edit/new, notification previews, scheduled tasks (queue), activity, settings
+- `src/app/(dashboard)/` — dashboard home, group detail/edit/new, notifications hub, scheduled tasks (queue), activity, settings
 - `src/app/api/` — groups CRUD, group notification toggles, billing, notifications, scheduled tasks (queue admin), settings, confirm, telegram webhook/link, cron, register
 - `src/lib/` — db, auth, settings service, tokens (confirmation + link), email, telegram, billing calculator, notifications, tasks (queue + worker)
 - `src/lib/storage/` — `StorageAdapter` interface, `MongooseAdapter`, `SqliteAdapter`, domain types, adapter factory
@@ -59,7 +59,7 @@ Switch: `SUB5TR4CKER_MODE=local` (set by `s54r start`).
 - Settings: GET/PATCH /api/settings, POST /api/settings/test-email, POST /api/settings/test-telegram
 - Auth: /api/auth/[...nextauth], POST /api/register
 - Telegram: POST /api/telegram/webhook, POST /api/telegram/link, GET /api/groups/[groupId]/members/[memberId]/telegram-invite (admin copyable member deep link)
-- Dashboard: GET /api/dashboard/quick-status (aligned `unpaidCount` rules with GET /api/groups; `groupsNeedingAttention` / `groupsEligibleForReminders`), GET/POST /api/dashboard/notify-unpaid (POST accepts optional groupIds, paymentIds, channelPreference; always groups by member email for one combined message per user; cron aggregation uses the notifications.aggregateReminders setting)
+- Dashboard: GET /api/dashboard/quick-status (aligned `unpaidCount` rules with GET /api/groups; `groupsNeedingAttention` / `groupsEligibleForReminders`), GET/POST /api/dashboard/notify-unpaid (POST accepts optional groupIds, paymentIds, channelPreference; groups by linked user/email/member fallback so Telegram-only members can still receive one combined reminder; cron aggregation uses the notifications.aggregateReminders setting)
 - Scheduled tasks (admin): GET /api/scheduled-tasks, PATCH /api/scheduled-tasks/[taskId], POST /api/scheduled-tasks/bulk-cancel
 - Cron: POST /api/cron/billing, reminders, follow-ups, notification-tasks (x-cron-secret)
 - Confirm: GET /api/confirm/[token] (email "I paid")

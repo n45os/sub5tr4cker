@@ -240,6 +240,7 @@ function runConformanceSuite(getAdapter: () => StorageAdapter) {
       const g = await adapter.createGroup(buildGroupInput());
       await adapter.logNotification({
         recipientEmail: "alice@example.com",
+        recipientLabel: "alice@example.com",
         groupId: g.id,
         type: "payment_reminder",
         channel: "email",

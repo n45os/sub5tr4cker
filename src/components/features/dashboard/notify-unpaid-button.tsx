@@ -34,7 +34,8 @@ type ChannelPreference = "email" | "telegram" | "both";
 
 interface PreviewPayment {
   paymentId: string;
-  memberEmail: string;
+  memberEmail: string | null;
+  recipientLabel: string;
   memberNickname: string;
   sendEmail: boolean;
   sendTelegram: boolean;
@@ -42,7 +43,9 @@ interface PreviewPayment {
 }
 
 interface PreviewByUserEntry {
-  memberEmail: string;
+  recipientKey: string;
+  memberEmail: string | null;
+  recipientLabel: string;
   memberNickname: string;
   totalAmount: number;
   sendEmail: boolean;
@@ -238,10 +241,10 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
               selectedPaymentIds.has(p.paymentId) &&
               selectedGroupIds.has(p.groupId)
           );
-        if (hasSelected) selectedUserEmails.add(u.memberEmail);
+        if (hasSelected) selectedUserEmails.add(u.recipientKey);
       }
       for (const u of preview.byUser) {
-        if (!selectedUserEmails.has(u.memberEmail)) continue;
+        if (!selectedUserEmails.has(u.recipientKey)) continue;
         if (channelPreference === "email" && u.sendEmail) email += 1;
         else if (channelPreference === "telegram" && u.sendTelegram) telegram += 1;
         else {
@@ -550,10 +553,11 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
                               selectedPaymentIds.has(p.paymentId) &&
                               selectedGroupIds.has(p.groupId)
                           );
-                          const displayName = u.memberNickname || u.memberEmail;
+                          const displayName =
+                            u.memberNickname || u.recipientLabel || u.memberEmail || "member";
                           return (
                             <li
-                              key={u.memberEmail}
+                              key={u.recipientKey}
                               className={cn(
                                 "flex flex-wrap items-center gap-3 rounded-md border border-transparent px-1 py-1.5",
                                 !selected ? "opacity-40" : ""
@@ -735,7 +739,7 @@ export function NotifyUnpaidButton({ disabled, onSent }: NotifyUnpaidButtonProps
                                             : ""
                                         }`}
                                       >
-                                        {p.memberNickname || p.memberEmail}{" "}
+                                        {p.memberNickname || p.recipientLabel || p.memberEmail}{" "}
                                         <span className="text-muted-foreground">
                                           ({per.periodLabel})
                                         </span>

@@ -23,7 +23,7 @@ interface RecentNotificationItem {
   status: string;
   subject: string | null;
   preview: string;
-  recipientEmail: string;
+  recipientLabel: string;
   createdAt: string;
 }
 
@@ -127,7 +127,7 @@ export function GroupNotificationsPanel({
 
           <div className="flex items-center justify-between gap-3">
             <Link href="/dashboard/notifications" className="text-sm text-primary hover:underline">
-              Open template center
+              Open notifications hub
             </Link>
             {isAdmin ? (
               <Button onClick={savePreferences} disabled={saving}>
@@ -183,7 +183,7 @@ export function GroupNotificationsPanel({
                     {notification.subject || notification.preview}
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    To {notification.recipientEmail}
+                    To {notification.recipientLabel}
                   </p>
                 </div>
               ))}

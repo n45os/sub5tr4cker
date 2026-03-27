@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Eye, EyeOff, Loader2, MoreHorizontal, Send, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,18 +11,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button-variants";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
 import { PluginsSettingsTab } from "./plugins-settings-tab";
 
 type SettingsCategory =
@@ -50,15 +41,7 @@ interface SettingsPageClientProps {
   settings: SettingItem[];
 }
 
-interface WebhookInfoState {
-  url: string;
-  pending_update_count: number;
-  last_error_date?: number;
-  last_error_message?: string;
-}
-
-// display groups: combine small categories so each tab has a meaningful set of fields
-type SettingsTabId = "general" | "notifications" | "security" | "plugins";
+type SettingsTabId = "general" | "security" | "plugins";
 
 const tabs: Array<{
   id: SettingsTabId;
@@ -70,21 +53,14 @@ const tabs: Array<{
     id: "general",
     label: "General",
     description:
-      "Values every feature depends on: the public URL of this install so generated links and Telegram’s webhook point at the right host.",
+      "Workspace-wide basics like the public app URL and other shared runtime values.",
     categoryKeys: ["general"],
-  },
-  {
-    id: "notifications",
-    label: "Notifications",
-    description:
-      "Outbound channels: Resend for email, your Telegram bot for DMs. Test sends and webhook registration live under Quick actions.",
-    categoryKeys: ["email", "telegram", "notifications"],
   },
   {
     id: "security",
     label: "Security & automation",
     description:
-      "HMAC secrets so member-facing links (payment confirm, Telegram link, invites) cannot be forged, plus a shared bearer for /api/cron/* so only your scheduler can run automated jobs.",
+      "Secrets for confirmation links, Telegram account linking, and protected cron endpoints.",
     categoryKeys: ["security", "cron"],
   },
   {
@@ -101,10 +77,6 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
   );
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [savingTab, setSavingTab] = useState<SettingsTabId | null>(null);
-  const [testing, setTesting] = useState<"email" | "telegram" | null>(null);
-  const [webhookLoading, setWebhookLoading] = useState(false);
-  const [webhookInfoLoading, setWebhookInfoLoading] = useState(false);
-  const [webhookInfo, setWebhookInfo] = useState<WebhookInfoState | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const groupedByTab = useMemo(
@@ -125,10 +97,10 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
     setSavingTab(tabId);
 
     try {
-      const tab = tabs.find((t) => t.id === tabId);
-      const tabSettings = tab
+      const tab = tabs.find((entry) => entry.id === tabId);
+      const payload = tab
         ? settings
-            .filter((s) => tab.categoryKeys.includes(s.category))
+            .filter((setting) => tab.categoryKeys.includes(setting.category))
             .map((setting) => ({
               key: setting.key,
               value: values[setting.key] ?? null,
@@ -138,97 +110,20 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
       const response = await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ settings: tabSettings }),
+        body: JSON.stringify({ settings: payload }),
       });
       const json = await response.json();
 
       if (!response.ok) {
         setMessage(json.error?.message || "Failed to save settings.");
-        setSavingTab(null);
         return;
       }
 
-      const tabLabel = tabs.find((t) => t.id === tabId)?.label ?? tabId;
-      setMessage(`${tabLabel} settings saved.`);
+      setMessage(`${tab?.label ?? tabId} settings saved.`);
     } catch {
       setMessage("Failed to save settings.");
     } finally {
       setSavingTab(null);
-    }
-  }
-
-  async function runTest(kind: "email" | "telegram") {
-    setMessage(null);
-    setTesting(kind);
-
-    try {
-      const response = await fetch(`/api/settings/test-${kind}`, { method: "POST" });
-      const json = await response.json();
-
-      if (!response.ok) {
-        setMessage(json.error?.message || `Failed to send ${kind} test.`);
-        return;
-      }
-
-      setMessage(
-        kind === "email"
-          ? "Test email sent successfully."
-          : "Test Telegram message sent successfully."
-      );
-    } catch {
-      setMessage(`Failed to send ${kind} test.`);
-    } finally {
-      setTesting(null);
-    }
-  }
-
-  async function registerWebhook() {
-    setMessage(null);
-    setWebhookInfo(null);
-    setWebhookLoading(true);
-    try {
-      const response = await fetch("/api/telegram/set-webhook", {
-        method: "POST",
-      });
-      const json = await response.json();
-
-      if (!response.ok) {
-        setMessage(json.error?.message ?? "Failed to register webhook.");
-        return;
-      }
-
-      setMessage(
-        "Webhook registered. Telegram will now send updates (e.g. when users open your bot link) to this app."
-      );
-    } catch {
-      setMessage("Failed to register webhook.");
-    } finally {
-      setWebhookLoading(false);
-    }
-  }
-
-  async function checkWebhookStatus() {
-    setMessage(null);
-    setWebhookInfoLoading(true);
-    try {
-      const response = await fetch("/api/telegram/webhook-info", {
-        method: "GET",
-      });
-      const json = await response.json();
-
-      if (!response.ok) {
-        setWebhookInfo(null);
-        setMessage(json.error?.message ?? "Failed to fetch webhook info.");
-        return;
-      }
-
-      setWebhookInfo(json.data ?? null);
-      setMessage("Fetched Telegram webhook status.");
-    } catch {
-      setWebhookInfo(null);
-      setMessage("Failed to fetch webhook info.");
-    } finally {
-      setWebhookInfoLoading(false);
     }
   }
 
@@ -240,49 +135,19 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
             <ShieldCheck className="size-3" />
             Database-backed config
           </Badge>
-          <CardTitle className="text-3xl">App settings</CardTitle>
+          <CardTitle className="text-3xl">Workspace settings</CardTitle>
           <CardDescription className="max-w-2xl">
-            Runtime configuration now lives inside the app instead of being scattered
-            across env files. Update integrations here and run quick channel tests
-            without leaving the dashboard.
+            General app configuration, security secrets, cron access, and plugins now
+            live in one dashboard surface. Notification channels moved to the
+            notifications hub.
           </CardDescription>
         </CardHeader>
       </Card>
 
       {message ? (
-        <div className="rounded-xl border px-4 py-3 text-sm text-muted-foreground">
+        <div className="rounded-xl border border-border/70 px-4 py-3 text-sm text-muted-foreground">
           {message}
         </div>
-      ) : null}
-      {webhookInfo ? (
-        <Card className="border-border/70">
-          <CardHeader>
-            <CardTitle className="text-base">Telegram webhook status</CardTitle>
-            <CardDescription>
-              Current webhook registration details reported by Telegram.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-2 text-sm text-muted-foreground">
-            <p>
-              <span className="font-medium text-foreground">URL:</span>{" "}
-              {webhookInfo.url || "Not set"}
-            </p>
-            <p>
-              <span className="font-medium text-foreground">Pending updates:</span>{" "}
-              {webhookInfo.pending_update_count}
-            </p>
-            <p>
-              <span className="font-medium text-foreground">Last error:</span>{" "}
-              {webhookInfo.last_error_message || "None"}
-            </p>
-            <p>
-              <span className="font-medium text-foreground">Last error date:</span>{" "}
-              {webhookInfo.last_error_date
-                ? new Date(webhookInfo.last_error_date * 1000).toLocaleString()
-                : "N/A"}
-            </p>
-          </CardContent>
-        </Card>
       ) : null}
 
       <Tabs defaultValue="general" className="gap-6">
@@ -299,113 +164,50 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
             {tab.id === "plugins" ? (
               <PluginsSettingsTab />
             ) : (
-              <Card>
+              <Card className="border-border/70">
                 <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <CardTitle>{tab.label}</CardTitle>
                     <CardDescription>{tab.description}</CardDescription>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {tab.id === "notifications" ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          className={cn(
-                            buttonVariants({ variant: "outline", size: "sm" }),
-                            "gap-1.5"
-                          )}
-                          type="button"
-                        >
-                          <MoreHorizontal className="size-4" />
-                          Quick actions
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
-                          <DropdownMenuItem
-                            onClick={() => runTest("email")}
-                            disabled={testing === "email"}
-                          >
-                            {testing === "email" ? (
-                              <Loader2 className="size-4 animate-spin" />
-                            ) : (
-                              <Send className="size-4" />
-                            )}
-                            Send test email
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => registerWebhook()}
-                            disabled={webhookLoading}
-                          >
-                            {webhookLoading ? (
-                              <Loader2 className="size-4 animate-spin" />
-                            ) : null}
-                            Register webhook
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => checkWebhookStatus()}
-                            disabled={webhookInfoLoading}
-                          >
-                            {webhookInfoLoading ? (
-                              <Loader2 className="size-4 animate-spin" />
-                            ) : null}
-                            Check webhook status
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => runTest("telegram")}
-                            disabled={testing === "telegram"}
-                          >
-                            {testing === "telegram" ? (
-                              <Loader2 className="size-4 animate-spin" />
-                            ) : (
-                              <Send className="size-4" />
-                            )}
-                            Send test Telegram
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                  <Button
+                    onClick={() => saveTab(tab.id)}
+                    disabled={savingTab === tab.id}
+                  >
+                    {savingTab === tab.id ? (
+                      <Loader2 className="size-4 animate-spin" />
                     ) : null}
-                    <Button
-                      onClick={() => saveTab(tab.id)}
-                      disabled={savingTab === tab.id}
-                    >
-                      {savingTab === tab.id ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : null}
-                      Save {tab.label}
-                    </Button>
-                  </div>
+                    Save {tab.label}
+                  </Button>
                 </CardHeader>
                 <CardContent className="grid gap-4">
                   {tab.id === "security" ? (
-                    <div className="rounded-lg border border-border/80 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-                      <p className="font-medium text-foreground">
-                        How these secrets work
-                      </p>
+                    <div className="rounded-2xl border border-border/70 bg-muted/25 px-4 py-3 text-sm text-muted-foreground">
+                      <p className="font-medium text-foreground">How these secrets work</p>
                       <ul className="mt-2 list-disc space-y-2 pl-5">
                         <li>
-                          Confirmation token secret signs URLs in email (and
-                          related flows) so only this server could have created
-                          them. Rotating it invalidates old links still in
-                          inboxes.
+                          Confirmation token secret signs member-facing links so old
+                          emails stop working if you rotate it.
                         </li>
                         <li>
-                          Telegram link secret does the same for “link my
-                          account” style URLs. Empty means the confirmation
-                          secret is reused.
+                          Telegram link secret protects account-link URLs and falls back
+                          to the confirmation secret when empty.
                         </li>
                         <li>
-                          Cron secret is sent as the{" "}
+                          Cron secret is sent in the{" "}
                           <code className="rounded bg-muted px-1 py-0.5 text-xs">
                             x-cron-secret
                           </code>{" "}
-                          header on POSTs to protected cron routes; match it in
-                          your external scheduler config.
+                          header for protected scheduler routes.
                         </li>
                       </ul>
                     </div>
                   ) : null}
+
                   {tab.settings.map((setting) => (
                     <div
                       key={setting.key}
-                      className="grid gap-3 rounded-xl border p-4 lg:grid-cols-[220px_1fr_auto]"
+                      className="grid gap-3 rounded-2xl border border-border/70 p-4 lg:grid-cols-[220px_1fr_auto]"
                     >
                       <div>
                         <Label htmlFor={setting.key}>{setting.label}</Label>
@@ -413,55 +215,32 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
                           {setting.description}
                         </p>
                       </div>
-                      {setting.key === "notifications.aggregateReminders" ? (
-                        <Switch
-                          id={setting.key}
-                          checked={values[setting.key] === "true"}
-                          onCheckedChange={(checked) =>
-                            updateValue(
-                              setting.key,
-                              checked ? "true" : "false"
-                            )
+                      <Input
+                        id={setting.key}
+                        type={setting.isSecret && !revealed[setting.key] ? "password" : "text"}
+                        value={values[setting.key] ?? ""}
+                        placeholder={setting.isSecret ? setting.maskedValue : ""}
+                        onChange={(event) => updateValue(setting.key, event.target.value)}
+                      />
+                      {setting.isSecret ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() =>
+                            setRevealed((current) => ({
+                              ...current,
+                              [setting.key]: !current[setting.key],
+                            }))
                           }
-                        />
-                      ) : (
-                        <>
-                          <Input
-                            id={setting.key}
-                            type={
-                              setting.isSecret && !revealed[setting.key]
-                                ? "password"
-                                : "text"
-                            }
-                            value={values[setting.key] ?? ""}
-                            placeholder={
-                              setting.isSecret ? setting.maskedValue : ""
-                            }
-                            onChange={(event) =>
-                              updateValue(setting.key, event.target.value)
-                            }
-                          />
-                          {setting.isSecret ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() =>
-                                setRevealed((current) => ({
-                                  ...current,
-                                  [setting.key]: !current[setting.key],
-                                }))
-                              }
-                            >
-                              {revealed[setting.key] ? (
-                                <EyeOff className="size-4" />
-                              ) : (
-                                <Eye className="size-4" />
-                              )}
-                              {revealed[setting.key] ? "Hide" : "Reveal"}
-                            </Button>
-                          ) : null}
-                        </>
-                      )}
+                        >
+                          {revealed[setting.key] ? (
+                            <EyeOff className="size-4" />
+                          ) : (
+                            <Eye className="size-4" />
+                          )}
+                          {revealed[setting.key] ? "Hide" : "Reveal"}
+                        </Button>
+                      ) : null}
                     </div>
                   ))}
                 </CardContent>

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.37.0] - 2026-03-26
+
+### Added
+
+- **Notifications hub** — `/dashboard/notifications` now combines workspace email setup, Telegram setup, delivery behavior, template previews, and direct links to the delivery log and scheduled sends.
+
+### Changed
+
+- **Admin navigation** — Dashboard shortcuts, sidebar labels, group delivery settings placement, and page headers now make delivery history, scheduled sends, settings, and notification setup easier to reach.
+- **Channel controls** — Workspace-level `email.enabled` and `telegram.enabled` toggles now let admins disable either outbound channel without removing the underlying configuration.
+- **Telegram-only members** — Group members and billing snapshots can now exist without an email address; reminder aggregation and activity logs use recipient labels and member/user identity instead of assuming email is always present.
+
 ## [0.36.0] - 2026-03-26
 
 ### Added

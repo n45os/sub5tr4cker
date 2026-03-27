@@ -477,7 +477,7 @@ Admin-only. Counts across **active** groups where the user is the admin, using t
 
 ### `GET /api/dashboard/notify-unpaid`
 
-Preview unpaid reminder candidates: by group, period, and payment, with per-payment eligibility (sendEmail, sendTelegram) and skip reasons. No body. Always includes `byUser` (payments grouped by member email, case-insensitive) and `aggregateReminders: true` for the dialog UI. The app setting `notifications.aggregateReminders` applies to **cron** reminders only, not this preview.
+Preview unpaid reminder candidates: by group, period, and payment, with per-payment eligibility (`sendEmail`, `sendTelegram`) and skip reasons. No body. Always includes `byUser` for the dialog UI, grouped by a recipient key: linked user first, then member email when present, then member id for Telegram-only members. The app setting `notifications.aggregateReminders` applies to **cron** reminders only, not this preview.
 
 ### `POST /api/dashboard/notify-unpaid`
 
@@ -496,7 +496,7 @@ Send payment reminders to unpaid (pending/overdue) members. Optional body to nar
 - `paymentIds` — only send to these payment IDs. Omit for all eligible payments.
 - `channelPreference` — `"email"` | `"telegram"` | `"both"` (default). For this batch, restrict to one channel or use both per member preferences.
 
-Reminders are grouped by member email (case-insensitive): each unique email receives at most one email and one Telegram with all their unpaid amounts across groups. Response counts are per user, not per payment. Cron reminder grouping still follows the `notifications.aggregateReminders` setting.
+Reminders are grouped by recipient identity: linked user first, then member email when present, then member id for Telegram-only members. Each recipient receives at most one email and one Telegram with all their unpaid amounts across groups. Response counts are per recipient, not per payment. Cron reminder grouping still follows the `notifications.aggregateReminders` setting.
 
 **Response:** `{ "data": { "emailSent", "telegramSent", "skipped", "failed" } }`.
 

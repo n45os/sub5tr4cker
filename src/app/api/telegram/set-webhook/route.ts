@@ -17,6 +17,18 @@ export async function POST() {
     );
   }
 
+  if ((await getSetting("telegram.enabled")) === "false") {
+    return NextResponse.json(
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Telegram is disabled for this workspace",
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   const token = await getSetting("telegram.botToken");
   if (!token) {
     return NextResponse.json(

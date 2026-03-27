@@ -13,7 +13,7 @@ export interface ChannelSendMessage {
 }
 
 export interface ChannelSendTarget {
-  email: string;
+  email?: string | null;
   telegramChatId?: number | null;
   userId?: string | null;
   preferences?: { email?: boolean; telegram?: boolean };
@@ -43,7 +43,8 @@ function createEmailChannel(): NotificationChannel {
     name: "Email",
     isBuiltIn: true,
     async send(target, message) {
-      if (!target.email || target.preferences?.email === false) {
+      const enabled = (await getSetting("email.enabled")) !== "false";
+      if (!enabled || !target.email || target.preferences?.email === false) {
         return { sent: false, skipped: true };
       }
       const result = await sendEmail({
@@ -62,7 +63,9 @@ function createTelegramChannel(): NotificationChannel {
     name: "Telegram",
     isBuiltIn: true,
     async send(target, message) {
-      const enabled = await isTelegramEnabled();
+      const enabled =
+        (await getSetting("telegram.enabled")) !== "false" &&
+        (await isTelegramEnabled());
       if (
         !enabled ||
         !target.telegramChatId ||

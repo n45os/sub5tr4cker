@@ -162,11 +162,11 @@ Admin-only. Returns `groupsNeedingAttention` (any open follow-up), `groupsEligib
 
 ### `GET /api/dashboard/notify-unpaid`
 
-Preview unpaid reminder candidates (by group, period, payment) with eligibility and skip reasons. No body. Always includes `byUser` (grouped by member email, case-insensitive) and `aggregateReminders: true`.
+Preview unpaid reminder candidates (by group, period, payment) with eligibility and skip reasons. No body. Always includes `byUser`, grouped by recipient identity (linked user, then email, then member fallback for Telegram-only members), plus `aggregateReminders: true`.
 
 ### `POST /api/dashboard/notify-unpaid`
 
-Send payment reminders. Optional body: `groupIds` (string[]), `paymentIds` (string[]), `channelPreference` (`"email"` | `"telegram"` | `"both"`). Always groups by member email (one combined message per user). Response: `{ "data": { "emailSent", "telegramSent", "skipped", "failed" } }`.
+Send payment reminders. Optional body: `groupIds` (string[]), `paymentIds` (string[]), `channelPreference` (`"email"` | `"telegram"` | `"both"`). Groups by recipient identity (linked user, then email, then member fallback) so Telegram-only members can still receive combined reminders. Response: `{ "data": { "emailSent", "telegramSent", "skipped", "failed" } }`.
 
 ## Scheduled tasks
 

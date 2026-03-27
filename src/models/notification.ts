@@ -13,7 +13,8 @@ export type NotificationType =
 
 export interface INotification extends Document {
   recipient: Types.ObjectId | null;
-  recipientEmail: string;
+  recipientEmail: string | null;
+  recipientLabel: string;
   group: Types.ObjectId | null;
   billingPeriod: Types.ObjectId | null;
   type: NotificationType;
@@ -36,7 +37,8 @@ const notificationSchema = new Schema<INotification>(
       ref: "User",
       default: null,
     },
-    recipientEmail: { type: String, required: true },
+    recipientEmail: { type: String, default: null },
+    recipientLabel: { type: String, required: true },
     group: { type: Schema.Types.ObjectId, ref: "Group", default: null },
     billingPeriod: {
       type: Schema.Types.ObjectId,

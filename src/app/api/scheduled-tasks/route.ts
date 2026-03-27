@@ -115,9 +115,9 @@ export async function GET(request: NextRequest) {
   const items = tasks.map((t) => {
     const payload = t.payload;
     let summary = "";
-    if (t.type === "aggregated_payment_reminder" && payload.memberEmail) {
+    if (t.type === "aggregated_payment_reminder") {
       const n = payload.payments?.length ?? 0;
-      summary = `${payload.memberEmail} — ${n} payment(s)`;
+      summary = `${payload.recipientLabel ?? payload.memberEmail ?? payload.memberId ?? "recipient"} — ${n} payment(s)`;
     } else if (payload.groupId) {
       const gName = groupNameById.get(payload.groupId) ?? "Group";
       const pLabel = payload.billingPeriodId

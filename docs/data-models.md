@@ -97,7 +97,7 @@ A subscription group managed by an admin.
   // members (embedded for performance — groups rarely exceed 20 members)
   members: [{
     user: ObjectId | null,                // ref: User (null if email-only)
-    email: string,                        // always present
+    email: string | null,                 // optional for Telegram-only members
     nickname: string,                     // display name in the group
     role: 'member' | 'admin',
     joinedAt: Date,
@@ -150,7 +150,7 @@ One billing cycle for a group. Created automatically by the cron job or manually
   // per-member payment tracking
   payments: [{
     memberId: ObjectId,                   // matches group.members._id
-    memberEmail: string,                  // denormalized for convenience
+    memberEmail: string | null,           // denormalized when email exists
     memberNickname: string,               // denormalized
     amount: number,                       // this member's share
     status: 'pending' | 'member_confirmed' | 'confirmed' | 'overdue' | 'waived',
@@ -207,7 +207,8 @@ Log of all notifications sent. Useful for debugging and user history.
 {
   _id: ObjectId,
   recipient: ObjectId | null,            // ref: User (null for email-only members)
-  recipientEmail: string,
+  recipientEmail: string | null,
+  recipientLabel: string,                // neutral display label for activity / delivery log
   group: ObjectId | null,                // ref: Group
   billingPeriod: ObjectId | null,        // ref: BillingPeriod
 
@@ -264,7 +265,9 @@ Queue for notification delivery. Cron (or other producers) enqueue tasks; a work
     memberId?: string,
     paymentId?: string,
     channel?: 'email' | 'telegram',
-    memberEmail?: string,                 // for aggregated_payment_reminder
+    memberEmail?: string | null,          // optional for aggregated_payment_reminder
+    recipientKey?: string,                // aggregated reminder identity (user/email/member fallback)
+    recipientLabel?: string,              // display label for admin task UIs
     payments?: Array<{ groupId, billingPeriodId, memberId, paymentId }>,  // for aggregated_payment_reminder
     [key: string]: unknown,
   },

@@ -18,7 +18,7 @@ function canAccessGroup(
       m.isActive &&
       !m.leftAt &&
       (m.userId === userId ||
-        m.email.toLowerCase() === userEmail.toLowerCase())
+        (!!m.email && m.email.toLowerCase() === userEmail.toLowerCase()))
   );
 }
 

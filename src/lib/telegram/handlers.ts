@@ -14,6 +14,7 @@ import { runNotificationTasks } from "@/jobs/run-notification-tasks";
 import { sendNotification } from "@/lib/notifications/service";
 import { buildTelegramWelcomeEmailHtml } from "@/lib/email/templates/group-invite";
 import { formatGroupPaymentDetailsPlainText } from "@/lib/telegram/payment-details-text";
+import { getTelegramPlaceholderEmail } from "@/lib/users/placeholder-email";
 
 function buildBillingSummary(group: StorageGroup): string {
   const { billing } = group;
@@ -315,7 +316,9 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
 
   const wasAccepted = !!member.acceptedAt;
   const now = new Date();
-  const normalizedEmail = member.email.toLowerCase().trim();
+  const normalizedEmail = (member.email ?? getTelegramPlaceholderEmail(member.id))
+    .toLowerCase()
+    .trim();
   let user = member.userId ? await store.getUser(member.userId) : null;
   if (!user) {
     user = await store.getUserByEmail(normalizedEmail);
@@ -370,7 +373,7 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
     );
     const magicToken = await createMagicLoginToken(user.id);
     const magicLoginUrl = `${baseUrl}/invite-callback?token=${encodeURIComponent(magicToken)}&groupId=${encodeURIComponent(group.id)}`;
-    const sendEmail = !member.unsubscribedFromEmail;
+    const sendEmail = !!member.email && !member.unsubscribedFromEmail;
     const unsubscribeUrl = sendEmail
       ? await getUnsubscribeUrl(
           await createUnsubscribeToken(member.id, group.id)

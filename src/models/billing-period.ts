@@ -3,7 +3,7 @@ import mongoose, { Schema, Document, Types } from "mongoose";
 export interface IMemberPayment {
   _id: Types.ObjectId;
   memberId: Types.ObjectId;
-  memberEmail: string;
+  memberEmail: string | null;
   memberNickname: string;
   amount: number;
   /** admin override of the calculated share for this specific period+member */
@@ -44,7 +44,7 @@ export interface IBillingPeriod extends Document {
 
 const memberPaymentSchema = new Schema<IMemberPayment>({
   memberId: { type: Schema.Types.ObjectId, required: true },
-  memberEmail: { type: String, required: true },
+  memberEmail: { type: String, default: null },
   memberNickname: { type: String, required: true },
   amount: { type: Number, required: true },
   adjustedAmount: { type: Number, default: null },

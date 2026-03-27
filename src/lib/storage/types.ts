@@ -47,7 +47,7 @@ export interface CreateUserInput {
 export interface StorageGroupMember {
   id: string;
   userId: string | null;
-  email: string;
+  email: string | null;
   nickname: string;
   role: "member" | "admin";
   joinedAt: Date;
@@ -121,7 +121,7 @@ export interface StorageGroupWithUsers extends StorageGroup {
 export interface StorageMemberPayment {
   id: string;
   memberId: string;
-  memberEmail: string;
+  memberEmail: string | null;
   memberNickname: string;
   amount: number;
   adjustedAmount: number | null;
@@ -173,7 +173,8 @@ export type StorageNotificationType =
 export interface StorageNotification {
   id: string;
   recipientId: string | null;
-  recipientEmail: string;
+  recipientEmail: string | null;
+  recipientLabel: string;
   groupId: string | null;
   billingPeriodId: string | null;
   type: StorageNotificationType;
@@ -242,9 +243,12 @@ export interface StorageTaskPayload {
   groupId?: string;
   billingPeriodId?: string;
   memberId?: string;
+  memberUserId?: string | null;
   paymentId?: string;
   channel?: "email" | "telegram";
-  memberEmail?: string;
+  memberEmail?: string | null;
+  recipientKey?: string;
+  recipientLabel?: string;
   payments?: Array<{
     groupId: string;
     billingPeriodId: string;
@@ -309,7 +313,8 @@ export interface PaymentStatusUpdate {
 
 export interface CreateNotificationInput {
   recipientId?: string | null;
-  recipientEmail: string;
+  recipientEmail?: string | null;
+  recipientLabel: string;
   groupId?: string | null;
   billingPeriodId?: string | null;
   type: StorageNotificationType;

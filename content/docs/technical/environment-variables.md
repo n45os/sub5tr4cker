@@ -28,6 +28,7 @@ Copy `.env.example` to `.env.local` (or set in your host’s env) and fill in th
 |----------|----------|-------------|
 | `RESEND_API_KEY` | Yes* | Resend API key. *Required if you send email. |
 | `EMAIL_FROM` | Yes* | Sender address (e.g. `SubsTrack <noreply@yourdomain.com>`). |
+| `EMAIL_ENABLED` | No | Master fallback for the workspace email channel. Defaults to `true`; the dashboard `email.enabled` setting can override it. |
 
 ## Telegram
 
@@ -35,6 +36,7 @@ Copy `.env.example` to `.env.local` (or set in your host’s env) and fill in th
 |----------|----------|-------------|
 | `TELEGRAM_BOT_TOKEN` | No | Bot token from @BotFather. Required for Telegram reminders/confirmations. |
 | `TELEGRAM_WEBHOOK_SECRET` | No | Random secret for webhook verification when using webhook mode. |
+| `TELEGRAM_ENABLED` | No | Master fallback for the workspace Telegram channel. Defaults to `true`; the dashboard `telegram.enabled` setting can override it. |
 
 ## Security
 
@@ -59,9 +61,11 @@ NEXTAUTH_SECRET=your-64-char-secret
 NEXTAUTH_URL=http://localhost:3000
 RESEND_API_KEY=re_xxxx
 EMAIL_FROM=SubsTrack <noreply@example.com>
+EMAIL_ENABLED=true
 CONFIRMATION_SECRET=your-hmac-secret
 CRON_SECRET=your-cron-secret
 TELEGRAM_BOT_TOKEN=optional
+TELEGRAM_ENABLED=true
 ```
 
 Never commit `.env.local` or put secrets in the client. Use your platform’s secret storage in production.

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { sendTelegramMessage } from "@/lib/telegram/send";
 import { db } from "@/lib/storage";
+import { getSetting } from "@/lib/settings/service";
 
 export async function POST() {
   const session = await auth();
@@ -9,6 +10,18 @@ export async function POST() {
     return NextResponse.json(
       { error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
       { status: 401 }
+    );
+  }
+
+  if ((await getSetting("telegram.enabled")) === "false") {
+    return NextResponse.json(
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Telegram is disabled for this workspace",
+        },
+      },
+      { status: 400 }
     );
   }
 

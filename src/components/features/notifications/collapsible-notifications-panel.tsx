@@ -26,7 +26,7 @@ interface CollapsibleNotificationsPanelProps {
     status: string;
     subject: string | null;
     preview: string;
-    recipientEmail: string;
+    recipientLabel: string;
     createdAt: string;
   }>;
 }
@@ -40,9 +40,9 @@ export function CollapsibleNotificationsPanel(
     <Collapsible open={open} onOpenChange={setOpen}>
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Notifications & delivery log</h3>
+          <h3 className="text-lg font-semibold">Delivery & channel settings</h3>
           <p className="text-sm text-muted-foreground">
-            Notification preferences and recent delivery history.
+            Group notification switches plus the latest delivery history.
           </p>
         </div>
         <CollapsibleTrigger

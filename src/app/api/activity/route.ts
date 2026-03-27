@@ -31,7 +31,7 @@ function canAccessGroup(
       m.isActive &&
       !m.leftAt &&
       (m.userId === userId ||
-        m.email.toLowerCase() === userEmail.toLowerCase())
+        (!!m.email && m.email.toLowerCase() === userEmail.toLowerCase()))
   );
 }
 
@@ -130,7 +130,8 @@ export async function GET(request: NextRequest) {
         status: string;
         subject: string | null;
         preview: string;
-        recipientEmail: string;
+        recipientEmail: string | null;
+        recipientLabel: string;
         externalId: string | null;
         hasEmailParams: boolean;
         groupId: string | null;
@@ -176,6 +177,7 @@ export async function GET(request: NextRequest) {
         subject: n.subject,
         preview: n.preview,
         recipientEmail: n.recipientEmail,
+        recipientLabel: n.recipientLabel,
         externalId: n.externalId ?? null,
         hasEmailParams: !!n.emailParams,
         groupId: n.groupId ?? null,
@@ -226,6 +228,7 @@ export async function GET(request: NextRequest) {
       subject: n.subject,
       preview: n.preview,
       recipientEmail: n.recipientEmail,
+      recipientLabel: n.recipientLabel,
       externalId: n.externalId ?? null,
       hasEmailParams: !!n.emailParams,
       groupId: n.groupId ?? null,

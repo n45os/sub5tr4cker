@@ -100,7 +100,8 @@ export async function POST(
     const payments: StorageMemberPayment[] = [];
     for (const p of periodData.payments) {
       const member = group.members.find(
-        (m: StorageGroupMember) => m.email.toLowerCase() === p.memberEmail.toLowerCase()
+        (m: StorageGroupMember) =>
+          !!m.email && m.email.toLowerCase() === p.memberEmail.toLowerCase()
       );
       if (!member) continue;
       payments.push({

@@ -11,7 +11,7 @@ type IdLike = { toString: () => string } | string;
 type GroupMemberLike = {
   id?: string;
   _id?: IdLike;
-  email: string;
+  email: string | null;
   nickname: string;
   role: string;
   customAmount?: number | null;
@@ -106,7 +106,8 @@ export function getGroupAccess(
     (m) =>
       m.isActive &&
       !m.leftAt &&
-      ((m.userId ?? asId(m.user as IdLike | undefined)) === userId || m.email === userEmail)
+      ((m.userId ?? asId(m.user as IdLike | undefined)) === userId ||
+        (!!m.email && m.email === userEmail))
   );
   return member ? "member" : null;
 }
@@ -121,7 +122,8 @@ export function getMemberEntry(
       (m) =>
         m.isActive &&
         !m.leftAt &&
-        ((m.userId ?? asId(m.user as IdLike | undefined)) === userId || m.email === userEmail)
+        ((m.userId ?? asId(m.user as IdLike | undefined)) === userId ||
+          (!!m.email && m.email === userEmail))
     ) ?? null;
   return member;
 }

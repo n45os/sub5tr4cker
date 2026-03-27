@@ -105,7 +105,7 @@ export async function POST(
   const adminName = admin?.name ?? "The group admin";
   const billingSummary = buildBillingSummary(group);
   const groupIdStr = group.id;
-  const sendEmail = !member.unsubscribedFromEmail;
+  const sendEmail = !!member.email && !member.unsubscribedFromEmail;
 
   let telegramChatId: number | null = null;
   let preferences = { email: sendEmail, telegram: false };
@@ -171,6 +171,7 @@ export async function POST(
         email: member.email,
         telegramChatId,
         userId: member.userId ?? null,
+        recipientLabel: member.email || `${member.nickname} (Telegram only)`,
         preferences,
       },
       {
@@ -187,7 +188,10 @@ export async function POST(
       data: { sent, email: result.email.sent, telegram: result.telegram.sent },
     });
   } catch (error) {
-    console.error(`send-invite failed for ${member.email}:`, error);
+    console.error(
+      `send-invite failed for ${member.email || `${member.nickname} (Telegram only)`}:`,
+      error
+    );
     return NextResponse.json(
       {
         error: {

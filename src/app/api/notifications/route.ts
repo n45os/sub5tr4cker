@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
         status: notification.status,
         subject: notification.subject,
         preview: notification.preview,
-        recipientEmail: notification.recipientEmail,
+        recipientLabel: notification.recipientLabel,
         externalId: notification.externalId ?? null,
         deliveredAt: notification.deliveredAt,
         createdAt: notification.createdAt,

@@ -2,6 +2,7 @@ import { db, type StorageMemberPayment, type StorageScheduledTask } from "@/lib/
 import { sendReminderForPayment } from "@/lib/notifications/reminder-send";
 import {
   sendAggregatedReminder,
+  type AggregatedReminderRecipient,
   type AggregatedPaymentInput,
 } from "@/lib/notifications/aggregated-reminder-send";
 import { sendAdminConfirmationNudge } from "@/lib/notifications/admin-nudge";
@@ -19,8 +20,11 @@ export async function executeTask(task: StorageScheduledTask): Promise<void> {
     groupId?: string;
     billingPeriodId?: string;
     memberId?: string;
+    memberUserId?: string | null;
     paymentId?: string;
-    memberEmail?: string;
+    memberEmail?: string | null;
+    recipientKey?: string;
+    recipientLabel?: string;
     payments?: Array<{
       groupId: string;
       billingPeriodId: string;
@@ -57,9 +61,9 @@ export async function executeTask(task: StorageScheduledTask): Promise<void> {
         break;
       }
       case "aggregated_payment_reminder": {
-        if (!payload.memberEmail || !payload.payments?.length) {
+        if (!payload.memberId || !payload.payments?.length) {
           throw new Error(
-            "aggregated_payment_reminder task missing memberEmail or payments"
+            "aggregated_payment_reminder task missing recipient or payments"
           );
         }
         const inputs: AggregatedPaymentInput[] = [];
@@ -82,12 +86,14 @@ export async function executeTask(task: StorageScheduledTask): Promise<void> {
           await completeTask(task);
           return;
         }
-        const memberName = inputs[0].payment.memberNickname;
-        await sendAggregatedReminder(
-          payload.memberEmail,
-          memberName,
-          inputs
-        );
+        const recipient: AggregatedReminderRecipient = {
+          memberId: payload.memberId,
+          memberUserId: payload.memberUserId ?? null,
+          memberEmail: payload.memberEmail ?? null,
+          recipientLabel: payload.recipientLabel,
+          memberName: inputs[0].payment.memberNickname,
+        };
+        await sendAggregatedReminder(recipient, inputs);
         break;
       }
       case "admin_confirmation_request": {

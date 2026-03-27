@@ -5,7 +5,7 @@ import { db, type StorageGroupMember } from "@/lib/storage";
 
 const joinSchema = z.object({
   inviteCode: z.string().min(1, "Invite code is required"),
-  email: z.string().email(),
+  email: z.string().trim().email().nullable(),
   nickname: z.string().min(1).max(100),
 });
 
@@ -70,10 +70,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const existing = group.members.find(
-    (m: StorageGroupMember) =>
-      m.email.toLowerCase() === email.toLowerCase() && m.isActive && !m.leftAt
-  );
+  const normalizedEmail = email?.trim().toLowerCase() || null;
+  const existing = normalizedEmail
+    ? group.members.find(
+        (m: StorageGroupMember) =>
+          !!m.email &&
+          m.email.toLowerCase() === normalizedEmail &&
+          m.isActive &&
+          !m.leftAt
+      )
+    : null;
   if (existing) {
     return NextResponse.json(
       {
@@ -89,7 +95,7 @@ export async function POST(request: NextRequest) {
   const newMember: StorageGroupMember = {
     id: nanoid(),
     userId: null,
-    email,
+    email: normalizedEmail,
     nickname,
     customAmount: null,
     role: "member",

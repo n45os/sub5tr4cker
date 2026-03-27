@@ -13,6 +13,7 @@ import {
 } from "@/lib/plugins/templates";
 import { TemplateTestActions } from "@/components/features/notifications/template-test-actions";
 import { EMAIL_THEME_OPTIONS } from "@/lib/email/themes";
+import { getSetting } from "@/lib/settings/service";
 
 export default async function NotificationTemplatePage({
   params,
@@ -23,8 +24,14 @@ export default async function NotificationTemplatePage({
 }) {
   const { type } = await params;
   const { theme } = await searchParams;
+  const [emailEnabledSetting, telegramEnabledSetting] = await Promise.all([
+    getSetting("email.enabled"),
+    getSetting("telegram.enabled"),
+  ]);
   const selectedTheme = theme ?? "clean";
   const template = getNotificationTemplatePreview(type, { theme: selectedTheme });
+  const emailEnabled = emailEnabledSetting !== "false";
+  const telegramEnabled = telegramEnabledSetting !== "false";
 
   if (!template) {
     notFound();
@@ -51,7 +58,10 @@ export default async function NotificationTemplatePage({
             <Card>
               <CardHeader>
                 <CardTitle>Email preview</CardTitle>
-                <CardDescription>{template.subject}</CardDescription>
+                <CardDescription>
+                  {template.subject}
+                  {!emailEnabled ? " Email is currently disabled for this workspace." : ""}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="mb-3 flex flex-wrap gap-2">
@@ -85,6 +95,7 @@ export default async function NotificationTemplatePage({
                 <CardTitle>Telegram preview</CardTitle>
                 <CardDescription>
                   Telegram content shown with the same body used during delivery.
+                  {!telegramEnabled ? " Telegram is currently disabled for this workspace." : ""}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -126,7 +137,13 @@ export default async function NotificationTemplatePage({
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <TemplateTestActions channels={template.channels} />
+                <TemplateTestActions
+                  channels={template.channels}
+                  channelEnabled={{
+                    email: emailEnabled,
+                    telegram: telegramEnabled,
+                  }}
+                />
               </CardContent>
             </Card>
           </div>

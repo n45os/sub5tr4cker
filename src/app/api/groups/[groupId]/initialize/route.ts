@@ -110,7 +110,7 @@ export async function POST(
   for (const member of activeMembers) {
     let telegramChatId: number | null = null;
     let preferences = { email: true, telegram: false };
-    const sendEmail = !member.unsubscribedFromEmail;
+    const sendEmail = !!member.email && !member.unsubscribedFromEmail;
 
     if (member.userId) {
       const user = await store.getUser(member.userId);
@@ -183,6 +183,7 @@ export async function POST(
           email: member.email,
           telegramChatId,
           userId: member.userId ?? null,
+          recipientLabel: member.email || `${member.nickname} (Telegram only)`,
           preferences,
         },
         {

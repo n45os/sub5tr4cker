@@ -92,8 +92,7 @@ describe("failTask", () => {
           lockedAt: null,
           lockedBy: null,
         }),
-      }),
-      { returnDocument: "after" }
+      })
     );
   });
 

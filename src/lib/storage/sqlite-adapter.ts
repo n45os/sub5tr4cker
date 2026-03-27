@@ -505,7 +505,10 @@ export class SqliteAdapter implements StorageAdapter {
     return groups.filter((g) => {
       if (g.adminId === userId) return true;
       return g.members.some(
-        (m) => m.isActive && (m.userId === userId || m.email.toLowerCase() === email.toLowerCase())
+        (m) =>
+          m.isActive &&
+          (m.userId === userId ||
+            (!!m.email && m.email.toLowerCase() === email.toLowerCase()))
       );
     });
   }
@@ -755,7 +758,8 @@ export class SqliteAdapter implements StorageAdapter {
     const notif: StorageNotification = {
       id,
       recipientId: data.recipientId ?? null,
-      recipientEmail: data.recipientEmail,
+      recipientEmail: data.recipientEmail ?? null,
+      recipientLabel: data.recipientLabel,
       groupId: data.groupId ?? null,
       billingPeriodId: data.billingPeriodId ?? null,
       type: data.type,

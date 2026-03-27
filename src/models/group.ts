@@ -3,7 +3,7 @@ import mongoose, { Schema, Document, Types } from "mongoose";
 export interface IGroupMember {
   _id: Types.ObjectId;
   user: Types.ObjectId | null;
-  email: string;
+  email: string | null;
   nickname: string;
   role: "member" | "admin";
   joinedAt: Date;
@@ -74,7 +74,7 @@ export interface IGroup extends Document {
 
 const groupMemberSchema = new Schema<IGroupMember>({
   user: { type: Schema.Types.ObjectId, ref: "User", default: null },
-  email: { type: String, required: true },
+  email: { type: String, default: null },
   nickname: { type: String, required: true },
   role: { type: String, enum: ["member", "admin"], default: "member" },
   joinedAt: { type: Date, default: Date.now },

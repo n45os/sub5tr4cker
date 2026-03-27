@@ -4,6 +4,10 @@ import { buildIdempotencyKey } from "./idempotency";
 const DEFAULT_LOCK_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const DEFAULT_BATCH_SIZE = 50;
 
+function taskIdOf(task: { id?: string; _id?: string }): string {
+  return task.id ?? task._id ?? "";
+}
+
 export interface EnqueueInput {
   type: StorageTaskType;
   runAt: Date;
@@ -59,17 +63,17 @@ export async function claimTasks(
  * Mark task as completed and clear lock.
  */
 export async function completeTask(
-  task: Pick<StorageScheduledTask, "id">
+  task: Pick<StorageScheduledTask, "id"> & { _id?: string }
 ): Promise<void> {
   const store = await db();
-  await store.completeTask(task.id);
+  await store.completeTask(taskIdOf(task));
 }
 
 /**
  * Record failure and either retry (with backoff) or mark failed.
  */
 export async function failTask(
-  task: Pick<StorageScheduledTask, "id" | "attempts" | "maxAttempts">,
+  task: Pick<StorageScheduledTask, "id" | "attempts" | "maxAttempts"> & { _id?: string },
   error: unknown
 ): Promise<void> {
   const errMessage =
@@ -77,17 +81,17 @@ export async function failTask(
   const attempts = (task.attempts ?? 0) + 1;
   const maxAttempts = task.maxAttempts ?? 5;
   const store = await db();
-  await store.failTask(task.id, errMessage, attempts, maxAttempts);
+  await store.failTask(taskIdOf(task), errMessage, attempts, maxAttempts);
 }
 
 /**
  * Release a locked task back to pending (e.g. worker shutting down).
  */
 export async function releaseTask(
-  task: Pick<StorageScheduledTask, "id">
+  task: Pick<StorageScheduledTask, "id"> & { _id?: string }
 ): Promise<void> {
   const store = await db();
-  await store.releaseTask(task.id);
+  await store.releaseTask(taskIdOf(task));
 }
 
 export async function getTaskCounts(): Promise<{

@@ -14,7 +14,7 @@ const notifyMemberAddedSchema = z.object({
     z.object({
       memberId: z.string(),
       memberNickname: z.string(),
-      memberEmail: z.string(),
+        memberEmail: z.string().nullable(),
       totalCredit: z.number(),
       periods: z.array(
         z.object({

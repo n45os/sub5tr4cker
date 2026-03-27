@@ -233,6 +233,8 @@ Revoke the invite link (clear code and disable). Admin only. The previous link s
 
 Admin only. Returns a member-specific Telegram deep link in the form `https://t.me/<bot>?start=invite_<token>` so the admin can send it directly.
 
+Send the full `deepLink` to the member. A plain `/start` message without the attached `invite_<token>` payload only opens the bot welcome message and does not claim the invitation.
+
 **Response:**
 ```json
 {

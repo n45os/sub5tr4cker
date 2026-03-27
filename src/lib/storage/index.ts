@@ -12,8 +12,6 @@ let _initPromise: Promise<StorageAdapter> | null = null;
 export function getAdapter(): StorageAdapter {
   if (_adapter) return _adapter;
 
-  // check if local mode is configured by looking for the app-mode env var
-  // set by the CLI / config manager when starting in local mode
   const mode = process.env.SUB5TR4CKER_MODE;
 
   if (mode === "local") {

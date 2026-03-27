@@ -118,7 +118,7 @@ export async function GET(
     );
   }
 
-  const payload = filterGroupForMember(groupForAccess, memberEntry, access);
+  const payload = await filterGroupForMember(groupForAccess, memberEntry, access);
 
   return NextResponse.json({ data: payload });
 }

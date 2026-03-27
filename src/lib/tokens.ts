@@ -1,6 +1,12 @@
 import crypto from "crypto";
 import { getSetting } from "@/lib/settings/service";
 
+const INVITE_LINK_EXP_LENGTH = 7;
+const INVITE_LINK_SIGNATURE_LENGTH = 12;
+const INVITE_LINK_LENGTH_PREFIX_LENGTH = 2;
+const INVITE_LINK_TOKEN_VERSION = "v";
+const LEGACY_INVITE_LINK_MEMBER_ID_LENGTH = 24;
+
 interface ConfirmationPayload {
   memberId: string;
   periodId: string;
@@ -133,6 +139,90 @@ export interface InviteLinkPayload {
   exp: number;
 }
 
+type ParsedCompactInviteLinkToken = {
+  memberId: string;
+  exp: string;
+  signature: string;
+  data: string;
+};
+
+function signInviteLinkData(data: string, secret: string) {
+  return crypto.createHmac("sha256", secret).update(data).digest("hex").slice(0, 12);
+}
+
+function parseVersionedInviteLinkToken(token: string): ParsedCompactInviteLinkToken | null {
+  if (!token.startsWith(INVITE_LINK_TOKEN_VERSION)) return null;
+
+  const body = token.slice(INVITE_LINK_TOKEN_VERSION.length);
+  const minimumLength =
+    INVITE_LINK_LENGTH_PREFIX_LENGTH +
+    1 +
+    INVITE_LINK_EXP_LENGTH +
+    INVITE_LINK_SIGNATURE_LENGTH;
+
+  if (body.length < minimumLength) return null;
+
+  const memberIdLengthHex = body.slice(0, INVITE_LINK_LENGTH_PREFIX_LENGTH);
+  if (!/^[a-f0-9]{2}$/i.test(memberIdLengthHex)) return null;
+
+  const memberIdLength = parseInt(memberIdLengthHex, 16);
+  if (!Number.isFinite(memberIdLength) || memberIdLength < 1) return null;
+
+  const expectedBodyLength =
+    INVITE_LINK_LENGTH_PREFIX_LENGTH +
+    memberIdLength +
+    INVITE_LINK_EXP_LENGTH +
+    INVITE_LINK_SIGNATURE_LENGTH;
+
+  if (body.length !== expectedBodyLength) return null;
+
+  const memberIdStart = INVITE_LINK_LENGTH_PREFIX_LENGTH;
+  const memberIdEnd = memberIdStart + memberIdLength;
+  const expEnd = memberIdEnd + INVITE_LINK_EXP_LENGTH;
+  const memberId = body.slice(memberIdStart, memberIdEnd);
+  const exp = body.slice(memberIdEnd, expEnd);
+  const signature = body.slice(expEnd);
+
+  if (!memberId) return null;
+  if (!/^[0-9a-z]{7}$/.test(exp)) return null;
+  if (!/^[a-f0-9]{12}$/i.test(signature)) return null;
+
+  return {
+    memberId,
+    exp,
+    signature,
+    data: `${INVITE_LINK_TOKEN_VERSION}${memberIdLengthHex}${memberId}${exp}`,
+  };
+}
+
+function parseLegacyInviteLinkToken(token: string): ParsedCompactInviteLinkToken | null {
+  const minimumLength = LEGACY_INVITE_LINK_MEMBER_ID_LENGTH + INVITE_LINK_EXP_LENGTH;
+  if (token.length < minimumLength + INVITE_LINK_SIGNATURE_LENGTH) return null;
+
+  const memberId = token.slice(0, token.length - INVITE_LINK_EXP_LENGTH - INVITE_LINK_SIGNATURE_LENGTH);
+  const exp = token.slice(
+    token.length - INVITE_LINK_EXP_LENGTH - INVITE_LINK_SIGNATURE_LENGTH,
+    token.length - INVITE_LINK_SIGNATURE_LENGTH
+  );
+  const signature = token.slice(token.length - INVITE_LINK_SIGNATURE_LENGTH);
+
+  if (memberId.length !== LEGACY_INVITE_LINK_MEMBER_ID_LENGTH) return null;
+  if (!/^[a-f0-9]{24}$/i.test(memberId)) return null;
+  if (!/^[0-9a-z]{7}$/.test(exp)) return null;
+  if (!/^[a-f0-9]{12}$/i.test(signature)) return null;
+
+  return {
+    memberId,
+    exp,
+    signature,
+    data: `${memberId}${exp}`,
+  };
+}
+
+function parseCompactInviteLinkToken(token: string): ParsedCompactInviteLinkToken | null {
+  return parseVersionedInviteLinkToken(token) ?? parseLegacyInviteLinkToken(token);
+}
+
 export async function createInviteLinkToken(
   memberId: string,
   _groupId: string,
@@ -142,13 +232,13 @@ export async function createInviteLinkToken(
     (Date.now() + expiresInDays * 24 * 60 * 60 * 1000) / 1000
   );
   const exp = expSec.toString(36).padStart(7, "0");
-  const data = `${memberId}${exp}`;
+  if (memberId.length > 0xff) {
+    throw new Error("member id is too long for invite link token");
+  }
+  const memberIdLengthHex = memberId.length.toString(16).padStart(2, "0");
+  const data = `${INVITE_LINK_TOKEN_VERSION}${memberIdLengthHex}${memberId}${exp}`;
   const secret = await getTelegramLinkSecret();
-  const signature = crypto
-    .createHmac("sha256", secret)
-    .update(data)
-    .digest("hex")
-    .slice(0, 12);
+  const signature = signInviteLinkData(data, secret);
   return `${data}${signature}`;
 }
 
@@ -177,27 +267,17 @@ export async function verifyInviteLinkToken(
     }
   }
 
-  if (token.length < 43) return null;
-  const memberId = token.slice(0, 24);
-  const exp = token.slice(24, 31);
-  const signature = token.slice(31);
-  if (!/^[a-f0-9]{24}$/i.test(memberId)) return null;
-  if (!/^[0-9a-z]{7}$/.test(exp)) return null;
-  if (!/^[a-f0-9]{12}$/i.test(signature)) return null;
+  const parsed = parseCompactInviteLinkToken(token);
+  if (!parsed) return null;
 
-  const data = `${memberId}${exp}`;
   const secret = await getTelegramLinkSecret();
-  const expectedSignature = crypto
-    .createHmac("sha256", secret)
-    .update(data)
-    .digest("hex")
-    .slice(0, 12);
-  if (signature !== expectedSignature) return null;
-  const expSec = parseInt(exp, 36);
+  const expectedSignature = signInviteLinkData(parsed.data, secret);
+  if (parsed.signature !== expectedSignature) return null;
+  const expSec = parseInt(parsed.exp, 36);
   if (!Number.isFinite(expSec)) return null;
   if (Math.floor(Date.now() / 1000) > expSec) return null;
   return {
-    memberId,
+    memberId: parsed.memberId,
     exp: expSec * 1000,
   };
 }

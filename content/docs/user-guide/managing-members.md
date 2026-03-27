@@ -68,4 +68,4 @@ For pending members, use one of these:
 - **Resend invite** — Sends the standard email/notification invite again
 - **Copy Telegram link** — Copies a member-specific `t.me/...start=invite_<token>` link you can send directly
 
-Telegram invite links are especially useful when the app is hosted locally or behind a private network.
+Telegram invite links are especially useful when the app is hosted locally or behind a private network. Send the copied link itself to the member; asking them to type plain `/start` will only open the bot without the invite payload.

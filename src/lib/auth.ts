@@ -22,6 +22,7 @@ function getMongoClientPromise(): Promise<MongoClient> {
 
 // 30 days in seconds — persistent session so cookie is shared across tabs
 const SESSION_MAX_AGE = 30 * 24 * 60 * 60;
+const isLocalAuthMode = isLocalMode();
 
 const {
   handlers: nextAuthHandlers,
@@ -34,7 +35,7 @@ const {
     process.env.NEXTAUTH_SECRET ||
     process.env.AUTH_SECRET ||
     (process.env.NODE_ENV === "development" ? "dev-secret-change-in-production" : undefined),
-  adapter: MongoDBAdapter(getMongoClientPromise()),
+  adapter: isLocalAuthMode ? undefined : MongoDBAdapter(getMongoClientPromise()),
   session: { strategy: "jwt", maxAge: SESSION_MAX_AGE },
   cookies: {
     sessionToken: {

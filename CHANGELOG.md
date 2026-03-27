@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.37.1] - 2026-03-27
+
+### Fixed
+
+- **Local auth startup** — `s54r start` no longer initializes the MongoDB Auth.js adapter in local mode, so SQLite/local installs stop throwing `ECONNREFUSED` errors when MongoDB is not running.
+- **Telegram polling in local mode** — `s54r start` now sets local-mode environment variables on the parent CLI process (not only the spawned Next.js child), so Telegram polling handlers resolve the correct SQLite storage adapter instead of falling through to MongooseAdapter.
+- **Telegram member invites** — Member-specific Telegram deep links now validate correctly for SQLite/local-mode member ids instead of assuming MongoDB ObjectIds, so opening the copied `t.me/...start=invite_<token>` link works again in local installs.
+- **Group member channel status** — The admin members panel now hides `Email connected` when the workspace email channel is disabled, matching the actual delivery behavior controlled by `email.enabled`.
+
 ## [0.37.0] - 2026-03-26
 
 ### Added

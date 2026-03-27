@@ -107,6 +107,8 @@ Send or resend the standard member invite notification. Admin only. In local/pri
 
 Generate a member-specific Telegram deep link that the admin can copy and send directly.
 
+Members must open the returned `deepLink` itself. Sending plain `/start` to the bot without the `invite_<token>` payload only opens the bot welcome flow and does not accept the invite.
+
 **Response:** `{ "data": { "botUsername", "deepLink", "expiresInDays" } }`
 
 ## Billing

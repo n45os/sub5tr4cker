@@ -26,19 +26,18 @@ export async function runStartCommand(options: { port?: number } = {}): Promise<
   p.log.info(`Data directory: ${getDbPath()}`);
   p.log.info(`Press Ctrl+C to stop.`);
 
-  // set env vars for local mode
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    SUB5TR4CKER_MODE: "local",
-    SUB5TR4CKER_DATA_PATH: getDbPath(),
-    SUB5TR4CKER_AUTH_TOKEN: config.authToken ?? "",
-    // Auth.js requires a secret even in local mode (where we bypass it);
-    // reuse the existing auth token so it never throws MissingSecret
-    AUTH_SECRET: config.authToken ?? "sub5tr4cker-local-fallback",
-    PORT: String(port),
-    HOSTNAME: "localhost",
-    NEXTAUTH_URL: `http://localhost:${port}`,
-  };
+  // set env vars for local mode — apply to the current process first so that
+  // anything running in-process (e.g. Telegram polling) sees the same values
+  process.env.SUB5TR4CKER_MODE = "local";
+  process.env.SUB5TR4CKER_DATA_PATH = getDbPath();
+  process.env.SUB5TR4CKER_AUTH_TOKEN = config.authToken ?? "";
+  process.env.AUTH_SECRET = config.authToken ?? "sub5tr4cker-local-fallback";
+  process.env.PORT = String(port);
+  process.env.HOSTNAME = "localhost";
+  process.env.NEXTAUTH_URL = `http://localhost:${port}`;
+
+  // pass the same env to the child process
+  const env: NodeJS.ProcessEnv = { ...process.env };
 
   // local mode loads better-sqlite3 (native addon). Next's `output: standalone` bundle
   // copies JS into `.next/standalone/node_modules` but not compiled `.node` bindings,

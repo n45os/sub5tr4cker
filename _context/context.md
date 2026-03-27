@@ -1,5 +1,5 @@
 <!-- context-status: active -->
-<!-- last-updated: 2026-03-26 -->
+<!-- last-updated: 2026-03-27 -->
 
 # SubsTrack — Project Context
 
@@ -10,7 +10,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 - **Stack**: Next.js 15 (App Router), MongoDB/Mongoose **or SQLite (local mode)**, Auth.js v5, Resend, grammy, node-cron, persisted notification task queue (ScheduledTask)
 - **UI**: Tailwind CSS + shadcn/ui with a sidebar dashboard shell, richer cards, tabs, and settings surfaces
 - **Origin**: Migrated from a Google Sheets + Apps Script setup (see `docs/legacy/`)
-- **Phase**: Core MVP plus dashboard refresh (including an admin "subscriptions you pay for" table), editable groups with soft-delete from the UI, DB-backed app settings (Mongo via `MongooseAdapter` in advanced mode; `config.json` in local mode), a dedicated **notifications hub** for workspace email + Telegram setup, **scheduled tasks** page for admins to cancel/retry queued reminders, per-group email accent + style presets with live preview, shared themed email templates, aggregated reminders by user (optional), profile email/Telegram toggles, optional per-group **save email params** for Activity sent-email preview, and **Telegram-only member support** where member email is optional. **Local-first mode** via `s54r` CLI (SQLite, no MongoDB, auto-login, Telegram polling, OS-native cron, export/import/migrate). **API routes, cron jobs, Activity, member portal, and grammy handlers** use the shared `StorageAdapter` (`db()`) so local and advanced modes share one code path.
+- **Phase**: Core MVP plus dashboard refresh (including an admin "subscriptions you pay for" table), editable groups with soft-delete from the UI, DB-backed app settings (Mongo via `MongooseAdapter` in advanced mode; `config.json` in local mode), a dedicated **notifications hub** for workspace email + Telegram setup, **scheduled tasks** page for admins to cancel/retry queued reminders, per-group email accent + style presets with live preview, shared themed email templates, aggregated reminders by user (optional), profile email/Telegram toggles, optional per-group **save email params** for Activity sent-email preview, and **Telegram-only member support** where member email is optional. **Local-first mode** via `s54r` CLI (SQLite, no MongoDB, auto-login, Telegram polling, OS-native cron, export/import/migrate), with local auth now avoiding eager MongoDB adapter startup and Telegram invite links working for SQLite-backed member ids. **API routes, cron jobs, Activity, member portal, and grammy handlers** use the shared `StorageAdapter` (`db()`) so local and advanced modes share one code path.
 
 ## Key Directories
 

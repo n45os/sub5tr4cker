@@ -1,4 +1,5 @@
 import type { Session } from "next-auth";
+import { getSetting } from "@/lib/settings/service";
 
 /** when members.user is populated (e.g. for admin payload), minimal user shape for channel status */
 type PopulatedMemberUser = {
@@ -128,12 +129,14 @@ export function getMemberEntry(
   return member;
 }
 
-export function filterGroupForMember(
+export async function filterGroupForMember(
   group: GroupLike,
   memberEntry: GroupMemberLike | null,
   access: "member" | "admin"
 ) {
   if (access === "admin") {
+    const emailEnabled = (await getSetting("email.enabled")) !== "false";
+
     return {
       _id: group.id ?? asId(group._id),
       name: group.name,
@@ -177,7 +180,7 @@ export function filterGroupForMember(
               ? (m.billingStartsAt as Date).toISOString().slice(0, 10)
               : null,
             emailConnected:
-              !unsubscribed && (u?.notificationPreferences?.email ?? true),
+              emailEnabled && !unsubscribed && (u?.notificationPreferences?.email ?? true),
             telegramConnected: !!(
               u?.telegram?.chatId &&
               (u?.notificationPreferences?.telegram ?? false)

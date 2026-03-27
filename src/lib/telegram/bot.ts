@@ -28,6 +28,11 @@ export async function getBot(): Promise<Bot> {
     const instance = new Bot(token);
     registerHandlers(instance);
     await instance.init();
+    await instance.api.setMyCommands([
+      { command: "start", description: "Open the bot or use an invite link" },
+      { command: "services", description: "Your subscriptions and payment status" },
+      { command: "help", description: "How to use this bot" },
+    ]);
     botToken = token;
     bot = instance;
     initPromise = null;

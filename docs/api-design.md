@@ -527,6 +527,16 @@ Query: `page`, `limit` (max 50), optional `status` (`pending` \| `locked` \| `co
 
 ## Telegram
 
+### Bot commands (grammy)
+
+Handled in `src/lib/telegram/handlers.ts` (polling locally via `startPolling` / `pollOnce`, or webhook below):
+
+- **`/start`** — Optional payload: `link_<code>` (account linking from the app), `invite_<jwt>` (member invite). Plain `/start` shows a short welcome; in local mode the copy emphasizes invite links and `/services` / `/help`.
+- **`/services`** — Requires a linked user (`User.telegram.chatId`). Lists active groups for that user, typical share per group, and status in any **open, unpaid** billing period.
+- **`/help`** — Explains reminder buttons and the commands above.
+
+On bot init (`getBot`), `setMyCommands` registers `start`, `services`, and `help` for the Telegram client command menu.
+
 ### `POST /api/telegram/webhook`
 
 Telegram webhook endpoint (alternative to polling). Receives updates from Telegram Bot API. Protected by `X-Telegram-Bot-Api-Secret-Token`.

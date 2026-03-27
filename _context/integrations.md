@@ -1,4 +1,4 @@
-<!-- last-updated: 2026-03-20 -->
+<!-- last-updated: 2026-03-27 -->
 
 # Integrations
 
@@ -22,6 +22,8 @@
 - Webhook secret via `TELEGRAM_WEBHOOK_SECRET`
 - Bot code in `src/lib/telegram/`
 - Polling mode for development, webhook via `/api/telegram/webhook` for production
+- **`/start`** with `link_` / `invite_` payloads; **`/services`** (subscriptions + open-period status); **`/help`**; `setMyCommands` on bot init
+- Rich DM after **`invite_`** accept: share, billing, payment text, next steps
 - Inline keyboards for payment confirmation (**I've Paid**, **Remind later**, **Show paying details**) and admin **Confirm** / **Reject**
 
 ## Auth.js v5

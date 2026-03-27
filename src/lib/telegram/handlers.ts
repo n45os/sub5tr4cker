@@ -15,6 +15,14 @@ import { sendNotification } from "@/lib/notifications/service";
 import { buildTelegramWelcomeEmailHtml } from "@/lib/email/templates/group-invite";
 import { formatGroupPaymentDetailsPlainText } from "@/lib/telegram/payment-details-text";
 import { getTelegramPlaceholderEmail } from "@/lib/users/placeholder-email";
+import { isLocalMode } from "@/lib/config/manager";
+import {
+  buildEmailSignInFooter,
+  buildServicesCommandText,
+  buildTelegramHelpText,
+  buildTelegramInviteWelcomeText,
+  buildTelegramProfileLinkSuccessText,
+} from "@/lib/telegram/member-onboarding-text";
 
 function buildBillingSummary(group: StorageGroup): string {
   const { billing } = group;
@@ -29,8 +37,76 @@ function buildBillingSummary(group: StorageGroup): string {
   return `${price} per ${cycle} (variable)`;
 }
 
+function buildGenericStartMessage(): string {
+  if (isLocalMode()) {
+    return (
+      "Welcome to sub5tr4cker!\n\n" +
+      "Most people join with an invite link from their admin (opens this chat with a link that starts with /start invite_…).\n\n" +
+      "If you already use the web app, connect Telegram from your profile there.\n\n" +
+      "Commands: /services — your subscriptions. /help — how this works."
+    );
+  }
+  return (
+    "Welcome to sub5tr4cker!\n\n" +
+    "I help you manage shared subscription payments.\n\n" +
+    "• New member: open the invite link your admin sent.\n" +
+    "• Already have an account: connect Telegram from your profile in the web app.\n\n" +
+    "Commands: /services — your subscriptions. /help — how this works."
+  );
+}
+
+async function handleServicesCommand(ctx: Context): Promise<void> {
+  const chatId = ctx.chat?.id;
+  if (!chatId) {
+    await ctx.reply("Could not get chat id.");
+    return;
+  }
+
+  const store = await db();
+  const user = await store.getUserByTelegramChatId(chatId);
+  if (!user) {
+    await ctx.reply(
+      "No sub5tr4cker account is linked to this Telegram chat yet. Ask your admin for an invite link, or connect Telegram from your profile in the web app."
+    );
+    return;
+  }
+
+  const groups = await store.listGroupsForUser(user.id, user.email);
+  if (groups.length === 0) {
+    await ctx.reply("You're not in any active groups yet.");
+    return;
+  }
+
+  const groupIds = groups.map((g) => g.id);
+  const openPeriods = await store.getOpenBillingPeriods({
+    asOf: new Date(),
+    groupIds,
+    unpaidOnly: true,
+  });
+
+  await ctx.reply(buildServicesCommandText(user, groups, openPeriods));
+}
+
 // register all bot handlers
 export function registerHandlers(bot: Bot): void {
+  bot.command("help", async (ctx) => {
+    try {
+      await ctx.reply(buildTelegramHelpText());
+    } catch (err) {
+      console.error("telegram /help handler error:", err);
+      await ctx.reply("Something went wrong. Try again later.").catch(() => {});
+    }
+  });
+
+  bot.command("services", async (ctx) => {
+    try {
+      await handleServicesCommand(ctx);
+    } catch (err) {
+      console.error("telegram /services handler error:", err);
+      await ctx.reply("Something went wrong. Try again later.").catch(() => {});
+    }
+  });
+
   // /start command — handles deep links for account linking (payload may have leading space)
   bot.command("start", async (ctx) => {
     const raw = typeof ctx.match === "string" ? ctx.match : "";
@@ -49,11 +125,7 @@ export function registerHandlers(bot: Bot): void {
         return;
       }
 
-      await ctx.reply(
-        "Welcome to sub5tr4cker!\n\n" +
-          "I help you manage shared subscription payments.\n\n" +
-          "Link your account from the sub5tr4cker web app to get started."
-      );
+      await ctx.reply(buildGenericStartMessage());
     } catch (err) {
       console.error("telegram /start handler error:", err);
       await ctx.reply("Something went wrong. Please try again or generate a new link from the app.").catch(() => {});
@@ -275,9 +347,7 @@ async function handleAccountLink(
     return;
   }
 
-  await ctx.reply(
-    "✅ Account linked! You’ll receive payment reminders here when enabled for your groups."
-  );
+  await ctx.reply(buildTelegramProfileLinkSuccessText());
 }
 
 async function handleInviteLink(ctx: Context, token: string): Promise<void> {
@@ -334,6 +404,17 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
         email: true,
         telegram: true,
         reminderFrequency: "every_3_days",
+      },
+    });
+    user = await store.updateUser(user.id, {
+      telegram: {
+        chatId,
+        username,
+        linkedAt: now,
+      },
+      notificationPreferences: {
+        ...user.notificationPreferences,
+        telegram: true,
       },
     });
   } else {
@@ -424,13 +505,11 @@ async function handleInviteLink(ctx: Context, token: string): Promise<void> {
         emailParams,
       }
     );
-    await ctx.reply(
-      "✅ Account linked! Check your email for a secure sign-in link to open your dashboard."
-    );
+    const welcome = buildTelegramInviteWelcomeText(group, member);
+    const emailFooter = sendEmail ? buildEmailSignInFooter() : "";
+    await ctx.reply(`${welcome}${emailFooter}`);
     return;
   }
 
-  await ctx.reply(
-    "✅ Account linked! You’ll receive payment reminders here when enabled for your groups."
-  );
+  await ctx.reply(buildTelegramInviteWelcomeText(group, member));
 }

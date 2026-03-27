@@ -67,8 +67,9 @@ src/
 | `src/lib/billing/calculator.ts` | Cost splitting logic (equal, fixed, variable) |
 | `src/lib/billing/collection-window.ts` | Collection open date, grace-from-open, Mongo filter for open periods |
 | `src/lib/notifications/service.ts` | Dispatches notifications across email + Telegram |
-| `src/lib/telegram/bot.ts` | grammy bot instance and setup |
-| `src/lib/telegram/handlers.ts` | Telegram callback handlers (payment confirmations) |
+| `src/lib/telegram/bot.ts` | grammy bot instance, `setMyCommands`, handler registration |
+| `src/lib/telegram/handlers.ts` | `/start` (link + invite payloads), `/services`, `/help`, callback handlers (payment confirmations) |
+| `src/lib/telegram/member-onboarding-text.ts` | invite welcome copy, profile-link success, `/help` and `/services` message builders |
 | `src/lib/telegram/polling.ts` | `pollOnce()` (cron) and `startPolling()` (server) for local mode |
 | `src/lib/tokens.ts` | HMAC token generation/verification for email links |
 | `src/jobs/runner.ts` | node-cron scheduler entry point |

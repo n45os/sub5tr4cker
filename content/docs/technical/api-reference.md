@@ -186,6 +186,10 @@ Body: `{ "action": "cancel" | "retry" }` — cancel pending/locked tasks or retr
 
 Body: at least one of `groupId`, `memberEmail`, `type`. Cancels matching pending/locked tasks.
 
+## Telegram bot (not HTTP)
+
+Member-facing **grammy** handlers (`src/lib/telegram/handlers.ts`): `/start` (`link_` / `invite_` payloads), `/services` (groups + open unpaid periods), `/help`. Webhook: `POST /api/telegram/webhook`. Full behavior: repo `docs/api-design.md` → **Telegram**.
+
 ## Cron
 
 All cron routes require header: `x-cron-secret: <secret>`.

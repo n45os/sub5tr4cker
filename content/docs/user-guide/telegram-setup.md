@@ -20,9 +20,20 @@ SubsTrack can send payment reminders and confirmation requests through **Telegra
 4. You’ll see a link like `https://t.me/SubsTrackBot?start=link_xxxxx`.
 5. Open that link on your phone or desktop. It opens Telegram and starts the bot.
 6. Press **Start** (or send `/start`) if the bot asks.
-7. The bot replies that your account is linked.
+7. The bot confirms the link. If you joined via a member **invite** link, it also summarizes the subscription, your share, how to pay, and what happens next.
 
 Your SubsTrack user is now linked to your Telegram chat. Reminders and confirmation requests can be sent there.
+
+## Bot commands
+
+After you’re linked, you can also send:
+
+- **`/services`** — Lists groups you belong to, your typical share, and whether you have an open period to pay (unpaid group billing windows only).
+- **`/help`** — Short explanation of reminders, inline buttons, and these commands.
+
+Plain **`/start`** (no invite payload) shows how to join or connect. On **local / CLI installs**, the wording favors invite links from your admin.
+
+Telegram’s command menu (near the message field) may list **start**, **services**, and **help** after the bot has run once with a current build.
 
 ## What you receive in Telegram
 

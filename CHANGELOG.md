@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.38.0] - 2026-03-27
+
+### Added
+
+- **Telegram bot commands** — `/services` lists your groups, typical share, and open-period payment status; `/help` explains reminders and buttons. The bot registers these with Telegram (`setMyCommands`) on startup.
+- **Rich invite welcome** — After a member opens an `invite_<token>` deep link, the bot sends billing summary, payment details, what happens next, and command hints (not only a one-line confirmation).
+
+### Fixed
+
+- **Telegram + new invite users** — First-time users created from a Telegram invite now persist `telegram.chatId` (previously only existing users did), so the admin members panel shows **Telegram connected** correctly.
+- **Invite reply vs email** — The bot no longer says “check your email” when no welcome email was sent (e.g. Telegram-only members with no real email).
+
+### Changed
+
+- **Profile link success & generic `/start`** — Linking from the web profile and plain `/start` messages now point to `/services` and `/help`, with local-mode wording that prioritizes invite links.
+
 ## [0.37.1] - 2026-03-27
 
 ### Fixed

@@ -1,4 +1,5 @@
 import { buildEmailShell } from "@/lib/email/layout";
+import { escapeTelegramHtml } from "@/lib/telegram/escape-html";
 
 export interface PaymentReminderTemplateParams {
   memberName: string;
@@ -105,15 +106,20 @@ export function buildPaymentReminderTelegramText(
     "memberName" | "groupName" | "periodLabel" | "amount" | "currency" | "paymentLink" | "adjustmentReason" | "priceNote"
   >
 ): string {
-  const noteLine = params.adjustmentReason || params.priceNote
-    ? `\n⚠️ <i>${params.adjustmentReason || params.priceNote}</i>\n`
-    : "";
+  const noteRaw = params.adjustmentReason || params.priceNote;
+  const noteLine =
+    noteRaw != null && noteRaw !== ""
+      ? `\n⚠️ <i>${escapeTelegramHtml(noteRaw)}</i>\n`
+      : "";
+  const cur = escapeTelegramHtml(params.currency);
+  const payLink = params.paymentLink ? escapeTelegramHtml(params.paymentLink) : null;
   return (
     `💳 <b>Payment Reminder</b>\n\n` +
-    `${params.memberName}, you owe <b>${params.amount.toFixed(2)}${params.currency}</b>\n` +
-    `for <b>${params.groupName}</b> — ${params.periodLabel}\n` +
-    noteLine + `\n` +
-    (params.paymentLink ? `Pay: ${params.paymentLink}\n\n` : "") +
+    `${escapeTelegramHtml(params.memberName)}, you owe <b>${params.amount.toFixed(2)}${cur}</b>\n` +
+    `for <b>${escapeTelegramHtml(params.groupName)}</b> — ${escapeTelegramHtml(params.periodLabel)}\n` +
+    noteLine +
+    `\n` +
+    (payLink ? `Pay: ${payLink}\n\n` : "") +
     `Tap below to verify payment once paid.`
   );
 }

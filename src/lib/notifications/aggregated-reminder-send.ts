@@ -1,4 +1,3 @@
-import { db } from "@/lib/storage";
 import { sendNotification } from "@/lib/notifications/service";
 import { paymentConfirmationKeyboard } from "@/lib/telegram/keyboards";
 import {
@@ -12,10 +11,8 @@ import {
   buildAggregatedPaymentReminderEmailHtml,
   buildAggregatedPaymentReminderTelegramText,
 } from "@/lib/email/templates/aggregated-payment-reminder";
-import {
-  getRecipientKey,
-  getRecipientLabel,
-} from "@/lib/notifications/member-email";
+import { getRecipientLabel } from "@/lib/notifications/member-email";
+import { resolveUserForReminder } from "@/lib/notifications/reminder-targeting";
 
 export interface SendAggregatedReminderResult {
   emailSent: boolean;
@@ -30,6 +27,13 @@ type GroupDoc = {
   id?: string;
   _id?: IdLike;
   name: string;
+  /** present on StorageGroup — used to resolve User when member.userId is stale or null */
+  members?: Array<{
+    id?: string;
+    _id?: IdLike;
+    userId?: string | null;
+    email?: string | null;
+  }>;
   service?: {
     name?: string;
     accentColor?: string | null;
@@ -61,6 +65,7 @@ type PaymentDoc = {
   memberEmail: string | null;
   memberNickname: string;
   amount: number;
+  status: string;
   adjustedAmount?: number | null;
   adjustmentReason?: string | null;
 };
@@ -93,12 +98,16 @@ export async function sendAggregatedReminder(
     return { emailSent: false, telegramSent: false };
   }
 
-  const store = await db();
-  const user = recipient.memberUserId
-    ? await store.getUser(recipient.memberUserId)
-    : recipient.memberEmail
-      ? await store.getUserByEmail(recipient.memberEmail)
-      : null;
+  const first = payments[0];
+  const grp = first.group;
+  const member = grp.members?.find(
+    (m) => asId(m.id ?? m._id) === asId(first.payment.memberId)
+  );
+  const user = await resolveUserForReminder({
+    member,
+    payment: first.payment,
+    memberUserIdOverride: recipient.memberUserId ?? null,
+  });
 
   const sendEmail = user?.notificationPreferences?.email ?? true;
   const sendTelegram = !!(
@@ -109,6 +118,17 @@ export async function sendAggregatedReminder(
   let wantTelegram = sendTelegram;
   if (options?.channelOverride === "email") wantTelegram = false;
   if (options?.channelOverride === "telegram") wantEmail = false;
+
+  const outboundEmail =
+    user?.email ?? recipient.memberEmail ?? member?.email ?? null;
+  // synthetic inbox — never send real email there (telegram path still runs)
+  if (
+    outboundEmail?.toLowerCase().endsWith("@telegram.sub5tr4cker.local") &&
+    options?.channelOverride !== "email"
+  ) {
+    wantEmail = false;
+  }
+
   if (!wantEmail && !wantTelegram) {
     return { emailSent: false, telegramSent: false };
   }
@@ -146,7 +166,6 @@ export async function sendAggregatedReminder(
     payments.map((i) => i.period.id ?? asId(i.period._id))
   ).size;
 
-  const first = payments[0];
   const firstMemberId = asId(first.payment.memberId);
   const firstGroupId = first.group.id ?? asId(first.group._id);
   const unsubscribeUrl = wantEmail
@@ -192,14 +211,14 @@ export async function sendAggregatedReminder(
 
   const result = await sendNotification(
     {
-      email: user?.email ?? recipient.memberEmail ?? null,
+      email: outboundEmail,
       telegramChatId: user?.telegram?.chatId ?? null,
       userId: user?.id ?? null,
       recipientLabel:
         recipient.recipientLabel ??
         getRecipientLabel({
           memberId: recipient.memberId,
-          memberEmail: user?.email ?? recipient.memberEmail,
+          memberEmail: outboundEmail,
           memberNickname: recipient.memberName,
           memberUserId: user?.id ?? recipient.memberUserId ?? null,
         }),

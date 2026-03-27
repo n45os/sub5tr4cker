@@ -1,6 +1,10 @@
-import { db, type StorageBillingPeriod, type StorageGroup, type StorageMemberPayment } from "@/lib/storage";
+import type { StorageBillingPeriod, StorageGroup, StorageMemberPayment } from "@/lib/storage";
 import { sendNotification } from "@/lib/notifications/service";
-import { getReminderEligibility, type PaymentLike } from "@/lib/notifications/reminder-targeting";
+import {
+  getReminderEligibility,
+  resolveUserForReminder,
+  type PaymentLike,
+} from "@/lib/notifications/reminder-targeting";
 import { paymentConfirmationKeyboard } from "@/lib/telegram/keyboards";
 import {
   createMemberPortalToken,
@@ -47,8 +51,9 @@ export async function sendReminderForPayment(
   const member = group.members.find(
     (m) => m.id === asId(payment.memberId)
   );
-  const store = await db();
-  const user = member?.userId ? await store.getUser(member.userId) : null;
+  const user = await resolveUserForReminder({ member, payment });
+  const outboundEmail =
+    user?.email ?? payment.memberEmail ?? member?.email ?? null;
 
   const periodId = period.id;
   const groupId = group.id;
@@ -110,12 +115,12 @@ export async function sendReminderForPayment(
 
   const result = await sendNotification(
     {
-      email: payment.memberEmail,
-      telegramChatId: user?.telegram?.chatId,
-      userId: user?.id,
+      email: outboundEmail,
+      telegramChatId: user?.telegram?.chatId ?? null,
+      userId: user?.id ?? null,
       recipientLabel: getRecipientLabel({
         memberId,
-        memberEmail: payment.memberEmail,
+        memberEmail: outboundEmail,
         memberNickname: payment.memberNickname,
         memberUserId: user?.id ?? member?.userId ?? null,
       }),

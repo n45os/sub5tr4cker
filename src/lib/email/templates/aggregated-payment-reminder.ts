@@ -1,4 +1,5 @@
 import { buildEmailShell } from "@/lib/email/layout";
+import { escapeTelegramHtml } from "@/lib/telegram/escape-html";
 
 export interface AggregatedPaymentEntry {
   groupName: string;
@@ -131,23 +132,30 @@ export function buildAggregatedPaymentReminderTelegramText(
     params.distinctPeriodCount,
     params.distinctGroupCount
   );
+  const introSafe = escapeTelegramHtml(intro.replace(/^You have /, "you have "));
+  const nameSafe = escapeTelegramHtml(params.memberName);
+  const currencySafe = escapeTelegramHtml(currency);
   const lines: string[] = [
     "💳 <b>Payment Reminders</b>",
     "",
-    `${params.memberName}, ${intro.replace(/^You have /, "you have ")}`,
-    `<b>Total: ${totalAmount.toFixed(2)}${currency}</b>`,
+    `${nameSafe}, ${introSafe}`,
+    `<b>Total: ${totalAmount.toFixed(2)}${currencySafe}</b>`,
     "",
   ];
   for (const entry of params.entries) {
+    const gn = escapeTelegramHtml(entry.groupName);
+    const pl = escapeTelegramHtml(entry.periodLabel);
+    const cur = escapeTelegramHtml(entry.currency);
+    const noteRaw = entry.adjustmentReason || entry.priceNote;
     const note =
-      entry.adjustmentReason || entry.priceNote
-        ? `\n⚠️ <i>${entry.adjustmentReason || entry.priceNote}</i>`
+      noteRaw != null && noteRaw !== ""
+        ? `\n⚠️ <i>${escapeTelegramHtml(noteRaw)}</i>`
         : "";
     lines.push(
-      `• <b>${entry.groupName}</b> — ${entry.periodLabel}: ${entry.amount.toFixed(2)}${entry.currency}${note}`
+      `• <b>${gn}</b> — ${pl}: ${entry.amount.toFixed(2)}${cur}${note}`
     );
     if (entry.paymentLink) {
-      lines.push(`  Pay: ${entry.paymentLink}`);
+      lines.push(`  Pay: ${escapeTelegramHtml(entry.paymentLink)}`);
     }
   }
   lines.push("", "Tap below to verify payment once paid (per group).");

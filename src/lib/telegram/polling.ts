@@ -68,7 +68,10 @@ export async function pollOnce(): Promise<number> {
   // if the web server is already long-polling, skip the one-shot poll
   const activePid = readLockPid();
   if (activePid && activePid !== process.pid) {
-    console.log(`[telegram] skipping pollOnce because pid ${activePid} is already polling`);
+    console.log(
+      `[telegram] skipping pollOnce (pid ${activePid} holds the poll lock — usually \`s54r start\`). ` +
+        `That process already delivers Telegram updates; cron notify does not need a second getUpdates.`
+    );
     return 0;
   }
 

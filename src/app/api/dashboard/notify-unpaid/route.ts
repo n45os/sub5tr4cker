@@ -215,9 +215,10 @@ export async function GET() {
         const member = groups
           .find((group) => group.id === ge.groupId)
           ?.members.find((entry) => entry.id === pay.memberId);
+        const effectiveMemberEmail = member?.email ?? pay.memberEmail ?? null;
         const key = getRecipientKey({
           memberId: pay.memberId,
-          memberEmail: pay.memberEmail,
+          memberEmail: effectiveMemberEmail,
           memberNickname: pay.memberNickname,
           memberUserId: member?.userId ?? null,
         });
@@ -243,7 +244,7 @@ export async function GET() {
           entry = {
             recipient: {
               memberId: pay.memberId,
-              memberEmail: pay.memberEmail,
+              memberEmail: effectiveMemberEmail,
               memberName: pay.memberNickname,
               memberUserId: member?.userId ?? null,
               recipientLabel: pay.recipientLabel,
@@ -396,9 +397,10 @@ export async function POST(req: Request) {
       }
       const input: AggregatedPaymentInput = { group, period, payment: p };
       const member = group.members.find((entry) => entry.id === p.memberId);
+      const effectiveMemberEmail = member?.email ?? p.memberEmail ?? null;
       const key = getRecipientKey({
         memberId: p.memberId,
-        memberEmail: p.memberEmail,
+        memberEmail: effectiveMemberEmail,
         memberNickname: p.memberNickname,
         memberUserId: member?.userId ?? null,
       });
@@ -408,11 +410,11 @@ export async function POST(req: Request) {
           recipient: {
             memberId: p.memberId,
             memberUserId: member?.userId ?? null,
-            memberEmail: p.memberEmail,
+            memberEmail: effectiveMemberEmail,
             memberName: p.memberNickname,
             recipientLabel: getRecipientLabel({
               memberId: p.memberId,
-              memberEmail: p.memberEmail,
+              memberEmail: effectiveMemberEmail,
               memberNickname: p.memberNickname,
               memberUserId: member?.userId ?? null,
             }),
@@ -454,7 +456,8 @@ export async function POST(req: Request) {
           periodChannels.set(periodIdStr, channels);
         }
       }
-    } catch {
+    } catch (err) {
+      console.error("dashboard notify-unpaid: sendAggregatedReminder error:", err);
       failed += 1;
     }
   }

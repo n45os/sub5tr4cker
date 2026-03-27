@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.38.4] - 2026-03-27
+
+### Fixed
+
+- **Notify all unpaid / reminders** — User resolution now also looks up `getTelegramPlaceholderEmail(memberId)`, matching Telegram-only invite accounts when billing payments omit `memberEmail`. Aggregated sends skip real email to `@telegram.sub5tr4cker.local` so the Telegram path is not paired with a doomed Resend attempt. Dashboard notify POST logs `sendAggregatedReminder` errors to the server console.
+
+## [0.38.3] - 2026-03-27
+
+### Changed
+
+- **`s54r notify`** — If reminders were enqueued but the worker claimed nothing on the first pass, runs one short-delay second pass (helps odd timing). File comment notes using `pnpm s54r notify` from the repo so the CLI matches source (stale global `dist/cli` can still run worker-before-enqueue from older builds).
+- **Telegram polling** — When `pollOnce` skips because `s54r start` holds the lock, the log line now explains that the running server already processes updates (not a failure).
+
+## [0.38.2] - 2026-03-27
+
+### Fixed
+
+- **Reminders + “Notify all unpaid”** — User lookup for delivery no longer relies only on `member.userId`. The app now merges **`member.userId`**, **`member.email`**, and **`payment.memberEmail`** (and prefers an account with Telegram linked when choosing among candidates). This fixes members who linked Telegram from the web profile without a group `userId`, stale `userId` rows, and aggregation keys that only had payment email.
+
+## [0.38.1] - 2026-03-27
+
+### Fixed
+
+- **`s54r notify`** — Runs `enqueueReminders` before `runNotificationTasks`, matching `POST /api/cron/reminders`. Previously the worker ran first, so tasks enqueued in the same invocation were not sent until the next cron/notify run.
+- **Telegram reminder text** — Payment and aggregated reminder DMs escape dynamic fields for HTML parse mode, avoiding silent send failures when names, links, or notes contain `&`, `<`, or `>`.
+
 ## [0.38.0] - 2026-03-27
 
 ### Added

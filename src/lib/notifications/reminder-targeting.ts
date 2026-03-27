@@ -1,4 +1,6 @@
 import { db } from "@/lib/storage";
+import type { StorageUser } from "@/lib/storage/types";
+import { getTelegramPlaceholderEmail } from "@/lib/users/placeholder-email";
 
 export type SkipReason =
   | "unsubscribed_from_email"
@@ -36,6 +38,7 @@ type MemberLike = {
   _id?: IdLike;
   userId?: string | null;
   user?: IdLike | null;
+  email?: string | null;
   unsubscribedFromEmail?: boolean;
 };
 
@@ -68,6 +71,57 @@ function asId(value: IdLike | undefined | null): string {
   return value == null ? "" : value.toString();
 }
 
+/**
+ * resolve the User row that should control email/Telegram delivery for this payment.
+ * prefers a candidate with telegram linked + telegram pref on (fixes profile-only TG link
+ * where member.userId is still null, or stale userId without chatId).
+ */
+export async function resolveUserForReminder(params: {
+  member?: MemberLike | null;
+  payment: PaymentLike;
+  /** from aggregated recipient — takes precedence over member.userId when set */
+  memberUserIdOverride?: string | null;
+}): Promise<StorageUser | null> {
+  const { member, payment, memberUserIdOverride } = params;
+  const store = await db();
+
+  const fromMember =
+    memberUserIdOverride && memberUserIdOverride !== ""
+      ? memberUserIdOverride
+      : member?.userId ?? (member?.user ? asId(member.user) : null) ?? null;
+
+  const emailSet = new Set<string>();
+  const addEmail = (e: string | null | undefined) => {
+    const n = (e ?? "").trim().toLowerCase();
+    if (n) emailSet.add(n);
+  };
+  addEmail(payment.memberEmail);
+  addEmail(member?.email);
+  // telegram-only invite users are keyed by synthetic email; billing rows may omit memberEmail
+  addEmail(getTelegramPlaceholderEmail(asId(payment.memberId)));
+
+  const seen = new Set<string>();
+  const candidates: StorageUser[] = [];
+  const push = (u: StorageUser | null) => {
+    if (u && !seen.has(u.id)) {
+      seen.add(u.id);
+      candidates.push(u);
+    }
+  };
+
+  if (fromMember) push(await store.getUser(fromMember));
+  for (const email of emailSet) {
+    push(await store.getUserByEmail(email));
+  }
+
+  for (const u of candidates) {
+    if (u.telegram?.chatId && (u.notificationPreferences?.telegram ?? false)) {
+      return u;
+    }
+  }
+  return candidates[0] ?? null;
+}
+
 /** compute skip reasons for a single payment from member/user and resolved channel flags */
 export function getSkipReasons(
   member: MemberLike | undefined,
@@ -97,16 +151,21 @@ export async function getReminderEligibility(params: {
   const member = group.members.find(
     (m) => asId(m.id ?? m._id) === asId(payment.memberId)
   );
-  let user = params.user;
-  const memberUserId = member?.userId ?? asId(member?.user);
-  if (!user && memberUserId) {
-    const store = await db();
-    const u = await store.getUser(memberUserId);
-    user = u ? { telegram: u.telegram, notificationPreferences: u.notificationPreferences } : null;
+  let user: ReminderUserLike = params.user ?? null;
+  if (!user) {
+    const full = await resolveUserForReminder({ member, payment });
+    user = full
+      ? { telegram: full.telegram, notificationPreferences: full.notificationPreferences }
+      : null;
   }
 
+  const emailForReach =
+    [payment.memberEmail, member?.email]
+      .map((e) => (e ?? "").trim())
+      .find((e) => e.length > 0) ?? null;
+
   const sendEmail =
-    !!payment.memberEmail &&
+    !!emailForReach &&
     !member?.unsubscribedFromEmail &&
     (user?.notificationPreferences?.email ?? true);
   const sendTelegram = !!(user?.telegram?.chatId && (user.notificationPreferences?.telegram ?? false));
@@ -115,7 +174,7 @@ export async function getReminderEligibility(params: {
   return {
     paymentId: payment.id ?? asId(payment._id),
     memberId: asId(payment.memberId),
-    memberEmail: payment.memberEmail,
+    memberEmail: payment.memberEmail ?? member?.email ?? null,
     memberNickname: payment.memberNickname,
     groupId: group.id ?? asId(group._id),
     groupName: group.name,

@@ -1,7 +1,6 @@
 {
   "name": "sub5tr4cker",
   "version": "0.38.4",
-  "private": true,
   "bin": {
     "s54r": "./dist/cli/index.js",
     "substrack": "./dist/cli/index.js"
@@ -25,11 +24,18 @@
     "configure": "tsx src/cli/index.ts configure",
     "seed": "tsx scripts/seed.ts"
   },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist/",
     ".next/standalone/",
     "src/",
     "public/",
+    ".env.example",
     "next.config.ts",
     "tsconfig.json",
     "postcss.config.mjs"

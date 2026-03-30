@@ -21,8 +21,7 @@ Before working on SubsTrack, read these files for context:
 1. Create route file at `src/app/api/<resource>/route.ts`
 2. Define Zod schema for request validation
 3. Add auth check (`auth()` from `@/lib/auth`)
-4. Call `dbConnect()` before any DB operations
-5. Use models from `@/models`
+4. Use `const store = await db()` from `@/lib/storage` for all data operations
 6. Return proper response format: `{ data }` or `{ error: { code, message } }`
 7. Update `docs/api-design.md` with the new endpoint
 
@@ -49,7 +48,7 @@ Before working on SubsTrack, read these files for context:
 1. Create job logic in `src/jobs/<job-name>.ts`
 2. Register in `src/jobs/runner.ts` with schedule
 3. Optionally add HTTP trigger at `src/app/api/cron/<job>/route.ts`
-4. Protect with `CRON_SECRET` header check
+4. Protect with cron secret header check (use `getSetting("security.cronSecret")` from `@/lib/settings/service`)
 
 ### New UI Feature
 
@@ -68,7 +67,7 @@ We use **grammy** (same as OpenClaw). Key patterns:
 - Handlers in `src/lib/telegram/handlers.ts`
 - Send helpers in `src/lib/telegram/send.ts`
 
-For reference on grammy patterns, see the OpenClaw codebase at `~/Developer/forks/openclaw/src/telegram/`.
+For reference on grammy patterns, check the OpenClaw codebase (use the openclaw inspiration skill).
 
 ## Payment Confirmation Flow
 
@@ -87,5 +86,5 @@ Telegram uses inline keyboard callbacks (see `src/lib/telegram/keyboards.ts`).
 ## Environment
 
 All config via env vars. See `.env.example`. Key ones:
-- `MONGODB_URI`, `NEXTAUTH_SECRET`, `RESEND_API_KEY`, `TELEGRAM_BOT_TOKEN`
+- `MONGODB_URI`, `NEXTAUTH_SECRET` / `AUTH_SECRET`, `RESEND_API_KEY`, `TELEGRAM_BOT_TOKEN`
 - `CONFIRMATION_SECRET` (for HMAC tokens), `CRON_SECRET` (for cron endpoints)

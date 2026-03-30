@@ -14,6 +14,7 @@ Detailed docs:
 - `docs/PLAN.md` — architecture plan, feature roadmap, billing modes
 - `docs/data-models.md` — Mongoose schema documentation
 - `docs/api-design.md` — API route reference
+- Local mode: `s54r` CLI, SQLite storage, token auth — see CLI commands in `AGENTS.md`
 
 ## Package Manager
 
@@ -47,8 +48,8 @@ Detailed docs:
 ## Database
 
 - Mongoose models in `src/models/`, re-exported from `src/models/index.ts`
-- Always call `dbConnect()` from `@/lib/db/mongoose` before model operations in API routes
-- Use Mongoose's built-in validation plus Zod for request validation
+- Use `const store = await db()` from `@/lib/storage` in API routes (works for both SQLite and MongoDB)
+- Mongoose validation is the second layer in advanced mode; Zod is the primary validation for all modes
 
 ## Components
 

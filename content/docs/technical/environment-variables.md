@@ -18,7 +18,7 @@ Copy `.env.example` to `.env.local` (or set in your host’s env) and fill in th
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `NEXTAUTH_SECRET` | Yes | Random secret for signing sessions. Generate: `openssl rand -base64 32`. |
-| `NEXTAUTH_URL` | Yes | Full URL of the app (e.g. `http://localhost:3000` or `https://substrack.example.com`). |
+| `NEXTAUTH_URL` | Yes | Full URL of the app (e.g. `http://localhost:3054` or `https://sub5tr4cker.example.com`). |
 | `GOOGLE_CLIENT_ID` | No | For “Sign in with Google”. |
 | `GOOGLE_CLIENT_SECRET` | No | For “Sign in with Google”. |
 
@@ -58,7 +58,7 @@ Copy `.env.example` to `.env.local` (or set in your host’s env) and fill in th
 ```env
 MONGODB_URI=mongodb://localhost:27017/substrack
 NEXTAUTH_SECRET=your-64-char-secret
-NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_URL=http://localhost:3054
 RESEND_API_KEY=re_xxxx
 EMAIL_FROM=SubsTrack <noreply@example.com>
 EMAIL_ENABLED=true

@@ -31,6 +31,7 @@
 - Secret via `NEXTAUTH_SECRET`
 - MongoDB adapter stores sessions and accounts
 - Google OAuth optional (needs `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`)
+- In local mode, auth uses a token cookie with auto-login (no MongoDB adapter or sessions)
 
 ## Payment Platforms (Phase 1)
 

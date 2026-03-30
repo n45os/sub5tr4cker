@@ -32,24 +32,27 @@ export async function GET() {
 
 ## Cron Route Protection
 
-Cron routes must verify the `CRON_SECRET` header:
+Cron routes must verify the cron secret header:
 
 ```typescript
-if (req.headers.get("x-cron-secret") !== process.env.CRON_SECRET) {
+import { getSetting } from "@/lib/settings/service";
+
+const cronSecret = await getSetting("security.cronSecret");
+if (req.headers.get("x-cron-secret") !== cronSecret) {
   return NextResponse.json({ error: { code: "UNAUTHORIZED" } }, { status: 401 });
 }
 ```
 
 ## Database
 
-Always await `dbConnect()` before any Mongoose operation:
+Use the storage adapter for all data operations:
 
 ```typescript
-import { dbConnect } from "@/lib/db/mongoose";
+import { db } from "@/lib/storage";
 
 export async function GET() {
-  await dbConnect();
-  const groups = await Group.find({ admin: session.user.id });
+  const store = await db();
+  const groups = await store.getGroupsByAdmin(session.user.id);
   // ...
 }
 ```

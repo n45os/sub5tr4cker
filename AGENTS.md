@@ -1,10 +1,10 @@
-# AGENTS.md — SubsTrack
+# AGENTS.md — sub5tr4cker
 
 ## Project Overview
 
-SubsTrack is an open-source web app for managing shared subscriptions. An admin pays for a service (YouTube Premium, Netflix, etc.) and splits the cost with members. The app automates reminders, tracks payments, and handles confirmations.
+sub5tr4cker is an open-source web app for managing shared subscriptions. An admin pays for a service (YouTube Premium, Netflix, etc.) and splits the cost with members. The app automates reminders, tracks payments, and handles confirmations.
 
-**Tech**: Next.js 15 (App Router), MongoDB/Mongoose, Auth.js v5, Resend (email), grammy (Telegram), node-cron, persisted notification task queue.
+**Tech**: Next.js 16 (App Router), MongoDB/Mongoose or SQLite (local mode), Auth.js v5, Resend (email), grammy (Telegram), node-cron, persisted notification task queue.
 
 ## Architecture
 
@@ -30,7 +30,17 @@ src/
 │       ├── confirm/        # email "I paid" token handler
 │       ├── telegram/       # Telegram webhook
 │       ├── cron/           # cron endpoints (billing, enqueue reminders/follow-ups, notification worker)
-│       └── notifications/  # manual notification triggers
+│       ├── notifications/  # manual notification triggers
+│       ├── dashboard/      # quick-status, notify-unpaid
+│       ├── activity/       # activity feed + notification email preview
+│       ├── scheduled-tasks/ # admin task queue (list, cancel, retry)
+│       ├── settings/       # app settings CRUD
+│       ├── invite/         # group invite acceptance
+│       ├── user/           # user profile
+│       ├── register/       # user registration
+│       ├── payments/       # member payment portal
+│       ├── plugins/        # plugin management
+│       └── health/         # health check endpoint
 ├── components/
 │   ├── ui/                 # shadcn/ui primitives
 │   ├── layout/             # app shell (header, sidebar, footer)
@@ -43,8 +53,13 @@ src/
 │   ├── billing/            # split calculation, period management
 │   ├── notifications/      # unified dispatcher across channels
 │   ├── tasks/              # task queue (enqueue, claim, worker)
+│   ├── storage/            # StorageAdapter interface + SQLite/Mongoose implementations
+│   ├── config/             # Config manager (~/.sub5tr4cker/config.json)
+│   ├── auth/               # Auth.js + local-mode token auth (local.ts)
+│   ├── settings/           # DB-backed app settings service
 │   └── tokens.ts           # HMAC tokens for confirmation links
 ├── models/                 # Mongoose schemas (User, Group, BillingPeriod, ScheduledTask, etc.)
+├── cli/                    # s54r CLI entry point + local/advanced commands
 ├── jobs/                   # cron logic (billing, enqueue-reminders/follow-ups, run-notification-tasks)
 └── types/                  # shared TypeScript types
 ```
@@ -91,6 +106,7 @@ See `docs/data-models.md`. Quick summary:
 - **PriceHistory** — price change log per group
 - **Notification** — delivery log for all sent messages
 - **ScheduledTask** — queue for notification delivery (pending → locked → completed/failed/cancelled); task types used in production: `payment_reminder`, `aggregated_payment_reminder`, `admin_confirmation_request` only; admins manage via `/dashboard/scheduled-tasks` and `/api/scheduled-tasks/*`
+- **AuditEvent** — audit trail for group operations, admin actions, and notifications
 
 ## Conventions
 
@@ -109,7 +125,7 @@ See `docs/data-models.md`. Quick summary:
 1. Create `src/app/api/<resource>/route.ts`
 2. Add Zod validation schema at the top
 3. Check auth with `auth()` from `@/lib/auth`
-4. Use Mongoose models from `@/models`
+4. Use the storage adapter via `const store = await db()` from `@/lib/storage`
 5. Return `NextResponse.json()`
 
 ### Adding a new notification type

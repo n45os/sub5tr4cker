@@ -573,13 +573,13 @@ Reconcile overdue payment state (pending → overdue after 14 days) and enqueue 
 
 Run the notification task worker: claim due tasks, execute sends via the notification service, return counts. Intended to be called frequently (e.g. every 5 min). Response includes `claimed`, `completed`, `failed`, and `counts` (pending, locked, completed, failed, cancelled) for observability.
 
-## User Settings
+## User Profile
 
-### `GET /api/user/settings`
+### `GET /api/user/profile`
 
 Get authenticated user's profile and notification preferences.
 
-### `PATCH /api/user/settings`
+### `PATCH /api/user/profile`
 
 Update profile and notification preferences.
 
@@ -636,19 +636,7 @@ is already linked.
 
 **Deprecated** for first-party UI (template list/preview uses `@/lib/plugins/templates` in-process). Authenticated; return plugin template metadata or HTML preview.
 
-## Dashboard and activity
-
-### `GET /api/dashboard/quick-status`
-
-Authenticated (admin-owned groups). See the **Dashboard** section above for response fields.
-
-### `GET /api/dashboard/notify-unpaid`
-
-Authenticated (admin groups). Preview of who would receive a manual unpaid reminder (`byGroup` / `byUser`, eligibility, skip reasons).
-
-### `POST /api/dashboard/notify-unpaid`
-
-Authenticated admin. Sends aggregated unpaid reminders; optional `groupIds`, `paymentIds`, `channelPreference` (`email` | `telegram` | `both`). Updates period `reminders[]` entries.
+## Activity
 
 ### `GET /api/activity`
 
@@ -663,16 +651,6 @@ Authenticated. User must be able to access the notification’s group. Rebuilds 
 ### `GET /api/payments`
 
 Authenticated **group admin** only. Cross-group payment rows with filters and pagination; includes summary totals.
-
-## User profile
-
-### `GET /api/user/profile` / `PATCH /api/user/profile`
-
-Current user profile and notification preferences.
-
-### `POST /api/user/change-password`
-
-Set or change password for credentials sign-in.
 
 ## Invite accept and member portal
 
@@ -698,7 +676,7 @@ Public liveness probe. Returns `{ "status": "ok" }` (not wrapped in `{ data }` �
 
 Public. One-click email unsubscribe for a member; signed token.
 
-## Member Requests (Phase 2)
+## Member Requests (planned — not yet implemented)
 
 ### `POST /api/groups/[groupId]/requests`
 

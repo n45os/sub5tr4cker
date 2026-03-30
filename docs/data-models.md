@@ -32,6 +32,10 @@ The person using the platform. Can be an instance admin (first user or promoted)
     username: string | null,
     linkedAt: Date | null,
   },
+  telegramLinkCode: {                     // short-lived code for Telegram deep link account linking
+    code: string,
+    expiresAt: Date,
+  } | null,
   notificationPreferences: {
     email: boolean,                       // default: true
     telegram: boolean,                    // default: false (until linked)
@@ -44,7 +48,7 @@ The person using the platform. Can be an instance admin (first user or promoted)
 }
 ```
 
-**Indexes**: `email` (unique), `telegram.chatId` (sparse unique)
+**Indexes**: `email` (unique), `telegram.chatId` (sparse unique), `telegramLinkCode.code` (sparse unique)
 
 ## Group
 
@@ -105,6 +109,8 @@ A subscription group managed by an admin.
     isActive: boolean,
     customAmount: number | null,          // override for this member (if not equal split)
     billingStartsAt: Date | null,         // first period member owes; null = from joinedAt
+    acceptedAt: Date | null,              // when the member accepted their invite
+    unsubscribedFromEmail: boolean,       // when true, skip reminder/invite/price-change emails for this member
   }],
 
   // communication
@@ -122,6 +128,7 @@ A subscription group managed by an admin.
   isActive: boolean,                      // soft delete
   inviteCode: string | null,              // for public invite links (null when revoked)
   inviteLinkEnabled: boolean,             // default: false; when false, join via link is blocked even if inviteCode is set
+  initializedAt: Date | null,            // when the group was first initialized (billing bootstrapped)
 
   createdAt: Date,
   updatedAt: Date,
@@ -146,6 +153,7 @@ One billing cycle for a group. Created automatically by the cron job or manually
   periodLabel: string,                    // e.g., "Mar 2026"
   totalPrice: number,                     // total price for this period
   currency: string,
+  priceNote: string | null,               // blanket admin note for the whole period (e.g. "annual price hike")
 
   // per-member payment tracking
   payments: [{
@@ -153,6 +161,8 @@ One billing cycle for a group. Created automatically by the cron job or manually
     memberEmail: string | null,           // denormalized when email exists
     memberNickname: string,               // denormalized
     amount: number,                       // this member's share
+    adjustedAmount: number | null,        // admin override of the calculated share for this period+member
+    adjustmentReason: string | null,      // free-text explanation for the adjustment
     status: 'pending' | 'member_confirmed' | 'confirmed' | 'overdue' | 'waived',
     memberConfirmedAt: Date | null,
     adminConfirmedAt: Date | null,
@@ -301,9 +311,9 @@ from the dashboard instead of editing env files.
 
 **Indexes**: `key` (unique), `category`
 
-## MemberRequest
+## MemberRequest (planned — not yet implemented)
 
-Requests from members to admins (future feature).
+Requests from members to admins.
 
 ```typescript
 {
@@ -319,6 +329,36 @@ Requests from members to admins (future feature).
   createdAt: Date,
 }
 ```
+
+## AuditEvent
+
+Audit trail for group operations, admin actions, and notification events.
+
+```typescript
+{
+  _id: ObjectId,
+  actor: ObjectId,                        // ref: User — who performed the action
+  actorName: string,                      // denormalized display name
+  action: 'payment_confirmed'
+        | 'payment_self_confirmed'
+        | 'payment_rejected'
+        | 'payment_waived'
+        | 'group_created'
+        | 'group_edited'
+        | 'member_added'
+        | 'member_removed'
+        | 'member_updated'
+        | 'billing_period_created',
+  group: ObjectId | null,                 // ref: Group
+  billingPeriod: ObjectId | null,         // ref: BillingPeriod
+  targetMember: ObjectId | null,          // ref: Group.members
+  metadata: Record<string, unknown>,      // action-specific details
+
+  createdAt: Date,
+}
+```
+
+**Indexes**: `actor`, `group`, `action`, `createdAt` (descending)
 
 ## Confirmation Token Structure
 

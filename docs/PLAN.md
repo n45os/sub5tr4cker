@@ -82,7 +82,7 @@ Members don't need to create accounts to receive reminders (email-only mode). Bu
 
 | Layer | Technology | Rationale |
 |-------|-----------|-----------|
-| Framework | Next.js 15 (App Router) | SSR, API routes, server actions, modern React |
+| Framework | Next.js 16 (App Router) | SSR, API routes, server actions, modern React |
 | Database | MongoDB + Mongoose | Flexible schema for subscription configs, self-hostable |
 | Auth | Auth.js v5 (NextAuth) | Mature, App Router support, multiple providers |
 | Email | Resend (default) + pluggable | Developer-friendly, React Email templates, free tier |
@@ -116,7 +116,8 @@ Members don't need to create accounts to receive reminders (email-only mode). Bu
 │  ┌────────────────▼─────────────────────────────────┐    │
 │  │              Data Layer (Mongoose)                │    │
 │  │  User | Group | BillingPeriod | PriceHistory |    │    │
-│  │  Notification | PaymentConfirmation               │    │
+│  │  Notification (confirmation state is embedded in     │    │
+│  │  BillingPeriod.payments, not a top-level collection) │    │
 │  └──────────────────────────────────────────────────┘    │
 │                   │                                      │
 └───────────────────┼──────────────────────────────────────┘
@@ -136,7 +137,7 @@ Members don't need to create accounts to receive reminders (email-only mode). Bu
 - Default channel, works without user accounts
 - Payment reminders with breakdown and "I paid" link
 - "I paid" link hits `/api/confirm/[token]` which marks the period as `member_confirmed`
-- Token is a signed JWT or HMAC to prevent spoofing
+- Token is a signed HMAC to prevent spoofing
 - Email templates built with React Email for maintainability
 
 ### Telegram
@@ -298,11 +299,11 @@ For groups that want automatic payment verification:
 
 - [ ] Stripe integration for automatic payment verification
 - [ ] Telegram group mode (shared tracking group)
-- [ ] Variable billing mode (utility bills)
+- [x] Variable billing mode (utility bills)
 - [ ] Multi-currency support
 - [ ] Payment receipt uploads (photo proof)
 - [ ] Export payment history (CSV)
-- [ ] Public group invite links
+- [x] Public group invite links
 - [ ] Webhook API for external integrations
 - [ ] Mobile-responsive PWA
 
@@ -391,7 +392,7 @@ subs-track/
 │   │   ├── billing/
 │   │   │   ├── calculator.ts                   # split calculation logic
 │   │   │   └── service.ts                      # billing period management
-│   │   ├── tokens.ts                           # JWT/HMAC for confirmation links
+│   │   ├── tokens.ts                           # HMAC for confirmation links
 │   │   └── utils.ts
 │   ├── models/
 │   │   ├── user.ts
@@ -446,8 +447,8 @@ docker-compose up -d
 
 Services:
 - `app` — Next.js + cron runner
-- `mongodb` — MongoDB instance
-- `telegram-bot` — Telegram polling process (or integrated with app)
+- `mongo` — MongoDB instance
+- `cron` — node-cron scheduler (billing, reminders, follow-ups, notification worker)
 
 ### Cloud (Vercel + MongoDB Atlas)
 

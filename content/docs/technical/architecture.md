@@ -21,7 +21,7 @@ SubsTrack is an open-source web app for managing shared subscriptions. One perso
 
 | Layer | Technology |
 |-------|-------------|
-| Framework | Next.js 15 (App Router) |
+| Framework | Next.js 16 (App Router) |
 | Database | **Advanced:** MongoDB + Mongoose (via `MongooseAdapter`). **Local (`s54r`):** SQLite + `SqliteAdapter`. Both implement `StorageAdapter`; routes call `db()`. |
 | Auth | Auth.js v5 (NextAuth) |
 | Email | Resend (pluggable) |

@@ -9,7 +9,7 @@ globs: src/models/**/*.ts
 
 - Define the TypeScript interface first, then the Mongoose schema
 - Use `mongoose.models.ModelName || mongoose.model()` pattern to avoid recompilation in dev
-- Add indexes as schema options, not separate calls
+- Add indexes via separate `.index()` calls on the schema
 - Use `timestamps: true` for automatic `createdAt`/`updatedAt`
 
 ## Pattern

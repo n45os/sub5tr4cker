@@ -14,7 +14,7 @@ SubsTrack is open source. Contributions to code, documentation, and design are w
 3. Copy `.env.example` to `.env.local` and set at least `MONGODB_URI` and `NEXTAUTH_SECRET`.
 4. Run MongoDB locally (e.g. Docker: `docker run -d -p 27017:27017 mongo:7`).
 5. Run the app: `npm run dev`.
-6. Open [http://localhost:3000](http://localhost:3000).
+6. Open [http://localhost:3054](http://localhost:3054).
 
 ## Project structure
 

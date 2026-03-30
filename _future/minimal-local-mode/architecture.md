@@ -146,7 +146,7 @@ Flow:
 
 ### Web UI Adapter
 - **Purpose**: the existing Next.js app, modified to read storage mode from config and use the appropriate adapter
-- **Tech**: Next.js 15 (App Router), pre-built and bundled in the npm package
+- **Tech**: Next.js 16 (App Router), pre-built and bundled in the npm package
 - **Integrates with**: storage adapter (chosen at startup based on config), config manager
 
 Key changes to the existing web app:

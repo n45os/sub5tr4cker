@@ -5,7 +5,7 @@
 ## Runtime
 
 - Node.js 20+
-- Next.js 15 (App Router, RSC)
+- Next.js 16 (App Router, RSC)
 - TypeScript 5 (strict)
 
 ## Database
@@ -23,7 +23,7 @@
 ## Email
 
 - Resend (primary, pluggable)
-- React Email for templates (planned)
+- React Email for templates
 
 ## Telegram
 

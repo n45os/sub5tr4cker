@@ -1,5 +1,5 @@
 {
-  "name": "sub5tr4cker",
+  "name": "s54r",
   "version": "0.38.4",
   "bin": {
     "s54r": "./dist/cli/index.js",

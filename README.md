@@ -28,13 +28,13 @@ One person pays for a shared service (YouTube Premium, Netflix, Spotify, a utili
 No database to install, no Docker, no config files. Just run:
 
 ```bash
-npx sub5tr4cker init
+npx s54r init
 ```
 
 The interactive wizard sets up a local SQLite database, notification channels (email and/or Telegram), and your admin account. When it finishes:
 
 ```bash
-npx sub5tr4cker start
+npx s54r start
 ```
 
 Open [http://localhost:3054](http://localhost:3054) — your dashboard is ready.
@@ -42,12 +42,12 @@ Open [http://localhost:3054](http://localhost:3054) — your dashboard is ready.
 To send reminders automatically, set up a cron job:
 
 ```bash
-npx sub5tr4cker cron-install
+npx s54r cron-install
 ```
 
 That's it. Everything lives under `~/.sub5tr4cker/` on your machine.
 
-> **Prefer a global install?** Run `npm i -g sub5tr4cker` and then use `s54r init`, `s54r start`, etc.
+> **Prefer a global install?** Run `npm i -g s54r` and then use `s54r init`, `s54r start`, etc.
 
 ## Why
 
@@ -55,7 +55,7 @@ If you've ever managed a shared subscription, you know the pain: spreadsheets, m
 
 ## Features
 
-- **One-command setup** — `npx sub5tr4cker init` gets you running with SQLite, no cloud required
+- **One-command setup** — `npx s54r init` gets you running with SQLite, no cloud required
 - **Subscription groups** — Create a group for each shared service, add members by email or Telegram invite
 - **Automated reminders** — Queued notification tasks: cron enqueues reminders and a worker sends them via email/Telegram
 - **Payment confirmation flow** — Members click "I paid" in email/Telegram, admin verifies
@@ -71,7 +71,7 @@ If you've ever managed a shared subscription, you know the pain: spreadsheets, m
 
 ## CLI Reference
 
-sub5tr4cker ships a CLI called `s54r` (also available as `substrack`). Every command works with `npx sub5tr4cker <command>` too.
+sub5tr4cker ships a CLI called `s54r` (also available as `substrack`). Every command works with `npx s54r <command>` too.
 
 | Command | Description |
 |---------|-------------|

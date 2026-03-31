@@ -18,7 +18,7 @@ export function getPackageRoot(): string {
     if (existsSync(pkgPath)) {
       try {
         const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-        if (pkg.name === "sub5tr4cker") {
+        if (pkg.name === "s54r") {
           _pkgRoot = dir;
           return dir;
         }

@@ -47,6 +47,7 @@ import {
 import { getPeriodDisplayState } from "@/lib/billing/period-display";
 import { cn } from "@/lib/utils";
 import type { BillingMode } from "@/types";
+import { BulkConfirmButton } from "./bulk-confirm-button";
 
 export interface PaymentCell {
   memberId: string;
@@ -767,6 +768,21 @@ export function PaymentMatrix({
                   <span className="mt-1 inline-block text-[10px] text-status-confirmed">
                     Fully paid
                   </span>
+                )}
+                {isAdmin && (
+                  <BulkConfirmButton
+                    groupId={groupId}
+                    periodId={period._id}
+                    memberConfirmedIds={period.payments
+                      .filter((p) => p.status === "member_confirmed")
+                      .map((p) => p.memberId)}
+                    onMemberConfirmed={(memberId) =>
+                      updateCell(period._id, memberId, {
+                        status: "confirmed",
+                        adminConfirmedAt: new Date().toISOString(),
+                      })
+                    }
+                  />
                 )}
               </td>
               {columnOrder.map((mem) => {

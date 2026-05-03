@@ -1,22 +1,29 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
   Bell,
   CalendarClock,
+  ChevronDown,
   ChevronsUpDown,
   CreditCard,
-  LayoutDashboard,
   LogOut,
   Plus,
   Settings,
+  ShieldCheck,
   User,
   Users,
   Wallet,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,21 +44,21 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-const NAV_ITEMS = [
-  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { title: "Delivery log", href: "/dashboard/activity", icon: Activity },
+const ADMIN_TOOLS = [
+  { title: "Notifications hub", href: "/dashboard/notifications", icon: Bell },
   {
     title: "Scheduled sends",
     href: "/dashboard/scheduled-tasks",
     icon: CalendarClock,
   },
   { title: "Payments", href: "/dashboard/payments", icon: Wallet },
-  { title: "Notifications", href: "/dashboard/notifications", icon: Bell },
-  { title: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -80,6 +87,10 @@ interface AppSidebarProps {
 
 export function AppSidebar({ user, groups }: AppSidebarProps) {
   const pathname = usePathname();
+  const adminToolsActive = ADMIN_TOOLS.some((item) =>
+    isActive(pathname, item.href)
+  );
+  const [adminToolsOpen, setAdminToolsOpen] = useState(adminToolsActive);
 
   return (
     <Sidebar collapsible="icon" variant="inset">
@@ -107,27 +118,7 @@ export function AppSidebar({ user, groups }: AppSidebarProps) {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {NAV_ITEMS.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    render={<Link href={item.href} />}
-                    isActive={isActive(pathname, item.href)}
-                    tooltip={item.title}
-                  >
-                    <item.icon />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Groups</SidebarGroupLabel>
+          <SidebarGroupLabel>My groups</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {groups.map((group) => (
@@ -154,10 +145,69 @@ export function AppSidebar({ user, groups }: AppSidebarProps) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  render={<Link href="/dashboard/activity" />}
+                  isActive={isActive(pathname, "/dashboard/activity")}
+                  tooltip="Activity"
+                >
+                  <Activity />
+                  <span>Activity</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter>
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              render={<Link href="/dashboard/settings" />}
+              isActive={isActive(pathname, "/dashboard/settings")}
+              tooltip="Settings"
+            >
+              <Settings />
+              <span>Settings</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
+          <Collapsible open={adminToolsOpen} onOpenChange={setAdminToolsOpen}>
+            <SidebarMenuItem>
+              <CollapsibleTrigger
+                render={
+                  <SidebarMenuButton tooltip="Admin tools">
+                    <ShieldCheck />
+                    <span>Admin tools</span>
+                    <ChevronDown
+                      className={`ml-auto size-4 transition-transform ${adminToolsOpen ? "rotate-180" : ""}`}
+                    />
+                  </SidebarMenuButton>
+                }
+              />
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  {ADMIN_TOOLS.map((item) => (
+                    <SidebarMenuSubItem key={item.href}>
+                      <SidebarMenuSubButton
+                        render={<Link href={item.href} />}
+                        isActive={isActive(pathname, item.href)}
+                      >
+                        <item.icon className="size-4" />
+                        <span>{item.title}</span>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  ))}
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </SidebarMenuItem>
+          </Collapsible>
+
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger

@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [0.39.0] - 2026-05-03
 
+### Added
+
+- **Telegram admin verification buttons** — The admin nudge that fires when a member self-confirms now ships with inline buttons: a per-member ✅ confirm + ✕ reject pair, plus a "✅ Confirm all (N)" bulk action. Tapping ✅ runs through the shared `applyAdminPaymentDecision` helper (same path as the dashboard route), edits the message to drop the just-handled member, and re-renders only the still-unverified rows. ✕ resets the payment to `pending`, clears `memberConfirmedAt`, and DMs/emails the member that they need to re-pay. "Confirm all" bulk-flips every `member_confirmed` payment in one update through `confirmAllMemberConfirmed`. Per-member rows include the self-confirm relative timestamp ("30m ago"). When the keyboard would exceed 8 member rows the bot falls back to a single dashboard link to stay within Telegram's practical inline-keyboard limits, and every callback_data string stays under the 64-byte cap even with 24-char Mongo ObjectIds.
+
 ### Changed
 
 - **Authentication (advanced mode)** — Migrated from Auth.js v5 (Credentials + Google + Magic-invite providers) to **n450s_auth** as the upstream identity provider. Login is a single "Continue with n450s" CTA that redirects to `<AUTH_SERVICE_URL>/oauth/consent`; sub5tr4cker exchanges the authorization code at the n450s `/api/auth/n450s/callback` route, stores access + refresh tokens in HttpOnly cookies (`s5_at`, `s5_rt`), and the new middleware silently refreshes the access token on every request that's within the expiry window. **Sliding 7-day refresh tokens give effectively-persistent sessions** for any user who interacts with the app at least once a week — the long-standing "users get logged out" complaint is the entry motivation for the migration. Google sign-in is now federated by n450s_auth itself; sub5tr4cker no longer carries a Google button or `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`. **Local mode (`SUB5TR4CKER_MODE=local`) is unchanged** — token-cookie auto-login (`src/lib/auth/local.ts`) is preserved.

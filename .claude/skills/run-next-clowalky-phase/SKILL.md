@@ -1,0 +1,71 @@
+---
+name: run-next-clowalky-phase
+description: Advance a single named phase in a clowalky plan under .clowalky/_plans/. Use when asked to "run the next clowalky phase", "advance plan X phase Y", or invoked by the clowalky orchestrator.
+---
+
+# run-next-clowalky-phase
+
+Advances **one specific phase** of a clowalky plan in this project. The caller (a human or the clowalky daemon) names which plan and which phase. Do not pick your own.
+
+## Inputs you must extract from the prompt
+
+- `plan-slug` — directory under `.clowalky/_plans/`
+- `phase-id` — the value of the `ID` column in `STATUS.md` (e.g. `0`, `1b`, `5a`)
+
+If either is missing, abort with a one-line error: `run-next-clowalky-phase: missing plan-slug or phase-id`.
+
+## Execution mode: just run, do not converse
+
+This skill is invoked by an autonomous scheduler. There is no human in the loop.
+
+- **No clarifying questions.** Do not ask anything. The brief plus STATUS.md is your full contract — if a detail is unspecified, pick the most reasonable interpretation and document the choice in `Notes`.
+- **No scheduling / follow-up offers.** Never propose recurring agents, cron jobs, `/schedule` follow-ups, or "want me to do X next?" prompts. Run this phase and stop.
+- **No suggestions for adjacent work.** Do not pitch refactors, cleanups, or unrelated improvements outside the brief. Surface them in `Notes` if truly load-bearing; otherwise drop them entirely.
+- **No status preambles.** Skip "Let me start by...", "I'll now do...", end-of-turn summaries, and chapter markers. Execute and report only what changed.
+- **Block, don't escalate.** If you genuinely cannot proceed, set the row to `blocked` with a one-line `Notes` reason and stop. Do not ask a human to choose between options.
+
+The only acceptable end states are: phase committed (`complete`), phase blocked (`blocked` with reason), or eligibility refusal (one-line abort message). Nothing else.
+
+## Procedure
+
+1. Open `.clowalky/_plans/<plan-slug>/STATUS.md`. Locate the row whose `ID` cell matches `phase-id` (trim before compare).
+2. Verify eligibility: `Status` must be `pending` AND every entry in `Depends on` must be a row whose `Status` is `complete`. If not eligible, abort with: `run-next-clowalky-phase: phase <id> not eligible (status=<x>, blocking deps=<list>)`.
+3. Set this row's `Status` to `in-progress` and `Started` to today (`YYYY-MM-DD`). Write the file. Do this **before** any other work so a crash leaves a visible trace.
+4. Read `.clowalky/_plans/<plan-slug>/<value-of-Brief-cell>` in full. This is the work brief.
+5. Execute the brief. Stay strictly inside the listed scope and files.
+6. Update the row: `Status` → `complete`, `Completed` → today (`YYYY-MM-DD`). Write the file.
+7. Commit your work — **scoped staging only**:
+   - Stage **only the files you modified for this phase**, by name: `git add <path1> <path2> ... .clowalky/_plans/<plan-slug>/STATUS.md`. Always include the updated STATUS.md.
+   - **Never** use `git add -A` or `git add .` — unrelated working-tree changes are not yours to commit.
+   - Use the brief's "Files to touch" section as the staging allowlist. If you genuinely needed to modify a file outside that list, surface it in `Notes` rather than expanding the commit silently.
+   - Commit subject exactly: `CLWLK: <plan-slug>/<phase-id> — <phase-title>` (phase-title is the `Phase` cell). No body, no co-author lines, no trailing punctuation.
+   - If only STATUS.md changed (the brief was a no-op), still commit — STATUS.md is the audit trail.
+8. If you cannot complete the brief, set `Status` → `blocked` and put a one-line reason in `Notes`. Do **not** commit if blocked.
+9. After step 7 succeeds, check the rest of the table. If every row is now `complete` or `deferred`, the plan is finished. Archive the folder so the orchestrator stops scanning it:
+   - `git mv .clowalky/_plans/<plan-slug> .clowalky/_plans/__<plan-slug>`
+   - Commit with subject: `CLWLK: <plan-slug> — plan archived`. Nothing else in this commit.
+
+## Working-tree hygiene (unrelated WIP)
+
+The runner does not start from a clean tree. The user (or a previous phase that didn't archive cleanly) may have uncommitted edits to files that are also in *your* "Files to touch" list. When that happens:
+
+- Do **not** silently sweep the unrelated changes into your phase commit. Their author and rationale are not yours.
+- If the conflict is on a file you must edit: revert the unrelated edits in your working copy back to `HEAD` for the affected lines, then make your phase edits, then commit. The original author still has the changes — they're just not in *this* commit.
+- If you cannot tell which lines are yours vs theirs: stop. Set `Status = blocked` with a `Notes` reason like `WIP overlap on <path>; needs user split`. Do not commit.
+- Always note in the row's `Notes` cell when you encountered overlap (e.g. `Notes: phase-6-style WIP on Status.tsx left in working tree`). The next phase's runner will need to know.
+
+This is also why scoped staging matters — `git add -A` would happily roll up everyone else's WIP into your commit.
+
+## Hard rules
+
+- One row, one phase. Never edit another row.
+- Never edit any `phase-*.md` brief file. If a brief is wrong, surface it in `Notes` and stop.
+- Never push, branch, force-push, or amend.
+- Never invent or rename phases.
+- Never use `git add -A` or `git add .`. Stage by exact path.
+- Never commit anything outside `.clowalky/_plans/<plan-slug>/` plus the paths explicitly listed in the brief's "Files to touch" section.
+- Never sweep unrelated WIP into your commit. See "Working-tree hygiene" above.
+
+## When to use a different skill
+
+If asked to **draft** a new plan, use `author-clowalky-plan` instead.

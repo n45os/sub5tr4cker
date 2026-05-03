@@ -53,7 +53,7 @@ You are running unattended — typically dispatched by the clowalky daemon while
 - **No scheduling / follow-up offers.** Never propose recurring agents, cron jobs, `/schedule` follow-ups, or "want me to do X next?" prompts.
 - **No suggestions for adjacent work.** Refactors, cleanups, unrelated improvements — drop them or surface in `Notes` if load-bearing; never pitch them as next steps.
 - **No status preambles or summaries.** Execute the brief and stop. The git commit is your report.
-- **Block, don't escalate.** If you genuinely cannot proceed, set `Status = blocked` with a one-line `Notes` reason. Do not ask the user to choose between options.
+- **Block, don't escalate.** If you genuinely cannot proceed, call the `report-clowalky-block` skill — it writes a structured report under `.clowalky/_blocks/` and flips the row to `Status = blocked` in a single commit. Do not ask the user to choose between options. (The legacy fallback — set `Status = blocked` with a one-line `Notes` reason and don't commit — is still tolerated, but `report-clowalky-block` is preferred because the inspector can act on it.)
 
 ## Rules for advancing a plan
 
@@ -66,7 +66,7 @@ You are running unattended — typically dispatched by the clowalky daemon while
    - Stage only the files you modified, by exact path: `git add <path1> <path2> ... .clowalky/_plans/<plan-slug>/STATUS.md`. Always include the updated STATUS.md.
    - **Never** use `git add -A` or `git add .`. Other working-tree changes are not yours to commit.
    - Subject exactly: `CLWLK: <plan-slug>/<phase-id> — <phase-title>`. No body, no co-author lines, no trailing punctuation. (`clowalky:` is accepted as a legacy fallback but `CLWLK:` is the current convention.)
-7. If you cannot finish, set the row to `blocked` with a one-line `Notes` reason. Do not commit.
+7. If you cannot finish, call `report-clowalky-block` (see `.clowalky/skills/report-clowalky-block/SKILL.md`). It writes a structured block report and flips the row to `blocked` in one commit. The inspector (`inspect-clowalky` + `fix-clowalky-block`) picks up from there.
 8. After step 6 succeeds, check whether every row in STATUS.md is now `complete` or `deferred`. If so, the plan is done — archive it:
    - `git mv .clowalky/_plans/<plan-slug> .clowalky/_plans/__<plan-slug>`
    - Commit with subject: `CLWLK: <plan-slug> — plan archived`. Nothing else in this commit.
@@ -80,10 +80,23 @@ You are running unattended — typically dispatched by the clowalky daemon while
 - Use `git add -A` or `git add .` in a phase commit.
 - Create a sample plan or rename existing plans (the only legal rename is the archive rename in step 8).
 
-## Authoring skills
+## Skills available in this project
 
-These skills are user-invoked, not orchestrator-invoked. Use them when planning,
-not when executing.
+Runtime (orchestrator-invoked, autonomous):
+
+- `run-next-clowalky-phase` — advance one phase. The dispatcher's primary call.
+- `report-clowalky-block` — record a structured block report under `.clowalky/_blocks/` and flip the row to `blocked` in one commit. Call this from inside `run-next-clowalky-phase` when you cannot proceed.
+
+Triage (user-invoked, after a run):
+
+- `inspect-clowalky` — read-only audit across daemon state, plans, and block reports. Produces a triage report.
+- `fix-clowalky-block` — apply one targeted fix (`unblock-and-retry`, `defer`, `mark-complete`, `clear-stuck-in-progress`, …). One action per call.
+
+Operator (user-invoked, human-in-the-loop):
+
+- `advance-operator-blocks` — walk the needs-human queue (VM SSH, Portainer, browser smoke, push-to-remote), do the underlying work with per-action confirmation, then mark each row complete or split it into smaller phases. The counterpart to `run-next-clowalky-phase` for blocks the autonomous worker correctly refused.
+
+Authoring (user-invoked, before a run):
 
 - `author-clowalky-plan` — draft a fresh plan from scratch when there is no source.
 - `adopt-clowalky-plan` — convert an existing plan (markdown TODO, README section,

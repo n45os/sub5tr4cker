@@ -3,7 +3,7 @@
 | 0 | UX audit + target-flow doc | complete | — | phase-00-audit.md | 2026-05-03 | 2026-05-03 | target-ui.md written; downstream phases mapped in trailing section |
 | 1 | Make groups the home — `/dashboard` becomes the groups grid | complete | 0 | phase-01-groups-as-home.md | 2026-05-03 | 2026-05-03 | groups grid now home; insights demoted into `<details>` strip; `/dashboard/groups` redirects; sidebar Groups entry removed |
 | 2 | Move stats + workspace pulse into a collapsible "insights" strip | complete | 1 | phase-02-insights-strip.md | 2026-05-03 | 2026-05-03 | strip slimmed to 4 tiles + activity link; admin-services-table, all-groups-quick-status (+ -card), notify-unpaid-button deleted; "last reminder send time" tile substituted with tracked-spend since prop shape from /api/groups doesn't carry reminder timestamps |
-| 3 | Group card quick actions (notify, view billing) | pending | 1 | phase-03-group-card-actions.md | | | |
+| 3 | Group card quick actions (notify, view billing) | complete | 1 | phase-03-group-card-actions.md | 2026-05-03 | 2026-05-03 | inline notify/view-billing actions on each card; aria-live status used in lieu of toast (no toast lib in deps); next-billing date moved to title sub-line |
 | 4 | Group detail consolidation (merge billing matrix + members + actions into one scroll) | pending | 1 | phase-04-group-detail.md | | | |
 | 5 | Unify member portal experience (logged-in member view = `/member/[token]` view) | pending | 4 | phase-05-member-portal-unify.md | | | |
 | 6 | Bulk-confirm action on billing matrix | pending | 4 | phase-06-bulk-confirm.md | | | |

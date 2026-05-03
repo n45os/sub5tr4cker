@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MemberGroupView } from "@/components/features/groups/member-group-view";
+import { MemberGroupExperience } from "@/components/features/groups/member-group-experience";
 import { MemberTelegramLink } from "@/components/features/groups/member-telegram-link";
 import { verifyMemberPortalToken } from "@/lib/tokens";
 import { db } from "@/lib/storage";
@@ -167,11 +167,15 @@ export default async function MemberPortalPage({
           </div>
         )}
 
-        <MemberGroupView
+        <MemberGroupExperience
           group={memberViewGroup}
-          periods={memberPeriods}
-          currentMemberId={member.id}
-          memberToken={token}
+          billingPeriods={memberPeriods}
+          identity={{
+            type: "portal",
+            id: member.id,
+            displayName: member.nickname,
+            token,
+          }}
           initialPayPeriodId={initialPayPeriodId}
           initialOpenConfirm={initialOpenConfirm}
         />

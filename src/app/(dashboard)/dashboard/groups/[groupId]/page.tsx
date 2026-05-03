@@ -6,7 +6,7 @@ import { NoPeriodsCard } from "@/components/features/billing/no-periods-card";
 import { PaymentMatrix } from "@/components/features/billing/payment-matrix";
 import { GroupMembersPanel } from "@/components/features/groups/group-members-panel";
 import { InviteLinkCard } from "@/components/features/groups/invite-link-card";
-import { MemberGroupView } from "@/components/features/groups/member-group-view";
+import { MemberGroupExperience } from "@/components/features/groups/member-group-experience";
 import { CollapsibleNotificationsPanel } from "@/components/features/notifications/collapsible-notifications-panel";
 import { auth } from "@/lib/auth";
 import { getNextPeriodStart } from "@/lib/billing/calculator";
@@ -176,12 +176,18 @@ export default async function GroupDetailPage({
     (session?.user?.email && members.find((m) => m.email === session.user.email)?._id) ??
     null;
 
-  // member view: limited info within the dashboard shell
+  // member view: same React tree as the public /member/[token] portal
   if (!isAdmin) {
-    const memberPeriods = periods.slice(0, 12);
+    const memberPeriods = periods.slice(0, 24);
+    const memberId = currentMemberId ?? myMembership?._id ?? "";
+    const displayName =
+      myMembership?.nickname ??
+      (session?.user?.name as string | undefined) ??
+      (session?.user?.email as string | undefined) ??
+      "Member";
     return (
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <MemberGroupView
+        <MemberGroupExperience
           group={{
             _id: group._id,
             name: group.name,
@@ -192,8 +198,12 @@ export default async function GroupDetailPage({
             memberCount,
             myMembership: group.myMembership,
           }}
-          periods={memberPeriods}
-          currentMemberId={currentMemberId}
+          billingPeriods={memberPeriods}
+          identity={{
+            type: "session",
+            id: memberId,
+            displayName,
+          }}
         />
       </div>
     );

@@ -17,6 +17,7 @@ export async function runTelegramStep(
 ) {
   await prompter.note(
     [
+      "Recommended for payment confirmations: members tap \"I paid\" in Telegram without digging through email.",
       "1) Open Telegram and chat with @BotFather",
       "2) Run /newbot or open one of your existing bots",
       "3) Copy the bot token",

@@ -5,6 +5,11 @@ export async function runEmailStep(
   prompter: WizardPrompter,
   state: SetupState
 ) {
+  await prompter.note(
+    "Email is fine for reminders; members usually have an easier time confirming payment via Telegram.",
+    "Email"
+  );
+
   const enableEmail = await prompter.confirm({
     message: "Configure Resend email delivery now?",
     initialValue: !!state.settings["email.apiKey"],

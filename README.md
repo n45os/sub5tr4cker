@@ -6,7 +6,7 @@
 
   <p>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="License: MIT" /></a>
-    <img src="https://img.shields.io/badge/v0.38.4-22c55e?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/v0.38.5-22c55e?style=flat-square" alt="Version" />
     <a href="https://github.com/n45os/sub5tr4cker/pulls"><img src="https://img.shields.io/badge/PRs-welcome-22c55e?style=flat-square" alt="PRs Welcome" /></a>
   </p>
 
@@ -31,7 +31,7 @@ No database to install, no Docker, no config files. Just run:
 npx s54r init
 ```
 
-The interactive wizard sets up a local SQLite database, notification channels (email and/or Telegram), and your admin account. When it finishes:
+The interactive wizard sets up a local SQLite database, notification channels (Telegram recommended so members can confirm payment in the bot; email optional), and your admin account. When it finishes:
 
 ```bash
 npx s54r start
@@ -123,8 +123,8 @@ For multi-user or production deployments, run sub5tr4cker with MongoDB:
 - Node.js 20+
 - pnpm (use Corepack: `corepack enable`)
 - MongoDB (local or Atlas)
-- A Resend API key (free tier: 3,000 emails/month)
-- (Optional) A Telegram bot token from [@BotFather](https://t.me/BotFather)
+- A Telegram bot token from [@BotFather](https://t.me/BotFather) (recommended: members tap **I paid** in the bot)
+- A Resend API key if you also want email (free tier: 3,000 emails/month); email works for reminders but is clunkier for payment confirmations
 
 ### Setup
 

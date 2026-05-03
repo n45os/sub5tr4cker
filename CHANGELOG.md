@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.38.5] - 2026-03-31
+
+### Changed
+
+- **Setup wizards** — `s54r init` and `pnpm setup` now steer people toward **Telegram** first: in-app notes explain that members confirm payment more easily in the bot than from email. Local init lists Telegram first with **recommended**; choosing **both** sets `defaultChannel` to Telegram.
+- **Docs** — README quick start and advanced prerequisites, plus the getting-started guide, match that guidance.
+
 ## [0.38.4] - 2026-03-27
 
 ### Fixed

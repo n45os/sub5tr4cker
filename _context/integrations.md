@@ -1,4 +1,4 @@
-<!-- last-updated: 2026-03-27 -->
+<!-- last-updated: 2026-03-31 -->
 
 # Integrations
 
@@ -18,6 +18,7 @@
 
 ## Telegram (grammy)
 
+- `s54r init` and `pnpm setup` steer admins toward Telegram first: members tap **I've paid** in the bot more reliably than from email
 - Bot token via `TELEGRAM_BOT_TOKEN`
 - Webhook secret via `TELEGRAM_WEBHOOK_SECRET`
 - Bot code in `src/lib/telegram/`

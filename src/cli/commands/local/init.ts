@@ -33,11 +33,15 @@ export async function runInitCommand(): Promise<void> {
   }
 
   // step 1: notification channel
+  p.note(
+    "Telegram is the best default: members can tap \"I paid\" in the bot. Email works for reminders, but confirming payment from mail is clunkier.",
+    "Notifications"
+  );
   const channel = await p.select({
     message: "How should sub5tr4cker notify people?",
     options: [
-      { value: "email", label: "Email (via Resend)", hint: "recommended" },
-      { value: "telegram", label: "Telegram (bot)" },
+      { value: "telegram", label: "Telegram (bot)", hint: "recommended" },
+      { value: "email", label: "Email (via Resend)", hint: "reminders only; weak confirmations" },
       { value: "both", label: "Both email and Telegram" },
     ],
   });
@@ -125,7 +129,7 @@ export async function runInitCommand(): Promise<void> {
         email: emailConfig,
         telegram: telegramConfig,
       },
-      defaultChannel: (channel === "both" ? "email" : channel) as "email" | "telegram",
+      defaultChannel: (channel === "both" ? "telegram" : channel) as "email" | "telegram",
     },
   });
 

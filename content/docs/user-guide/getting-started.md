@@ -48,8 +48,8 @@ Only the **admin** can delete a group. You’ll find **Delete** on the group pag
 
 ## What happens next
 
-- **Reminders** — On the schedule you set (or the default), members get an email (and optionally Telegram) with the amount they owe and your payment link.
-- **“I’ve paid”** — Members can confirm payment via the link in the email or a button in Telegram.
+- **Reminders** — On the schedule you set (or the default), members get Telegram and/or email with the amount they owe and your payment link.
+- **“I’ve paid”** — Telegram is the smoothest path (one tap in the bot). Email links work too but are easier to miss.
 - **You verify** — You get a notification and mark the payment as confirmed in the dashboard (or in Telegram).
 - **Repeat** — Each month a new period is created and reminders go out automatically.
 

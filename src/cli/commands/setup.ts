@@ -21,14 +21,17 @@ export async function runSetupCommand() {
 
   await prompter.intro("SubsTrack setup");
   await prompter.note(
-    "This wizard keeps only bootstrap values in .env.local and seeds the rest into the Settings collection.",
+    [
+      "This wizard keeps only bootstrap values in .env.local and seeds the rest into the Settings collection.",
+      "Prefer Telegram for notifications: members confirm payment in one tap there; email alone makes that flow harder.",
+    ].join("\n"),
     "How setup works"
   );
 
   await runDatabaseStep(prompter, state);
   await runAuthStep(prompter, state);
-  await runEmailStep(prompter, state);
   await runTelegramStep(prompter, state);
+  await runEmailStep(prompter, state);
   await runGeneralStep(prompter, state);
 
   await writeBootstrapEnv(rootDir, state);

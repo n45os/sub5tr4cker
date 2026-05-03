@@ -20,14 +20,14 @@ const sectionOptions: Array<{ value: SetupSection; label: string; hint: string }
     hint: "NEXTAUTH secret and Google OAuth",
   },
   {
-    value: "email",
-    label: "email",
-    hint: "Resend and sender details",
-  },
-  {
     value: "telegram",
     label: "telegram",
     hint: "Bot token and webhook secret",
+  },
+  {
+    value: "email",
+    label: "email",
+    hint: "Resend and sender details",
   },
   {
     value: "general",

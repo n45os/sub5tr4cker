@@ -1,4 +1,4 @@
-<!-- last-updated: 2026-03-31 -->
+<!-- last-updated: 2026-05-04 -->
 
 # Integrations
 
@@ -7,6 +7,12 @@
 - Connection string via `MONGODB_URI` env var
 - Singleton connection in `src/lib/db/mongoose.ts` with caching for serverless
 - Docker Compose runs MongoDB 7 locally
+
+## n450s_auth (advanced mode)
+
+- OAuth2/OIDC: `AUTH_SERVICE_URL`, `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET`, registered redirect URIs; HttpOnly cookies `s5_at` / `s5_rt` hold tokens; middleware refreshes access tokens
+- Local `User.authIdentityId` stores the verified JWT `sub`; the OAuth callback links that sub to an existing user when email matches (**userinfo first, then access token `email` claim**) so pre-existing accounts are not stranded
+- Placeholder users (`<sub>@n450s.local`) only appear when no email can be resolved; session display prefers the DB mailbox over synthetic `@n450s.local` from the token
 
 ## Resend (Email)
 
@@ -26,13 +32,6 @@
 - **`/start`** with `link_` / `invite_` payloads; **`/services`** (subscriptions + open-period status); **`/help`**; `setMyCommands` on bot init
 - Rich DM after **`invite_`** accept: share, billing, payment text, next steps
 - Inline keyboards for payment confirmation (**I've Paid**, **Remind later**, **Show paying details**) and admin **Confirm** / **Reject**
-
-## Auth.js v5
-
-- Secret via `NEXTAUTH_SECRET`
-- MongoDB adapter stores sessions and accounts
-- Google OAuth optional (needs `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`)
-- In local mode, auth uses a token cookie with auto-login (no MongoDB adapter or sessions)
 
 ## Payment Platforms (Phase 1)
 

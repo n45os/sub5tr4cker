@@ -131,4 +131,36 @@ describe("resolveSessionFromPayload", () => {
     expect(expiresMs).toBeGreaterThanOrEqual(before);
     expect(expiresMs).toBeLessThanOrEqual(before + 120_000);
   });
+
+  it("prefers a real local email when the token only carries @n450s.local", async () => {
+    mockStoreWith(
+      fakeUser({
+        email: "real@example.com",
+      })
+    );
+    const exp = Math.floor(Date.now() / 1000) + 60;
+    const payload = {
+      sub: "identity-123",
+      exp,
+      email: "696ce511c580fb43a6f5d22a@n450s.local",
+    } as N450sJwtPayload;
+    const session = await resolveSessionFromPayload(payload);
+    expect(session!.user.email).toBe("real@example.com");
+  });
+
+  it("prefers local name when the token carries a generic UI label", async () => {
+    mockStoreWith(
+      fakeUser({
+        name: "nassos",
+      })
+    );
+    const exp = Math.floor(Date.now() / 1000) + 60;
+    const payload = {
+      sub: "identity-123",
+      exp,
+      name: "Dashboard",
+    } as N450sJwtPayload;
+    const session = await resolveSessionFromPayload(payload);
+    expect(session!.user.name).toBe("nassos");
+  });
 });

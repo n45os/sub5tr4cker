@@ -73,6 +73,8 @@ Use a process manager (systemd, PM2) to keep both running.
 
 Use HTTPS in production. Set `NEXTAUTH_URL` and `APP_URL` (or the dashboard **App URL** setting under General) to the same public `https://` URL users see—especially when the app listens on `localhost` or `:3000` behind Docker/NPM; n450s login uses that value for redirects. If you use a reverse proxy (Nginx, Caddy, Nginx Proxy Manager), terminate SSL there and **forward `X-Forwarded-Host` and `X-Forwarded-Proto`** to the upstream so redirects stay on your public hostname when `APP_URL` is not yet set.
 
+**n450s account linking:** The OAuth callback merges identities onto an existing `User` when it can resolve a real email from userinfo *or* from the verified access token’s `email` claim. If userinfo omits email and the token did not carry one either, sub5tr4cker may create a placeholder row (`<sub>@n450s.local`) — that user id differs from any pre-n450s account until you link or merge rows in Mongo (set `authIdentityId` on the canonical user and remove the duplicate).
+
 ## Database
 
 - **MongoDB Atlas** — Create a cluster, whitelist IPs or use VPC peering, set `MONGODB_URI` in env.

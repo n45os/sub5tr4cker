@@ -1,6 +1,6 @@
 {
   "name": "s54r",
-  "version": "0.39.2",
+  "version": "0.39.3",
   "bin": {
     "s54r": "./dist/cli/index.js",
     "substrack": "./dist/cli/index.js"

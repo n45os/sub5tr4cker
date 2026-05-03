@@ -117,7 +117,13 @@ async function linkOrCreateUserForIdentity(
     }
   }
 
-  const email = typeof userinfo.email === "string" ? userinfo.email.toLowerCase().trim() : "";
+  const emailFromUserinfo =
+    typeof userinfo.email === "string" ? userinfo.email.toLowerCase().trim() : "";
+  const emailFromAccessToken =
+    typeof accessPayload.email === "string"
+      ? accessPayload.email.toLowerCase().trim()
+      : "";
+  const email = emailFromUserinfo || emailFromAccessToken;
   if (email) {
     const existingByEmail = await store.getUserByEmail(email);
     if (existingByEmail && !existingByEmail.authIdentityId) {

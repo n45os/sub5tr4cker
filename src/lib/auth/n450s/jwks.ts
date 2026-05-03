@@ -4,6 +4,10 @@ import { getN450sAuthConfig } from "./config";
 
 export interface N450sJwtPayload extends JWTPayload {
   sub: string;
+  /** may appear on access tokens even when /oauth/userinfo omits email */
+  email?: string;
+  /** may appear on access tokens when userinfo name is generic */
+  name?: string;
   /** n450s may also expose the auth-service user row id here */
   backendUserId?: string;
   client_id?: string;

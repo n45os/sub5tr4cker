@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.39.3] - 2026-05-04
+
+### Fixed
+
+- **n450s OAuth account linking when userinfo omits email** — `linkOrCreateUserForIdentity` now treats the verified access token’s `email` claim like `/oauth/userinfo` email when deciding whether an existing `User` row (e.g. registered with a real address) should receive `authIdentityId`, avoiding duplicate placeholder users (`*@n450s.local`) that only matched `members.email` and saw a subset of groups.
+- **Session display for federated users** — `resolveSessionFromPayload` prefers the database mailbox over synthetic `@n450s.local` from the JWT and ignores vague token display names (e.g. `Dashboard`) when the local profile has a real name.
+
 ## [0.39.2] - 2026-05-04
 
 ### Fixed

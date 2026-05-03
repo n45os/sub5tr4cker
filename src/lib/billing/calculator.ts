@@ -87,22 +87,24 @@ export function formatPeriodLabel(date: Date): string {
 }
 
 // get the billing period start/end dates for a given month
+// anchors are UTC-midnight so the same (year, month, cycleDay) yields the same
+// Date instant regardless of the server's local timezone
 export function getPeriodDates(
   year: number,
   month: number,
   cycleDay: number
 ): { start: Date; end: Date } {
-  const start = new Date(year, month, cycleDay);
-  const end = new Date(year, month + 1, cycleDay);
+  const start = new Date(Date.UTC(year, month, cycleDay));
+  const end = new Date(Date.UTC(year, month + 1, cycleDay));
   return { start, end };
 }
 
 // next period start date from today (for display in group list)
 export function getNextPeriodStart(cycleDay: number): Date {
   const now = new Date();
-  let year = now.getFullYear();
-  let month = now.getMonth();
-  const day = now.getDate();
+  let year = now.getUTCFullYear();
+  let month = now.getUTCMonth();
+  const day = now.getUTCDate();
   if (day >= cycleDay) {
     month += 1;
     if (month > 11) {
@@ -110,5 +112,5 @@ export function getNextPeriodStart(cycleDay: number): Date {
       year += 1;
     }
   }
-  return new Date(year, month, cycleDay);
+  return new Date(Date.UTC(year, month, cycleDay));
 }

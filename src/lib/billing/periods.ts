@@ -17,8 +17,8 @@ export async function createPeriodIfDue(
   const advance = group.billing.paymentInAdvanceDays ?? 0;
 
   const { start, end } = getPeriodDates(
-    now.getFullYear(),
-    now.getMonth(),
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
     cycleDay
   );
 

@@ -18,7 +18,7 @@ export function getCollectionOpensAt(
   paymentInAdvanceDays: number
 ): Date {
   const d = new Date(periodStart);
-  d.setDate(d.getDate() - paymentInAdvanceDays);
+  d.setUTCDate(d.getUTCDate() - paymentInAdvanceDays);
   return d;
 }
 
@@ -28,7 +28,7 @@ export function getFirstReminderEligibleAt(
   gracePeriodDays: number
 ): Date {
   const d = new Date(collectionOpensAt);
-  d.setDate(d.getDate() + gracePeriodDays);
+  d.setUTCDate(d.getUTCDate() + gracePeriodDays);
   return d;
 }
 

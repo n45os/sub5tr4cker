@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.39.2] - 2026-05-04
+
+### Fixed
+
+- **n450s login loop after successful callback** — `User.authIdentityId` is now set from the **verified access token `sub`**, matching `auth()` / `resolveSessionFromPayload`, instead of `/oauth/userinfo` `sub` when those differ (e.g. token carries both `sub` and `backendUserId`). Existing rows linked under the mistaken id are updated on the next successful login.
+
 ## [0.39.1] - 2026-05-03
 
 ### Fixed

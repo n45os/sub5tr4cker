@@ -4,11 +4,12 @@ import { getN450sAuthConfig } from "./config";
 
 export interface N450sJwtPayload extends JWTPayload {
   sub: string;
+  /** n450s may also expose the auth-service user row id here */
+  backendUserId?: string;
   client_id?: string;
   scope?: string;
   tokenType?: string;
   role?: string;
-  backendUserId?: string;
 }
 
 let remoteJwks: JWTVerifyGetKey | null = null;

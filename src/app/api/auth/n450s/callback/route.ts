@@ -6,7 +6,7 @@ import {
   type OAuthTokenResponse,
   type UserinfoResponse,
 } from "@/lib/auth/n450s/oauth-client";
-import { verifyAccessToken } from "@/lib/auth/n450s/jwks";
+import { verifyAccessToken, type N450sJwtPayload } from "@/lib/auth/n450s/jwks";
 import { resolvePublicOrigin } from "@/lib/auth/n450s/request-origin";
 import { setSessionTokens } from "@/lib/auth/n450s/session-cookies";
 import { db } from "@/lib/storage";
@@ -83,36 +83,59 @@ function persistSessionTokens(
   });
 }
 
-// link or auto-provision a local User row for this n450s identity. lookup
-// order: authIdentityId → email-link (legacy users from before the migration)
-// → create. returns the resolved user.
+// link or auto-provision a local User row for this n450s identity. the access
+// token's `sub` is canonical for auth(); userinfo.sub may differ (e.g. backend
+// user id), so we key authIdentityId on the verified JWT only. we also heal
+// rows linked under mistaken ids on first login after the fix.
 async function linkOrCreateUserForIdentity(
-  userinfo: UserinfoResponse
+  userinfo: UserinfoResponse,
+  accessPayload: N450sJwtPayload
 ): Promise<StorageUser> {
   const store = await db();
-  const sub = userinfo.sub;
-  const existingBySub = await store.getUserByAuthIdentityId(sub);
-  if (existingBySub) return existingBySub;
+  const identitySub = accessPayload.sub;
+  const existingByCanonical = await store.getUserByAuthIdentityId(identitySub);
+  if (existingByCanonical) return existingByCanonical;
+
+  const mistakenSubs = new Set<string>();
+  if (
+    typeof accessPayload.backendUserId === "string" &&
+    accessPayload.backendUserId.length > 0
+  ) {
+    mistakenSubs.add(accessPayload.backendUserId);
+  }
+  if (
+    typeof userinfo.sub === "string" &&
+    userinfo.sub.length > 0 &&
+    userinfo.sub !== identitySub
+  ) {
+    mistakenSubs.add(userinfo.sub);
+  }
+  for (const wrongSub of mistakenSubs) {
+    const u = await store.getUserByAuthIdentityId(wrongSub);
+    if (u) {
+      return await store.updateUser(u.id, { authIdentityId: identitySub });
+    }
+  }
 
   const email = typeof userinfo.email === "string" ? userinfo.email.toLowerCase().trim() : "";
   if (email) {
     const existingByEmail = await store.getUserByEmail(email);
     if (existingByEmail && !existingByEmail.authIdentityId) {
-      return await store.updateUser(existingByEmail.id, { authIdentityId: sub });
+      return await store.updateUser(existingByEmail.id, { authIdentityId: identitySub });
     }
   }
 
   const name =
     (typeof userinfo.name === "string" && userinfo.name.trim()) ||
     (typeof userinfo.preferred_username === "string" && userinfo.preferred_username.trim()) ||
-    (email || sub);
+    (email || identitySub);
 
   return await store.createUser({
     name,
-    email: email || `${sub}@n450s.local`,
+    email: email || `${identitySub}@n450s.local`,
     role: userinfo.role === "admin" ? "admin" : "user",
     hashedPassword: null,
-    authIdentityId: sub,
+    authIdentityId: identitySub,
     notificationPreferences: {
       email: true,
       telegram: false,
@@ -159,8 +182,9 @@ export async function GET(req: NextRequest) {
     return errorResponse(502, err instanceof Error ? err.message : "code exchange failed");
   }
 
+  let accessPayload: N450sJwtPayload;
   try {
-    await verifyAccessToken(tokens.access_token);
+    accessPayload = await verifyAccessToken(tokens.access_token);
   } catch (err) {
     return errorResponse(
       401,
@@ -179,7 +203,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    await linkOrCreateUserForIdentity(userinfo);
+    await linkOrCreateUserForIdentity(userinfo, accessPayload);
   } catch (err) {
     return errorResponse(
       500,

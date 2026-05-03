@@ -39,8 +39,10 @@ import {
   AuditEvent,
   BillingPeriod,
   Group,
+  Notification,
   ScheduledTask,
 } from "../src/models";
+import { getSetting } from "../src/lib/settings/service";
 
 type PassId = "orphan-tasks" | "orphan-periods" | "old-notifications";
 
@@ -66,6 +68,26 @@ interface Pass {
 
 function header(id: PassId, line: string): void {
   console.log(`[${id}] ${line}`);
+}
+
+const DEFAULT_NOTIFICATION_RETENTION_DAYS = 365;
+
+// resolution order: getSetting("general.notificationRetentionDays") → env
+// NOTIFICATION_RETENTION_DAYS → 365. unregistered setting key is fine; the
+// service returns null when no definition or row exists.
+async function resolveRetentionDays(): Promise<number> {
+  let raw: string | null = null;
+  try {
+    raw = await getSetting("general.notificationRetentionDays");
+  } catch {
+    raw = null;
+  }
+  if (!raw) raw = process.env.NOTIFICATION_RETENTION_DAYS ?? null;
+  const parsed = raw ? Number(raw) : NaN;
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return Math.floor(parsed);
+  }
+  return DEFAULT_NOTIFICATION_RETENTION_DAYS;
 }
 
 // pass scaffolds — phases 2/3/4 replace each body with the real logic.
@@ -372,13 +394,82 @@ const passes: Pass[] = [
     flag: "--old-notifications",
     description: "prune notification log entries older than the retention window",
     async run(ctx) {
+      // local SQLite installs are single-user — notification volume is tiny and
+      // the `notifications` table stores rows as JSON blobs that the script
+      // would need raw sqlite access to delete. advanced (mongo) mode is the
+      // only target; sqlite-mode pruning is deferred until adapter support exists.
+      if (process.env.SUB5TR4CKER_MODE === "local") {
+        header(
+          "old-notifications",
+          "skipped: old-notification pruning is advanced (mongo) mode only."
+        );
+        return { id: "old-notifications", scanned: 0, touched: 0, errors: [] };
+      }
+
+      const retentionDays = await resolveRetentionDays();
+      const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+
+      // filter: createdAt strictly before the cutoff. `type !== "audit"` honors
+      // the brief's safety clause even though the current Notification enum
+      // does not include "audit"; if it ever does, those rows are preserved.
+      const filter = {
+        createdAt: { $lt: cutoff },
+        type: { $ne: "audit" },
+      };
+
+      const scanned = await Notification.countDocuments(filter).exec();
+
+      if (scanned === 0) {
+        header(
+          "old-notifications",
+          `retention=${retentionDays}d cutoff=${cutoff.toISOString()} — 0 old notification(s) found.`
+        );
+        return { id: "old-notifications", scanned: 0, touched: 0, errors: [] };
+      }
+
+      if (!ctx.apply) {
+        header(
+          "old-notifications",
+          `retention=${retentionDays}d cutoff=${cutoff.toISOString()} — would delete ${scanned} notification(s) — pass --apply to execute.`
+        );
+        return { id: "old-notifications", scanned, touched: 0, errors: [] };
+      }
+
+      // hard delete: notifications are append-only delivery logs, not state.
+      const deleteRes = await Notification.deleteMany(filter).exec();
+
+      // batch audit row via raw collection — `old_notifications_pruned` is not
+      // in the AuditEvent action enum; bypassing strict mode keeps the schema
+      // unchanged while preserving the audit trail.
+      const now = new Date();
+      await AuditEvent.collection.insertOne({
+        actor: null,
+        actorName: "System (db-cleanup --old-notifications)",
+        action: "old_notifications_pruned",
+        group: null,
+        billingPeriod: null,
+        targetMember: null,
+        metadata: {
+          count: deleteRes.deletedCount ?? 0,
+          retentionDays,
+          cutoff: cutoff.toISOString(),
+          scriptRunId: ctx.scriptRunId,
+        },
+        createdAt: now,
+        updatedAt: now,
+      });
+
       header(
         "old-notifications",
-        ctx.apply
-          ? "(stub) would prune old notifications past retention — implemented in phase 4"
-          : "(stub) would prune old notifications past retention — pass --apply to execute (phase 4)"
+        `retention=${retentionDays}d cutoff=${cutoff.toISOString()} — deleted ${deleteRes.deletedCount ?? 0} of ${scanned} notification(s); audit event written (scriptRunId=${ctx.scriptRunId}).`
       );
-      return { id: "old-notifications", scanned: 0, touched: 0, errors: [] };
+
+      return {
+        id: "old-notifications",
+        scanned,
+        touched: deleteRes.deletedCount ?? 0,
+        errors: [],
+      };
     },
   },
 ];

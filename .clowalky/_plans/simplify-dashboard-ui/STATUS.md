@@ -1,0 +1,12 @@
+| ID | Phase | Status | Depends on | Brief | Started | Completed | Notes |
+|----|-------|--------|------------|-------|---------|-----------|-------|
+| 0 | UX audit + target-flow doc | complete | — | phase-00-audit.md | 2026-05-03 | 2026-05-03 | target-ui.md written; downstream phases mapped in trailing section |
+| 1 | Make groups the home — `/dashboard` becomes the groups grid | pending | 0 | phase-01-groups-as-home.md | | | |
+| 2 | Move stats + workspace pulse into a collapsible "insights" strip | pending | 1 | phase-02-insights-strip.md | | | |
+| 3 | Group card quick actions (notify, view billing) | pending | 1 | phase-03-group-card-actions.md | | | |
+| 4 | Group detail consolidation (merge billing matrix + members + actions into one scroll) | pending | 1 | phase-04-group-detail.md | | | |
+| 5 | Unify member portal experience (logged-in member view = `/member/[token]` view) | pending | 4 | phase-05-member-portal-unify.md | | | |
+| 6 | Bulk-confirm action on billing matrix | pending | 4 | phase-06-bulk-confirm.md | | | |
+| 7 | Sidebar slim-down (groups list + collapsible secondary nav) | pending | 1 | phase-07-sidebar.md | | | parallel with 2/3 if no overlap |
+| 8 | Activity feed default-filter cleanup | pending | 0 | phase-08-activity.md | | | parallel with 1–7 |
+| 9 | Smoke-pass + screenshot diff in dev | pending | 1,2,3,4,5,6,7,8 | phase-09-smoke.md | | | manual; uses dev server |

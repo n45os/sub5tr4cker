@@ -6,6 +6,7 @@ import {
 } from "@/lib/email/templates/admin-follow-up";
 import { isTelegramEnabled } from "@/lib/telegram/bot";
 import { getSetting } from "@/lib/settings/service";
+import { adminVerificationKeyboard } from "@/lib/telegram/keyboards";
 
 type GroupDoc = StorageGroup;
 type PeriodDoc = Pick<
@@ -56,6 +57,17 @@ export async function sendAdminConfirmationNudge(
 
   const emailHtml = buildAdminFollowUpEmailHtml(templateParams);
   const telegramText = buildAdminFollowUpTelegramText(templateParams);
+  const telegramKeyboard = adminVerificationKeyboard({
+    groupId: group.id,
+    periodId: period.id,
+    unverifiedMembers: unverified.map(
+      (payment: { memberId: string; memberNickname: string }) => ({
+        memberId: payment.memberId,
+        nickname: payment.memberNickname,
+      })
+    ),
+    appUrl,
+  });
 
   const emailParams =
     group.notifications?.saveEmailParams === true
@@ -84,6 +96,7 @@ export async function sendAdminConfirmationNudge(
       subject: `Verify payments for ${group.name} — ${period.periodLabel}`,
       emailHtml,
       telegramText,
+      telegramKeyboard,
       groupId: group.id,
       billingPeriodId: period.id,
       emailParams,

@@ -57,7 +57,7 @@ Switch: `SUB5TR4CKER_MODE=local` (set by `s54r start`).
 - Notifications: GET /api/notifications (templates list/preview APIs exist but are deprecated for first-party UI — use `docs/api-design.md`)
 - Group preview: GET /api/groups/[groupId]/notification-preview (deprecated for first-party UI)
 - Settings: GET/PATCH /api/settings, POST /api/settings/test-email, POST /api/settings/test-telegram
-- Auth: GET /api/auth/n450s/login, GET /api/auth/n450s/callback, GET /api/auth/n450s/logout (advanced mode; NextAuth + `/api/register` removed in 0.39.0). Local mode unchanged: token cookie set by `s54r start`, no auth API.
+- Auth: GET /api/auth/n450s/login, GET /api/auth/n450s/callback, GET /api/auth/n450s/logout (advanced mode; NextAuth + `/api/register` removed in 0.39.0). Post-login redirects use `general.appUrl` / `APP_URL` then `X-Forwarded-*`, not raw container `Host`. Local mode unchanged: token cookie set by `s54r start`, no auth API.
 - Telegram: POST /api/telegram/webhook, POST /api/telegram/link, GET /api/groups/[groupId]/members/[memberId]/telegram-invite (admin copyable member deep link); bot `/services`, `/help`, rich invite welcome; new invite users persist `telegram.chatId`
 - Dashboard: GET /api/dashboard/quick-status (aligned `unpaidCount` rules with GET /api/groups; `groupsNeedingAttention` / `groupsEligibleForReminders`), GET/POST /api/dashboard/notify-unpaid (POST accepts optional groupIds, paymentIds, channelPreference; groups by linked user/email/member fallback so Telegram-only members can still receive one combined reminder; cron aggregation uses the notifications.aggregateReminders setting)
 - Scheduled tasks (admin): GET /api/scheduled-tasks, PATCH /api/scheduled-tasks/[taskId], POST /api/scheduled-tasks/bulk-cancel

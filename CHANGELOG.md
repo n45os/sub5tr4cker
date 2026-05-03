@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.39.1] - 2026-05-03
+
+### Fixed
+
+- **n450s OAuth behind Docker / reverse proxy** — After login, redirects no longer send the browser to an internal hostname (e.g. container id `:3000`). Post-login Location, logout return URL, and `redirect_uri` selection now derive the public origin from `general.appUrl` / `APP_URL`, then `X-Forwarded-Host` / `X-Forwarded-Proto`, before falling back to the request URL.
+
 ## [0.39.0] - 2026-05-03
 
 ### Added

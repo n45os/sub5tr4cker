@@ -71,7 +71,7 @@ Use a process manager (systemd, PM2) to keep both running.
 
 ## HTTPS
 
-Use HTTPS in production. Set `NEXTAUTH_URL` and `APP_URL` to the `https://` URL. If you use a reverse proxy (Nginx, Caddy), terminate SSL there and proxy to the app.
+Use HTTPS in production. Set `NEXTAUTH_URL` and `APP_URL` (or the dashboard **App URL** setting under General) to the same public `https://` URL users see—especially when the app listens on `localhost` or `:3000` behind Docker/NPM; n450s login uses that value for redirects. If you use a reverse proxy (Nginx, Caddy, Nginx Proxy Manager), terminate SSL there and **forward `X-Forwarded-Host` and `X-Forwarded-Proto`** to the upstream so redirects stay on your public hostname when `APP_URL` is not yet set.
 
 ## Database
 

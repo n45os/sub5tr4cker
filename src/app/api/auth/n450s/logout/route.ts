@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getN450sAuthConfig } from "@/lib/auth/n450s/config";
+import { resolvePublicOrigin } from "@/lib/auth/n450s/request-origin";
 
 // session cookies that phase 3 will start writing — clear them all here
 // so logout is forward-compatible without touching this file again
@@ -24,9 +25,10 @@ function sanitizePostLogout(raw: string | null, origin: string): string {
 
 export async function GET(req: NextRequest) {
   const cfg = getN450sAuthConfig();
+  const publicOrigin = await resolvePublicOrigin(req);
   const postLogoutRedirectUri = sanitizePostLogout(
     req.nextUrl.searchParams.get("post_logout_redirect_uri"),
-    req.nextUrl.origin
+    publicOrigin
   );
 
   const target = new URL(`${cfg.authServiceUrl}/oauth/logout`);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getN450sAuthConfig } from "@/lib/auth/n450s/config";
+import { resolvePublicOrigin } from "@/lib/auth/n450s/request-origin";
 
 // short-lived cookie that carries CSRF state, PKCE verifier, and the
 // post-login destination across the redirect to n450s_auth and back
@@ -40,14 +41,15 @@ function sanitizeCallbackUrl(raw: string | null): string {
   return raw;
 }
 
-function pickRedirectUri(req: NextRequest, configured: string[]): string {
-  const expected = new URL("/api/auth/n450s/callback", req.nextUrl.origin).toString();
+function pickRedirectUri(origin: string, configured: string[]): string {
+  const expected = new URL("/api/auth/n450s/callback", origin).toString();
   if (configured.includes(expected)) return expected;
   return configured[0] ?? expected;
 }
 
 export async function GET(req: NextRequest) {
   const cfg = getN450sAuthConfig();
+  const publicOrigin = await resolvePublicOrigin(req);
 
   const state = base64url(crypto.randomBytes(16));
   const codeVerifier = base64url(crypto.randomBytes(32));
@@ -55,7 +57,7 @@ export async function GET(req: NextRequest) {
     crypto.createHash("sha256").update(codeVerifier).digest()
   );
   const callbackUrl = sanitizeCallbackUrl(req.nextUrl.searchParams.get("callbackUrl"));
-  const redirectUri = pickRedirectUri(req, cfg.redirectUris);
+  const redirectUri = pickRedirectUri(publicOrigin, cfg.redirectUris);
 
   const consentUrl = new URL(`${cfg.authServiceUrl}/oauth/consent`);
   consentUrl.searchParams.set("client_id", cfg.oauthClientId);

@@ -7,6 +7,7 @@ import {
   type UserinfoResponse,
 } from "@/lib/auth/n450s/oauth-client";
 import { verifyAccessToken } from "@/lib/auth/n450s/jwks";
+import { resolvePublicOrigin } from "@/lib/auth/n450s/request-origin";
 import { setSessionTokens } from "@/lib/auth/n450s/session-cookies";
 import { db } from "@/lib/storage";
 import type { StorageUser } from "@/lib/storage/types";
@@ -186,7 +187,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const dest = new URL(sanitizeCallbackUrl(stored.callbackUrl), url.origin);
+  const publicOrigin = await resolvePublicOrigin(req);
+  const dest = new URL(sanitizeCallbackUrl(stored.callbackUrl), publicOrigin);
   const res = NextResponse.redirect(dest.toString());
   res.cookies.delete(STATE_COOKIE);
   persistSessionTokens(res, tokens);

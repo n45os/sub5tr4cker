@@ -1,6 +1,9 @@
 import { Bot, Context } from "grammy";
+import { applyAdminPaymentDecision } from "@/lib/billing/admin-confirm";
+import { buildAdminFollowUpTelegramText } from "@/lib/email/templates/admin-follow-up";
 import { db } from "@/lib/storage";
-import type { StorageGroup } from "@/lib/storage/types";
+import { adminVerificationKeyboard } from "@/lib/telegram/keyboards";
+import type { StorageBillingPeriod, StorageGroup } from "@/lib/storage/types";
 import {
   verifyInviteLinkToken,
   createMagicLoginToken,
@@ -257,6 +260,17 @@ async function handleAdminConfirm(
   periodId: string,
   memberId: string
 ): Promise<void> {
+  if (!periodId || !memberId) {
+    await ctx.answerCallbackQuery({ text: "Invalid action" });
+    return;
+  }
+
+  const chatId = ctx.chat?.id;
+  if (!chatId) {
+    await ctx.answerCallbackQuery({ text: "Could not identify chat" });
+    return;
+  }
+
   const store = await db();
 
   const period = await store.getBillingPeriodById(periodId);
@@ -271,16 +285,91 @@ async function handleAdminConfirm(
     return;
   }
 
-  const updated = await store.updatePaymentStatus(periodId, memberId, {
-    status: "confirmed",
-    adminConfirmedAt: new Date(),
-  });
-  const payAfter = updated.payments.find((p) => p.memberId === memberId);
+  const user = await store.getUserByTelegramChatId(chatId);
+  const group = await store.getGroup(period.groupId);
+  if (!user || !group || group.adminId !== user.id) {
+    await ctx.answerCallbackQuery({
+      text: "Not authorized",
+      show_alert: true,
+    });
+    return;
+  }
 
-  await ctx.answerCallbackQuery?.({ text: "Payment confirmed!" });
-  await ctx.editMessageText?.(
-    `Confirmed payment from ${payAfter?.memberNickname ?? payment.memberNickname} (${payment.amount.toFixed(2)}${updated.currency}).`
+  if (payment.status === "confirmed") {
+    await ctx.answerCallbackQuery({ text: "Already confirmed" });
+    await renderAdminConfirmedMessage(ctx, group, period, memberId);
+    return;
+  }
+
+  const result = await applyAdminPaymentDecision({
+    groupId: group.id,
+    periodId,
+    memberId,
+    action: "confirm",
+    actor: { id: user.id, name: user.name || user.email || "Admin" },
+  });
+
+  if (!result.ok) {
+    await ctx.answerCallbackQuery({ text: "Could not confirm" });
+    return;
+  }
+
+  await ctx.answerCallbackQuery({ text: "Confirmed ✓" });
+  await renderAdminConfirmedMessage(ctx, group, result.period, memberId);
+}
+
+// rerender the admin nudge after a confirm so the row for the just-confirmed
+// member disappears and the keyboard shrinks to the still-unverified members.
+async function renderAdminConfirmedMessage(
+  ctx: Context,
+  group: StorageGroup,
+  period: StorageBillingPeriod,
+  memberId: string
+): Promise<void> {
+  const justConfirmed = period.payments.find((p) => p.memberId === memberId);
+  const remaining = period.payments.filter(
+    (p) => p.status === "member_confirmed"
   );
+  const appUrl = (
+    (await getSetting("general.appUrl")) || ""
+  ).replace(/\/$/, "");
+
+  if (remaining.length === 0) {
+    const summary = justConfirmed
+      ? `All payments verified for ${group.name} — ${period.periodLabel}.\n\nLast confirmed: ${justConfirmed.memberNickname} (${justConfirmed.amount.toFixed(2)} ${period.currency}).`
+      : `All payments verified for ${group.name} — ${period.periodLabel}.`;
+    await ctx.editMessageText?.(summary).catch(() => {});
+    return;
+  }
+
+  const text = buildAdminFollowUpTelegramText({
+    groupName: group.name,
+    periodLabel: period.periodLabel,
+    currency: period.currency,
+    unverifiedMembers: remaining.map((p) => ({
+      memberNickname: p.memberNickname,
+      amount: p.amount,
+      memberConfirmedAt: p.memberConfirmedAt,
+    })),
+    dashboardUrl: appUrl
+      ? `${appUrl}/dashboard/groups/${group.id}/billing`
+      : null,
+    accentColor: group.service?.accentColor ?? null,
+    theme: group.service?.emailTheme ?? "clean",
+  });
+  const keyboard = adminVerificationKeyboard({
+    groupId: group.id,
+    periodId: period.id,
+    unverifiedMembers: remaining.map((p) => ({
+      memberId: p.memberId,
+      nickname: p.memberNickname,
+    })),
+    appUrl,
+  });
+
+  await ctx
+    .editMessageText?.(text, { reply_markup: keyboard })
+    .catch(() => {});
 }
 
 async function handleAdminReject(

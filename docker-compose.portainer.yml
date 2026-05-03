@@ -1,5 +1,6 @@
 # Portainer stack: pull app image from GHCR, run mongo and cron alongside.
 # Set MONGODB_URI, NEXTAUTH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET in Portainer stack env.
+# n450s_auth (required in advanced mode): AUTH_SERVICE_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, OAUTH_REDIRECT_URIS.
 
 services:
   app:
@@ -13,6 +14,10 @@ services:
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID}
+      OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}
+      OAUTH_REDIRECT_URIS: ${OAUTH_REDIRECT_URIS}
     depends_on:
       mongo:
         condition: service_healthy
@@ -43,6 +48,10 @@ services:
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID}
+      OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}
+      OAUTH_REDIRECT_URIS: ${OAUTH_REDIRECT_URIS}
     depends_on:
       mongo:
         condition: service_healthy

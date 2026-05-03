@@ -1,7 +1,7 @@
 | ID | Phase | Status | Depends on | Brief | Started | Completed | Notes |
 |----|-------|--------|------------|-------|---------|-----------|-------|
 | 0 | UX audit + target-flow doc | complete | — | phase-00-audit.md | 2026-05-03 | 2026-05-03 | target-ui.md written; downstream phases mapped in trailing section |
-| 1 | Make groups the home — `/dashboard` becomes the groups grid | pending | 0 | phase-01-groups-as-home.md | | | |
+| 1 | Make groups the home — `/dashboard` becomes the groups grid | complete | 0 | phase-01-groups-as-home.md | 2026-05-03 | 2026-05-03 | groups grid now home; insights demoted into `<details>` strip; `/dashboard/groups` redirects; sidebar Groups entry removed |
 | 2 | Move stats + workspace pulse into a collapsible "insights" strip | pending | 1 | phase-02-insights-strip.md | | | |
 | 3 | Group card quick actions (notify, view billing) | pending | 1 | phase-03-group-card-actions.md | | | |
 | 4 | Group detail consolidation (merge billing matrix + members + actions into one scroll) | pending | 1 | phase-04-group-detail.md | | | |

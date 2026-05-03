@@ -44,7 +44,6 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV_ITEMS = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { title: "Groups", href: "/dashboard/groups", icon: Users },
   { title: "Delivery log", href: "/dashboard/activity", icon: Activity },
   {
     title: "Scheduled sends",

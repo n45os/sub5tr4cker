@@ -9,6 +9,10 @@ import { isLocalMode } from "@/lib/config/manager";
 import { buildLocalSession, validateAuthToken, LOCAL_AUTH_COOKIE } from "@/lib/auth/local";
 import { cookies } from "next/headers";
 import { db } from "@/lib/storage";
+import { ACCESS_COOKIE } from "@/lib/auth/n450s/session-cookies";
+import { verifyAccessToken } from "@/lib/auth/n450s/jwks";
+import { getCachedPayload, setCachedPayload } from "@/lib/auth/n450s/payload-cache";
+import { resolveSessionFromPayload, type ResolvedSession } from "@/lib/auth/n450s/session-resolver";
 
 let clientPromise: Promise<MongoClient> | null = null;
 
@@ -24,9 +28,11 @@ function getMongoClientPromise(): Promise<MongoClient> {
 const SESSION_MAX_AGE = 30 * 24 * 60 * 60;
 const isLocalAuthMode = isLocalMode();
 
+// nextAuth() itself is no longer called by auth() in advanced mode — the
+// `handlers` export remains so the legacy /api/auth/[...nextauth] route keeps
+// responding until phase 6 stubs it to 410.
 const {
   handlers: nextAuthHandlers,
-  auth: nextAuth,
   signIn,
   signOut,
 } = NextAuth({
@@ -151,22 +157,48 @@ const {
 });
 
 /**
- * auth() wrapper — in local mode returns the synthetic local admin session
- * if the auth cookie is valid, otherwise returns null.
- * In advanced mode delegates to NextAuth.
+ * auth() wrapper.
+ * - local mode: returns the synthetic local admin session when the auth cookie
+ *   is valid (or when called outside a request context, e.g. cron scripts).
+ * - advanced mode: reads the n450s_auth access-token cookie, verifies it
+ *   (re-using the request-scoped payload cache populated by middleware), and
+ *   maps the payload to the canonical session shape. returns null on any
+ *   failure — no fallback to NextAuth.
  */
-async function localAuth() {
-  if (!isLocalMode()) return nextAuth();
+async function authWrapper(): Promise<ResolvedSession | null> {
+  if (isLocalMode()) {
+    try {
+      const cookieStore = await cookies();
+      const token = cookieStore.get(LOCAL_AUTH_COOKIE)?.value;
+      if (!token || !validateAuthToken(token)) return null;
+      return buildLocalSession();
+    } catch {
+      // cookies() throws outside of a request context (e.g. in cron scripts)
+      return buildLocalSession();
+    }
+  }
 
+  let accessToken: string | undefined;
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get(LOCAL_AUTH_COOKIE)?.value;
-    if (!token || !validateAuthToken(token)) return null;
-    return buildLocalSession();
+    accessToken = cookieStore.get(ACCESS_COOKIE)?.value;
   } catch {
-    // cookies() throws outside of a request context (e.g. in cron scripts)
-    return buildLocalSession();
+    // cookies() unavailable outside a request — no session to resolve
+    return null;
   }
+  if (!accessToken) return null;
+
+  let payload = getCachedPayload(accessToken);
+  if (!payload) {
+    try {
+      payload = await verifyAccessToken(accessToken);
+      setCachedPayload(accessToken, payload);
+    } catch {
+      return null;
+    }
+  }
+
+  return resolveSessionFromPayload(payload);
 }
 
-export { localAuth as auth, nextAuthHandlers as handlers, signIn, signOut };
+export { authWrapper as auth, nextAuthHandlers as handlers, signIn, signOut };

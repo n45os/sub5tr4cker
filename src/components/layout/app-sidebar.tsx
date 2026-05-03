@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
 import {
   Activity,
   Bell,
@@ -204,7 +203,7 @@ export function AppSidebar({ user, groups }: AppSidebarProps) {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => signOut({ callbackUrl: "/" })}
+                  render={<a href="/api/auth/n450s/logout?post_logout_redirect_uri=/" />}
                 >
                   <LogOut className="size-4" />
                   Sign out

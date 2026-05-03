@@ -2,9 +2,7 @@ import { Suspense } from "react";
 import { LoginForm } from "./login-form";
 
 export default function LoginPage() {
-  const googleEnabled = !!(
-    process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
-  );
+  const mode = process.env.SUB5TR4CKER_MODE === "local" ? "local" : "advanced";
   return (
     <Suspense
       fallback={
@@ -15,7 +13,7 @@ export default function LoginPage() {
         </div>
       }
     >
-      <LoginForm googleEnabled={googleEnabled} />
+      <LoginForm mode={mode} />
     </Suspense>
   );
 }

@@ -263,13 +263,108 @@ const passes: Pass[] = [
     flag: "--orphan-periods",
     description: "archive billing periods belonging to soft-deleted groups",
     async run(ctx) {
+      // local SQLite installs are single-user — no soft-deleted-group cleanup
+      // worth a batch pass. advanced (mongo) mode is the only target.
+      if (process.env.SUB5TR4CKER_MODE === "local") {
+        header("orphan-periods", "skipped: orphan-period cleanup is advanced (mongo) mode only.");
+        return { id: "orphan-periods", scanned: 0, touched: 0, errors: [] };
+      }
+
+      // soft-deleted groups
+      const inactiveGroups = await Group.find({ isActive: false })
+        .select("_id")
+        .lean()
+        .exec();
+      const inactiveGroupIds = inactiveGroups.map((g) => new Types.ObjectId(String(g._id)));
+
+      if (inactiveGroupIds.length === 0) {
+        header("orphan-periods", "scanned 0 inactive group(s); 0 periods to archive.");
+        return { id: "orphan-periods", scanned: 0, touched: 0, errors: [] };
+      }
+
+      // billing periods under those groups that aren't already archived.
+      // `archivedAt: null` matches both missing and explicit-null values.
+      const periodFilter = {
+        group: { $in: inactiveGroupIds },
+        archivedAt: null,
+      };
+
+      const targetPeriods = await BillingPeriod.find(periodFilter)
+        .select("_id group")
+        .lean()
+        .exec();
+
+      const scanned = targetPeriods.length;
+      const groupCount = inactiveGroupIds.length;
+
+      if (scanned === 0) {
+        header(
+          "orphan-periods",
+          `scanned ${groupCount} inactive group(s); 0 unarchived period(s) found.`
+        );
+        return { id: "orphan-periods", scanned: 0, touched: 0, errors: [] };
+      }
+
+      if (!ctx.apply) {
+        const sample = targetPeriods
+          .slice(0, 5)
+          .map((p) => String(p._id))
+          .join(",");
+        const more = targetPeriods.length > 5 ? "..." : "";
+        header(
+          "orphan-periods",
+          `would archive ${scanned} period(s) across ${groupCount} inactive group(s) — sample: ${sample}${more} — pass --apply to execute.`
+        );
+        return { id: "orphan-periods", scanned, touched: 0, errors: [] };
+      }
+
+      // apply via raw collection driver — `archivedAt` / `archivalReason` are
+      // not in the BillingPeriod schema, so strict mode would drop them.
+      const now = new Date();
+      const updateRes = await BillingPeriod.collection.updateMany(
+        {
+          group: { $in: inactiveGroupIds },
+          archivedAt: null,
+        },
+        {
+          $set: {
+            archivedAt: now,
+            archivalReason: "group-soft-deleted",
+            updatedAt: now,
+          },
+        }
+      );
+
+      // batch audit row via raw collection — `billing_periods_archived_for_inactive_groups`
+      // is not in the AuditEvent action enum; bypassing strict mode keeps the
+      // schema unchanged while preserving the audit trail.
+      await AuditEvent.collection.insertOne({
+        actor: null,
+        actorName: "System (db-cleanup --orphan-periods)",
+        action: "billing_periods_archived_for_inactive_groups",
+        group: null,
+        billingPeriod: null,
+        targetMember: null,
+        metadata: {
+          groupCount,
+          periodCount: updateRes.modifiedCount,
+          scriptRunId: ctx.scriptRunId,
+        },
+        createdAt: now,
+        updatedAt: now,
+      });
+
       header(
         "orphan-periods",
-        ctx.apply
-          ? "(stub) would archive billing periods under soft-deleted groups — implemented in phase 3"
-          : "(stub) would archive billing periods under soft-deleted groups — pass --apply to execute (phase 3)"
+        `archived ${updateRes.modifiedCount} of ${scanned} period(s) across ${groupCount} inactive group(s); audit event written (scriptRunId=${ctx.scriptRunId}).`
       );
-      return { id: "orphan-periods", scanned: 0, touched: 0, errors: [] };
+
+      return {
+        id: "orphan-periods",
+        scanned,
+        touched: updateRes.modifiedCount,
+        errors: [],
+      };
     },
   },
   {

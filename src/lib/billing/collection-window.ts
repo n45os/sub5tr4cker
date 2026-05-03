@@ -9,6 +9,10 @@ export function collectionWindowOpenFilter(now: Date) {
     $expr: {
       $lte: [{ $ifNull: ["$collectionOpensAt", "$periodStart"] }, now],
     },
+    // archived periods (soft-deleted groups, see scripts/db-cleanup.ts
+    // --orphan-periods) must not surface in active workflows. matches both
+    // missing and explicit-null.
+    archivedAt: null,
   };
 }
 

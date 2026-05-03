@@ -650,6 +650,8 @@ export class MongooseAdapter implements StorageAdapter {
     const periods = await BillingPeriod.find({
       isFullyPaid: false,
       periodStart: { $lt: asOf },
+      // exclude periods archived by --orphan-periods cleanup
+      archivedAt: null,
     })
       .lean<IBillingPeriod[]>();
     return periods.map(periodToStorage);

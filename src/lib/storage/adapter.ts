@@ -41,6 +41,9 @@ export interface StorageAdapter {
   /** get a user by telegram chatId; returns null if not found */
   getUserByTelegramChatId(chatId: number): Promise<StorageUser | null>;
 
+  /** get a user by n450s authIdentityId (sub); returns null if not found */
+  getUserByAuthIdentityId(sub: string): Promise<StorageUser | null>;
+
   /** update specific user fields */
   updateUser(id: string, data: Partial<Omit<StorageUser, "id" | "createdAt">>): Promise<StorageUser>;
 

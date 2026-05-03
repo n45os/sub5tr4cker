@@ -9,6 +9,8 @@ export interface StorageUser {
   id: string;
   name: string;
   email: string;
+  /** n450s_auth identity sub — null in local mode, set in advanced mode after first federated login or migration */
+  authIdentityId: string | null;
   role: "admin" | "user";
   emailVerified: Date | null;
   image: string | null;
@@ -40,6 +42,8 @@ export interface CreateUserInput {
   /** null when the account is created from an invite (magic login only) */
   hashedPassword: string | null;
   notificationPreferences: StorageUser["notificationPreferences"];
+  /** set when provisioned from n450s_auth callback flow */
+  authIdentityId?: string | null;
 }
 
 // ─── group ────────────────────────────────────────────────────────────────────

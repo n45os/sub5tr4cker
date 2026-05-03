@@ -67,6 +67,7 @@ function userToStorage(u: IUser): StorageUser {
     id: toId(u._id),
     name: u.name,
     email: u.email,
+    authIdentityId: u.authIdentityId ?? null,
     role: u.role,
     emailVerified: u.emailVerified,
     image: u.image,
@@ -318,6 +319,12 @@ export class MongooseAdapter implements StorageAdapter {
     return u ? userToStorage(u) : null;
   }
 
+  async getUserByAuthIdentityId(sub: string): Promise<StorageUser | null> {
+    await dbConnect();
+    const u = await User.findOne({ authIdentityId: sub }).lean<IUser>();
+    return u ? userToStorage(u) : null;
+  }
+
   async updateUser(
     id: string,
     data: Partial<Omit<StorageUser, "id" | "createdAt">>
@@ -333,6 +340,7 @@ export class MongooseAdapter implements StorageAdapter {
     const u = await User.create({
       name: data.name.trim(),
       email: data.email.toLowerCase().trim(),
+      authIdentityId: data.authIdentityId ?? null,
       role: data.role,
       hashedPassword: data.hashedPassword,
       notificationPreferences: data.notificationPreferences,

@@ -213,6 +213,10 @@ function hydrateUser(data: Record<string, unknown>): StorageUser {
   if (u.telegramLinkCode) {
     u.telegramLinkCode = parseDates(u.telegramLinkCode as unknown as Record<string, unknown>, ["expiresAt"]) as unknown as StorageUser["telegramLinkCode"];
   }
+  // backfill for older rows written before authIdentityId existed
+  if (u.authIdentityId === undefined) {
+    u.authIdentityId = null;
+  }
   return u;
 }
 
@@ -268,6 +272,7 @@ export class SqliteAdapter implements StorageAdapter {
         id: LOCAL_ADMIN_USER_ID,
         name: config.adminName ?? "Admin",
         email: config.adminEmail ?? "admin@localhost",
+        authIdentityId: null,
         role: "admin",
         emailVerified: null,
         image: null,
@@ -323,6 +328,13 @@ export class SqliteAdapter implements StorageAdapter {
     return hydrateUser(parseRow(row));
   }
 
+  // local mode never federates a user, so this always returns null —
+  // the method exists to satisfy the StorageAdapter contract.
+  async getUserByAuthIdentityId(_sub: string): Promise<StorageUser | null> {
+    void _sub;
+    return null;
+  }
+
   async updateUser(id: string, data: Partial<Omit<StorageUser, "id" | "createdAt">>): Promise<StorageUser> {
     this.ensureOpen();
     const existing = await this.getUser(id);
@@ -348,6 +360,7 @@ export class SqliteAdapter implements StorageAdapter {
       id,
       name: data.name.trim(),
       email: data.email.toLowerCase().trim(),
+      authIdentityId: null,
       role: data.role,
       emailVerified: null,
       image: null,

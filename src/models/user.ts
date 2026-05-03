@@ -3,6 +3,8 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IUser extends Document {
   name: string;
   email: string;
+  /** n450s_auth identity sub — primary identity bridge once federated */
+  authIdentityId: string | null;
   role: "admin" | "user";
   emailVerified: Date | null;
   image: string | null;
@@ -32,6 +34,7 @@ const userSchema = new Schema<IUser>(
   {
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
+    authIdentityId: { type: String, default: null },
     role: { type: String, enum: ["admin", "user"], default: "user" },
     emailVerified: { type: Date, default: null },
     image: { type: String, default: null },
@@ -76,6 +79,7 @@ userSchema.index(
   { "telegramLinkCode.code": 1 },
   { sparse: true, unique: true }
 );
+userSchema.index({ authIdentityId: 1 }, { sparse: true, unique: true });
 
 export const User =
   mongoose.models.User || mongoose.model<IUser>("User", userSchema);

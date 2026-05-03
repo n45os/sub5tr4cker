@@ -7,6 +7,8 @@ import {
   type UserinfoResponse,
 } from "@/lib/auth/n450s/oauth-client";
 import { verifyAccessToken } from "@/lib/auth/n450s/jwks";
+import { db } from "@/lib/storage";
+import type { StorageUser } from "@/lib/storage/types";
 
 const STATE_COOKIE = "n450s.oauth_state";
 
@@ -78,6 +80,44 @@ async function setSessionTokens(
   void res;
 }
 
+// link or auto-provision a local User row for this n450s identity. lookup
+// order: authIdentityId → email-link (legacy users from before the migration)
+// → create. returns the resolved user.
+async function linkOrCreateUserForIdentity(
+  userinfo: UserinfoResponse
+): Promise<StorageUser> {
+  const store = await db();
+  const sub = userinfo.sub;
+  const existingBySub = await store.getUserByAuthIdentityId(sub);
+  if (existingBySub) return existingBySub;
+
+  const email = typeof userinfo.email === "string" ? userinfo.email.toLowerCase().trim() : "";
+  if (email) {
+    const existingByEmail = await store.getUserByEmail(email);
+    if (existingByEmail && !existingByEmail.authIdentityId) {
+      return await store.updateUser(existingByEmail.id, { authIdentityId: sub });
+    }
+  }
+
+  const name =
+    (typeof userinfo.name === "string" && userinfo.name.trim()) ||
+    (typeof userinfo.preferred_username === "string" && userinfo.preferred_username.trim()) ||
+    (email || sub);
+
+  return await store.createUser({
+    name,
+    email: email || `${sub}@n450s.local`,
+    role: userinfo.role === "admin" ? "admin" : "user",
+    hashedPassword: null,
+    authIdentityId: sub,
+    notificationPreferences: {
+      email: true,
+      telegram: false,
+      reminderFrequency: "every_3_days",
+    },
+  });
+}
+
 function errorResponse(status: number, message: string): NextResponse {
   const res = NextResponse.json({ error: { code: "oauth_callback", message } }, { status });
   res.cookies.delete(STATE_COOKIE);
@@ -132,6 +172,15 @@ export async function GET(req: NextRequest) {
     return errorResponse(
       502,
       err instanceof Error ? err.message : "userinfo fetch failed"
+    );
+  }
+
+  try {
+    await linkOrCreateUserForIdentity(userinfo);
+  } catch (err) {
+    return errorResponse(
+      500,
+      err instanceof Error ? err.message : "user provisioning failed"
     );
   }
 

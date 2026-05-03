@@ -10,7 +10,8 @@ export type AuditAction =
   | "member_added"
   | "member_removed"
   | "member_updated"
-  | "billing_period_created";
+  | "billing_period_created"
+  | "period_dedup_hit";
 
 export interface IAuditEvent extends Document {
   actor: Types.ObjectId;
@@ -40,6 +41,7 @@ const auditEventSchema = new Schema<IAuditEvent>(
         "member_removed",
         "member_updated",
         "billing_period_created",
+        "period_dedup_hit",
       ],
       required: true,
     },

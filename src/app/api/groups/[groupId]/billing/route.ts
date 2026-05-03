@@ -10,6 +10,7 @@ import {
 } from "@/lib/authorization";
 import { calculateShares } from "@/lib/billing/calculator";
 import { getCollectionOpensAt } from "@/lib/billing/collection-window";
+import { findExistingPeriodForMonth } from "@/lib/billing/periods";
 import { createConfirmationToken } from "@/lib/tokens";
 import { db, isStorageId, type StorageBillingPeriod } from "@/lib/storage";
 
@@ -222,12 +223,52 @@ export async function POST(
   const totalPrice = parsed.data.totalPrice;
   const periodLabel = parsed.data.periodLabel;
 
-  const existing = await store.getBillingPeriodByStart(groupId, periodStart);
-  if (existing) {
-    return NextResponse.json(
-      { error: { code: "CONFLICT", message: "A billing period already exists for this start date" } },
-      { status: 409 }
-    );
+  const existingForMonth = await findExistingPeriodForMonth(
+    store,
+    groupId,
+    periodStart.getUTCFullYear(),
+    periodStart.getUTCMonth()
+  );
+  if (existingForMonth) {
+    // idempotent: a period already covers this calendar month, so return it
+    // instead of 409. emit a dedup audit when the candidate's exact instant
+    // disagrees with the stored one — that signals a racing caller.
+    if (existingForMonth.periodStart.getTime() !== periodStart.getTime()) {
+      const actorName =
+        (session.user.name as string) ||
+        (session.user.email as string) ||
+        "Unknown";
+      await logAudit({
+        actorId: session.user.id,
+        actorName,
+        action: "period_dedup_hit",
+        groupId,
+        billingPeriodId: existingForMonth.id,
+        metadata: {
+          source: "POST /api/groups/[groupId]/billing",
+          candidatePeriodStart: periodStart.toISOString(),
+          existingPeriodStart: existingForMonth.periodStart.toISOString(),
+          year: periodStart.getUTCFullYear(),
+          monthIndex: periodStart.getUTCMonth(),
+        },
+      });
+    }
+    return NextResponse.json({
+      data: {
+        _id: existingForMonth.id,
+        periodLabel: existingForMonth.periodLabel,
+        periodStart: existingForMonth.periodStart.toISOString().slice(0, 10),
+        periodEnd: existingForMonth.periodEnd.toISOString().slice(0, 10),
+        totalPrice: existingForMonth.totalPrice,
+        currency: existingForMonth.currency,
+        payments: existingForMonth.payments.map((p) => ({
+          memberId: p.memberId,
+          memberNickname: p.memberNickname,
+          amount: p.amount,
+          status: p.status,
+        })),
+      },
+    });
   }
 
   const shares = calculateShares(group, totalPrice, periodStart);

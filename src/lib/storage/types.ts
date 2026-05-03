@@ -212,7 +212,8 @@ export type StorageAuditAction =
   | "member_removed"
   | "member_updated"
   | "billing_period_created"
-  | "period_dedup_hit";
+  | "period_dedup_hit"
+  | "period_duplicate_merged";
 
 export interface StorageAuditEvent {
   id: string;

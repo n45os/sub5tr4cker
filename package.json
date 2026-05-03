@@ -22,7 +22,8 @@
     "s54r": "tsx src/cli/index.ts",
     "setup": "tsx src/cli/index.ts setup",
     "configure": "tsx src/cli/index.ts configure",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "cleanup:dup-periods": "tsx scripts/cleanup-duplicate-billing-periods.ts"
   },
   "engines": {
     "node": ">=20"

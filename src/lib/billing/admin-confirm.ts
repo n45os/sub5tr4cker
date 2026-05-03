@@ -102,3 +102,76 @@ export async function applyAdminPaymentDecision(
     updated.payments.find((p) => p.memberId === memberId) ?? payment;
   return { ok: true, period: updated, payment: updatedPayment };
 }
+
+export type ConfirmAllResult =
+  | {
+      ok: true;
+      period: StorageBillingPeriod;
+      confirmedMemberIds: string[];
+    }
+  | {
+      ok: false;
+      code: "GROUP_NOT_FOUND" | "FORBIDDEN" | "PERIOD_NOT_FOUND";
+    };
+
+export interface ConfirmAllMemberConfirmedParams {
+  groupId: string;
+  periodId: string;
+  actor: { id: string; name: string };
+}
+
+// bulk-confirm every payment whose status is `member_confirmed` in one period.
+// updates the period once, then logs one audit entry per confirmed payment.
+export async function confirmAllMemberConfirmed(
+  params: ConfirmAllMemberConfirmedParams
+): Promise<ConfirmAllResult> {
+  const { groupId, periodId, actor } = params;
+
+  const store = await db();
+  const group = await store.getGroup(groupId);
+  if (!group || !group.isActive) {
+    return { ok: false, code: "GROUP_NOT_FOUND" };
+  }
+  if (group.adminId !== actor.id) {
+    return { ok: false, code: "FORBIDDEN" };
+  }
+
+  const period = await store.getBillingPeriod(periodId, groupId);
+  if (!period) {
+    return { ok: false, code: "PERIOD_NOT_FOUND" };
+  }
+
+  const now = new Date();
+  const confirmedMemberIds: string[] = [];
+  const payments = period.payments.map((p) => {
+    if (p.status !== "member_confirmed") return p;
+    confirmedMemberIds.push(p.memberId);
+    return { ...p, status: "confirmed" as const, adminConfirmedAt: now };
+  });
+
+  if (confirmedMemberIds.length === 0) {
+    return { ok: true, period, confirmedMemberIds: [] };
+  }
+
+  const isFullyPaid = payments.every(
+    (p) => p.status === "confirmed" || p.status === "waived"
+  );
+
+  const updated = await store.updateBillingPeriod(periodId, {
+    payments,
+    isFullyPaid,
+  });
+
+  for (const memberId of confirmedMemberIds) {
+    await logAudit({
+      actorId: actor.id,
+      actorName: actor.name,
+      action: "payment_confirmed",
+      groupId,
+      billingPeriodId: periodId,
+      targetMemberId: memberId,
+    });
+  }
+
+  return { ok: true, period: updated, confirmedMemberIds };
+}

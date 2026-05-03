@@ -1,5 +1,8 @@
 import { Bot, Context } from "grammy";
-import { applyAdminPaymentDecision } from "@/lib/billing/admin-confirm";
+import {
+  applyAdminPaymentDecision,
+  confirmAllMemberConfirmed,
+} from "@/lib/billing/admin-confirm";
 import { buildAdminFollowUpTelegramText } from "@/lib/email/templates/admin-follow-up";
 import { db } from "@/lib/storage";
 import { adminVerificationKeyboard } from "@/lib/telegram/keyboards";
@@ -139,13 +142,21 @@ export function registerHandlers(bot: Bot): void {
   bot.on("callback_query:data", async (ctx) => {
     const data = ctx.callbackQuery.data;
     const parts = data.split(":");
+    const [action, periodId, memberId] = parts;
+
+    if (action === "admin_confirm_all") {
+      if (parts.length < 2) {
+        await ctx.answerCallbackQuery({ text: "Invalid action" });
+        return;
+      }
+      await handleAdminConfirmAll(ctx as Context, periodId);
+      return;
+    }
 
     if (parts.length < 3) {
       await ctx.answerCallbackQuery({ text: "Invalid action" });
       return;
     }
-
-    const [action, periodId, memberId] = parts;
 
     switch (action) {
       case "confirm":
@@ -377,6 +388,17 @@ async function handleAdminReject(
   periodId: string,
   memberId: string
 ): Promise<void> {
+  if (!periodId || !memberId) {
+    await ctx.answerCallbackQuery({ text: "Invalid action" });
+    return;
+  }
+
+  const chatId = ctx.chat?.id;
+  if (!chatId) {
+    await ctx.answerCallbackQuery({ text: "Could not identify chat" });
+    return;
+  }
+
   const store = await db();
 
   const period = await store.getBillingPeriodById(periodId);
@@ -391,14 +413,142 @@ async function handleAdminReject(
     return;
   }
 
-  await store.updatePaymentStatus(periodId, memberId, {
-    status: "pending",
-    memberConfirmedAt: null,
+  const user = await store.getUserByTelegramChatId(chatId);
+  const group = await store.getGroup(period.groupId);
+  if (!user || !group || group.adminId !== user.id) {
+    await ctx.answerCallbackQuery({
+      text: "Not authorized",
+      show_alert: true,
+    });
+    return;
+  }
+
+  const result = await applyAdminPaymentDecision({
+    groupId: group.id,
+    periodId,
+    memberId,
+    action: "reject",
+    actor: { id: user.id, name: user.name || user.email || "Admin" },
   });
 
-  await ctx.answerCallbackQuery?.({ text: "Payment rejected" });
-  await ctx.editMessageText?.(
-    `Rejected payment claim from ${payment.memberNickname}. They'll be reminded again.`
+  if (!result.ok) {
+    await ctx.answerCallbackQuery({ text: "Could not reject" });
+    return;
+  }
+
+  await ctx.answerCallbackQuery({ text: "Rejected ✕" });
+  await renderAdminConfirmedMessage(ctx, group, result.period, memberId);
+  await notifyMemberOfRejection({
+    group,
+    period: result.period,
+    memberId,
+  });
+}
+
+async function handleAdminConfirmAll(
+  ctx: Context,
+  periodId: string
+): Promise<void> {
+  if (!periodId) {
+    await ctx.answerCallbackQuery({ text: "Invalid action" });
+    return;
+  }
+
+  const chatId = ctx.chat?.id;
+  if (!chatId) {
+    await ctx.answerCallbackQuery({ text: "Could not identify chat" });
+    return;
+  }
+
+  const store = await db();
+
+  const period = await store.getBillingPeriodById(periodId);
+  if (!period) {
+    await ctx.answerCallbackQuery({ text: "Period not found" });
+    return;
+  }
+
+  const user = await store.getUserByTelegramChatId(chatId);
+  const group = await store.getGroup(period.groupId);
+  if (!user || !group || group.adminId !== user.id) {
+    await ctx.answerCallbackQuery({
+      text: "Not authorized",
+      show_alert: true,
+    });
+    return;
+  }
+
+  const result = await confirmAllMemberConfirmed({
+    groupId: group.id,
+    periodId,
+    actor: { id: user.id, name: user.name || user.email || "Admin" },
+  });
+
+  if (!result.ok) {
+    await ctx.answerCallbackQuery({ text: "Could not confirm" });
+    return;
+  }
+
+  const count = result.confirmedMemberIds.length;
+  if (count === 0) {
+    await ctx.answerCallbackQuery({ text: "Nothing to confirm" });
+    return;
+  }
+
+  await ctx.answerCallbackQuery({ text: `Confirmed ${count} ✓` });
+  await ctx
+    .editMessageText?.(
+      `All ${count} payment${count === 1 ? "" : "s"} confirmed for ${group.name} — ${result.period.periodLabel}.`
+    )
+    .catch(() => {});
+}
+
+async function notifyMemberOfRejection(params: {
+  group: StorageGroup;
+  period: StorageBillingPeriod;
+  memberId: string;
+}): Promise<void> {
+  const { group, period, memberId } = params;
+  const member = group.members.find((m) => m.id === memberId);
+  const payment = period.payments.find((p) => p.memberId === memberId);
+  if (!member || !payment) return;
+
+  const store = await db();
+  const user = member.userId ? await store.getUser(member.userId) : null;
+  const telegramChatId = user?.telegram?.chatId ?? null;
+  const recipientEmail = member.email ?? user?.email ?? null;
+
+  const sendEmail =
+    !!recipientEmail &&
+    !member.unsubscribedFromEmail &&
+    (user?.notificationPreferences?.email ?? true);
+  const sendTelegram =
+    !!telegramChatId && (user?.notificationPreferences?.telegram ?? false);
+
+  if (!sendEmail && !sendTelegram) return;
+
+  const amountText = `${payment.amount.toFixed(2)} ${period.currency}`;
+  const subject = `Payment rejected — ${group.name}`;
+  const message =
+    `Your payment confirmation for ${group.name} (${period.periodLabel}) was rejected by the admin. ` +
+    `Please re-pay ${amountText} and confirm again.`;
+  const emailHtml = `<p>${message}</p>`;
+
+  await sendNotification(
+    {
+      email: recipientEmail,
+      telegramChatId,
+      userId: user?.id ?? null,
+      preferences: { email: sendEmail, telegram: sendTelegram },
+    },
+    {
+      type: "payment_reminder",
+      subject,
+      emailHtml,
+      telegramText: message,
+      groupId: group.id,
+      billingPeriodId: period.id,
+    }
   );
 }
 

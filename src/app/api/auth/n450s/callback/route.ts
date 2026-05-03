@@ -7,6 +7,7 @@ import {
   type UserinfoResponse,
 } from "@/lib/auth/n450s/oauth-client";
 import { verifyAccessToken } from "@/lib/auth/n450s/jwks";
+import { setSessionTokens } from "@/lib/auth/n450s/session-cookies";
 import { db } from "@/lib/storage";
 import type { StorageUser } from "@/lib/storage/types";
 
@@ -69,15 +70,16 @@ function sanitizeCallbackUrl(raw: string): string {
   return raw;
 }
 
-// phase 3 will replace this with a real cookie writer; for now we just
-// stash what we'd persist on the response so the route is end-to-end testable
-async function setSessionTokens(
+function persistSessionTokens(
   res: NextResponse,
-  _tokens: OAuthTokenResponse,
-  _userinfo: UserinfoResponse
-): Promise<void> {
-  // intentional no-op — implemented in phase 3 (token storage + middleware refresh)
-  void res;
+  tokens: OAuthTokenResponse
+): void {
+  const expiresAt = Math.floor(Date.now() / 1000) + tokens.expires_in;
+  setSessionTokens(res, {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    expiresAt,
+  });
 }
 
 // link or auto-provision a local User row for this n450s identity. lookup
@@ -187,6 +189,6 @@ export async function GET(req: NextRequest) {
   const dest = new URL(sanitizeCallbackUrl(stored.callbackUrl), url.origin);
   const res = NextResponse.redirect(dest.toString());
   res.cookies.delete(STATE_COOKIE);
-  await setSessionTokens(res, tokens, userinfo);
+  persistSessionTokens(res, tokens);
   return res;
 }

@@ -47,7 +47,7 @@ async function authWrapper(): Promise<ResolvedSession | null> {
     }
   }
 
-  return resolveSessionFromPayload(payload);
+  return await resolveSessionFromPayload(payload);
 }
 
 export { authWrapper as auth };

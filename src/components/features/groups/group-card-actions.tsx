@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { BellRing, Loader2, Receipt } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   Tooltip,
   TooltipContent,
@@ -115,11 +116,9 @@ export function GroupCardActions({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         {tooltipMessage ? (
-          <TooltipProvider delayDuration={150}>
+          <TooltipProvider delay={150}>
             <Tooltip>
-              <TooltipTrigger asChild>
-                <span tabIndex={0}>{notifyButton}</span>
-              </TooltipTrigger>
+              <TooltipTrigger render={<span tabIndex={0}>{notifyButton}</span>} />
               <TooltipContent>{tooltipMessage}</TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -127,15 +126,14 @@ export function GroupCardActions({
           notifyButton
         )}
 
-        <Button asChild type="button" size="sm" variant="ghost">
-          <Link
-            href={`/dashboard/groups/${groupId}/billing`}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <Receipt className="size-4" />
-            View billing
-          </Link>
-        </Button>
+        <Link
+          href={`/dashboard/groups/${groupId}/billing`}
+          onClick={(event) => event.stopPropagation()}
+          className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+        >
+          <Receipt className="size-4" />
+          View billing
+        </Link>
       </div>
 
       <p

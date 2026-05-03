@@ -353,29 +353,6 @@ export async function createMagicLoginToken(
   return `${data}.${signature}`;
 }
 
-export async function verifyMagicLoginToken(
-  token: string
-): Promise<MagicLoginPayload | null> {
-  const parts = token.split(".");
-  if (parts.length !== 2) return null;
-  const [data, signature] = parts;
-  const secret = await getConfirmationSecret();
-  const expectedSignature = crypto
-    .createHmac("sha256", secret)
-    .update(data)
-    .digest("base64url");
-  if (signature !== expectedSignature) return null;
-  try {
-    const payload: MagicLoginPayload = JSON.parse(
-      Buffer.from(data, "base64url").toString()
-    );
-    if (Date.now() > payload.exp) return null;
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
 export interface UnsubscribePayload {
   memberId: string;
   groupId: string;

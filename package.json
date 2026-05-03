@@ -42,7 +42,6 @@
     "postcss.config.mjs"
   ],
   "dependencies": {
-    "@auth/mongodb-adapter": "^3.11.1",
     "@base-ui/react": "^1.3.0",
     "@clack/prompts": "^1.1.0",
     "bcryptjs": "^3.0.3",

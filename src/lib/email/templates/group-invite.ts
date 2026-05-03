@@ -46,6 +46,20 @@ export const groupInviteSampleParams: GroupInviteTemplateParams = {
   acceptInviteUrl: "https://substrack.example.com/api/invite/accept/sample",
 };
 
+function buildN450sSignupUrl(acceptInviteUrl: string): string {
+  const authServiceUrl = process.env.AUTH_SERVICE_URL?.replace(/\/+$/, "");
+  if (!authServiceUrl) return acceptInviteUrl;
+
+  // pull the acceptInviteToken off the back of the URL for invite_code; the
+  // full acceptInviteUrl rides along as the post-signup continue target so
+  // n450s_auth can redirect back into sub5tr4cker after registration.
+  const inviteCode = acceptInviteUrl.split("/").filter(Boolean).pop() ?? "";
+  const target = new URL(`${authServiceUrl}/signup`);
+  if (inviteCode) target.searchParams.set("invite_code", inviteCode);
+  target.searchParams.set("continue", acceptInviteUrl);
+  return target.toString();
+}
+
 function buildInvitePaymentSection(params: GroupInviteTemplateParams): string {
   if (params.paymentLink) {
     return `
@@ -113,9 +127,9 @@ export function buildGroupInviteEmailHtml(
     ? `
         <div class="section-card">
           <p class="kicker">Accept invite</p>
-          <p>Confirm that you want to join this group.</p>
+          <p>Create your account to join this group.</p>
           <div class="cta">
-            <a href="${params.acceptInviteUrl}" class="btn">Accept invite</a>
+            <a href="${buildN450sSignupUrl(params.acceptInviteUrl)}" class="btn">Accept invite</a>
           </div>
         </div>`
     : "";

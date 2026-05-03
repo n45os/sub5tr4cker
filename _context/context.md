@@ -1,5 +1,5 @@
 <!-- context-status: active -->
-<!-- last-updated: 2026-03-31 -->
+<!-- last-updated: 2026-05-03 -->
 
 # sub5tr4cker — Project Context
 
@@ -7,7 +7,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 
 ## Quick Facts
 
-- **Stack**: Next.js 16 (App Router), MongoDB/Mongoose **or SQLite (local mode)**, Auth.js v5, Resend, grammy, node-cron, persisted notification task queue (ScheduledTask)
+- **Stack**: Next.js 16 (App Router), MongoDB/Mongoose **or SQLite (local mode)**, **n450s_auth (advanced mode, OAuth2/OIDC)** / token cookie (local mode), Resend, grammy, node-cron, persisted notification task queue (ScheduledTask)
 - **UI**: Tailwind CSS + shadcn/ui with a sidebar dashboard shell, richer cards, tabs, and settings surfaces
 - **Origin**: Migrated from a Google Sheets + Apps Script setup (see `docs/legacy/`)
 - **Phase**: Core MVP plus dashboard refresh (including an admin "subscriptions you pay for" table), editable groups with soft-delete from the UI, DB-backed app settings (Mongo via `MongooseAdapter` in advanced mode; `config.json` in local mode), a dedicated **notifications hub** for workspace email + Telegram setup, **scheduled tasks** page for admins to cancel/retry queued reminders, per-group email accent + style presets with live preview, shared themed email templates, aggregated reminders by user (optional), profile email/Telegram toggles, optional per-group **save email params** for Activity sent-email preview, and **Telegram-only member support** where member email is optional. **Local-first mode** via `s54r` CLI (SQLite, no MongoDB, auto-login, Telegram polling, OS-native cron, export/import/migrate), with local auth now avoiding eager MongoDB adapter startup and Telegram invite links working for SQLite-backed member ids. **API routes, cron jobs, Activity, member portal, and grammy handlers** use the shared `StorageAdapter` (`db()`) so local and advanced modes share one code path.
@@ -43,7 +43,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 | Mode | Storage | Auth | Telegram | Setup |
 |------|---------|------|----------|-------|
 | **local** | SQLite (`~/.sub5tr4cker/data.db`) | Token cookie (auto-login) | Polling | `s54r init` |
-| **advanced** | MongoDB | Auth.js v5 / NextAuth | Webhook | `s54r setup` or env vars |
+| **advanced** | MongoDB | **n450s_auth (OAuth2/OIDC) — sliding 7-day refresh tokens via middleware** | Webhook | `s54r setup` or env vars |
 
 Switch: `SUB5TR4CKER_MODE=local` (set by `s54r start`).
 
@@ -57,7 +57,7 @@ Switch: `SUB5TR4CKER_MODE=local` (set by `s54r start`).
 - Notifications: GET /api/notifications (templates list/preview APIs exist but are deprecated for first-party UI — use `docs/api-design.md`)
 - Group preview: GET /api/groups/[groupId]/notification-preview (deprecated for first-party UI)
 - Settings: GET/PATCH /api/settings, POST /api/settings/test-email, POST /api/settings/test-telegram
-- Auth: /api/auth/[...nextauth], POST /api/register
+- Auth: GET /api/auth/n450s/login, GET /api/auth/n450s/callback, GET /api/auth/n450s/logout (advanced mode; NextAuth + `/api/register` removed in 0.39.0). Local mode unchanged: token cookie set by `s54r start`, no auth API.
 - Telegram: POST /api/telegram/webhook, POST /api/telegram/link, GET /api/groups/[groupId]/members/[memberId]/telegram-invite (admin copyable member deep link); bot `/services`, `/help`, rich invite welcome; new invite users persist `telegram.chatId`
 - Dashboard: GET /api/dashboard/quick-status (aligned `unpaidCount` rules with GET /api/groups; `groupsNeedingAttention` / `groupsEligibleForReminders`), GET/POST /api/dashboard/notify-unpaid (POST accepts optional groupIds, paymentIds, channelPreference; groups by linked user/email/member fallback so Telegram-only members can still receive one combined reminder; cron aggregation uses the notifications.aggregateReminders setting)
 - Scheduled tasks (admin): GET /api/scheduled-tasks, PATCH /api/scheduled-tasks/[taskId], POST /api/scheduled-tasks/bulk-cancel

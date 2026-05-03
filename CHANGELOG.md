@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.39.0] - 2026-05-03
+
+### Changed
+
+- **Authentication (advanced mode)** — Migrated from Auth.js v5 (Credentials + Google + Magic-invite providers) to **n450s_auth** as the upstream identity provider. Login is a single "Continue with n450s" CTA that redirects to `<AUTH_SERVICE_URL>/oauth/consent`; sub5tr4cker exchanges the authorization code at the n450s `/api/auth/n450s/callback` route, stores access + refresh tokens in HttpOnly cookies (`s5_at`, `s5_rt`), and the new middleware silently refreshes the access token on every request that's within the expiry window. **Sliding 7-day refresh tokens give effectively-persistent sessions** for any user who interacts with the app at least once a week — the long-standing "users get logged out" complaint is the entry motivation for the migration. Google sign-in is now federated by n450s_auth itself; sub5tr4cker no longer carries a Google button or `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`. **Local mode (`SUB5TR4CKER_MODE=local`) is unchanged** — token-cookie auto-login (`src/lib/auth/local.ts`) is preserved.
+- **User model** — `User.authIdentityId` (sparse unique) added to link local users to n450s identities. Migration script `scripts/link-existing-users-to-n450s.ts` (dry-run by default, `--apply` to write) reconciles existing users by email; idempotent on re-run. `User.hashedPassword` is deliberately retained for one release as a rollback safety net — it will be dropped in a separate plan.
+- **Operator action required at cutover** — Register the `sub5tr4cker` OAuth client in the production n450s_auth, set `AUTH_SERVICE_URL` / `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` / `OAUTH_REDIRECT_URIS`, run the linking script, and follow the runbook in `.clowalky/_plans/migrate-auth-to-n450s/phase-09-cutover-log.md`. The runbook also lists the rollback path (re-deploy the previous image; legacy env vars + `hashedPassword` are intact).
+
+### Removed
+
+- `/api/auth/[...nextauth]` and `/api/register` routes (NextAuth no longer mounted in advanced mode).
+- `Credentials` and `MagicInvite` providers; `MongoDBAdapter` initialisation; `verifyMagicLoginToken` from `src/lib/tokens.ts`.
+- The dedicated Google sign-in button on the login page (Google now federated through n450s_auth).
+
 ## [0.38.5] - 2026-03-31
 
 ### Changed

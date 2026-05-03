@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 import { verifyAccessToken } from "@/lib/auth/n450s/jwks";
 import { refreshTokens } from "@/lib/auth/n450s/oauth-client";
 import {
@@ -13,6 +14,25 @@ import {
 } from "@/lib/auth/n450s/payload-cache";
 
 const LOCAL_AUTH_COOKIE = "sub5tr4cker-local-auth";
+
+function getNextAuthSecret(): string | undefined {
+  return (
+    process.env.NEXTAUTH_SECRET ||
+    process.env.AUTH_SECRET ||
+    (process.env.NODE_ENV === "development" ? "dev-secret-change-in-production" : undefined)
+  );
+}
+
+async function hasValidNextAuthSession(request: NextRequest): Promise<boolean> {
+  const secret = getNextAuthSecret();
+  if (!secret) return false;
+  try {
+    const token = await getToken({ req: request, secret });
+    return Boolean(token?.id);
+  } catch {
+    return false;
+  }
+}
 
 function withPathname(res: NextResponse, pathname: string): NextResponse {
   res.headers.set("x-pathname", pathname);
@@ -80,6 +100,11 @@ async function handleAdvancedMode(
         err instanceof Error ? err.message : err
       );
     }
+  }
+
+  // fall back to NextAuth Credentials session for users who logged in by email
+  if (await hasValidNextAuthSession(request)) {
+    return withPathname(NextResponse.next(), pathname);
   }
 
   if (isAdvancedProtectedPath(pathname)) {

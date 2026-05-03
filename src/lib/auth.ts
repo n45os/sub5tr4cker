@@ -32,22 +32,36 @@ async function authWrapper(): Promise<ResolvedSession | null> {
   try {
     const cookieStore = await cookies();
     accessToken = cookieStore.get(ACCESS_COOKIE)?.value;
-  } catch {
+  } catch (err) {
+    console.warn("[auth] auth(): cookies() threw:", err instanceof Error ? err.message : err);
     return null;
   }
-  if (!accessToken) return null;
+  if (!accessToken) {
+    console.warn("[auth] auth(): no access token cookie present");
+    return null;
+  }
 
   let payload = getCachedPayload(accessToken);
   if (!payload) {
     try {
       payload = await verifyAccessToken(accessToken);
       setCachedPayload(accessToken, payload);
-    } catch {
+    } catch (err) {
+      console.warn(
+        "[auth] auth(): access token verification failed:",
+        err instanceof Error ? err.message : err
+      );
       return null;
     }
   }
 
-  return await resolveSessionFromPayload(payload);
+  const session = await resolveSessionFromPayload(payload);
+  if (!session) {
+    console.warn(
+      `[auth] auth(): resolveSessionFromPayload returned null for sub=${payload.sub}`
+    );
+  }
+  return session;
 }
 
 export { authWrapper as auth };

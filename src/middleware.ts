@@ -49,9 +49,17 @@ async function handleAdvancedMode(
       const payload = await verifyAccessToken(accessToken);
       setCachedPayload(accessToken, payload);
       return withPathname(NextResponse.next(), pathname);
-    } catch {
-      // access token invalid or expired — fall through to refresh attempt
+    } catch (err) {
+      console.warn(
+        `[auth] middleware: access token verification failed for ${pathname}:`,
+        err instanceof Error ? err.message : err
+      );
+      // fall through to refresh attempt
     }
+  } else {
+    console.warn(
+      `[auth] middleware: no access token cookie on request to ${pathname}`
+    );
   }
 
   if (refreshToken) {
@@ -66,8 +74,11 @@ async function handleAdvancedMode(
         expiresAt,
       });
       return res;
-    } catch {
-      // refresh failed — treat as fully logged out
+    } catch (err) {
+      console.warn(
+        `[auth] middleware: refresh failed for ${pathname}:`,
+        err instanceof Error ? err.message : err
+      );
     }
   }
 

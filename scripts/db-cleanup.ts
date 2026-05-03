@@ -34,6 +34,13 @@ for (const file of [".env.local", ".env"]) {
 }
 
 import { db, type StorageAdapter } from "../src/lib/storage";
+import { Types } from "mongoose";
+import {
+  AuditEvent,
+  BillingPeriod,
+  Group,
+  ScheduledTask,
+} from "../src/models";
 
 type PassId = "orphan-tasks" | "orphan-periods" | "old-notifications";
 
@@ -68,13 +75,187 @@ const passes: Pass[] = [
     flag: "--orphan-tasks",
     description: "cancel scheduled tasks pointing at deleted groups/periods",
     async run(ctx) {
+      // local SQLite installs are single-user and don't accumulate cross-user
+      // orphans worth a batch pass. advanced (mongo) mode is the only target.
+      if (process.env.SUB5TR4CKER_MODE === "local") {
+        header("orphan-tasks", "skipped: orphan-task cleanup is advanced (mongo) mode only.");
+        return { id: "orphan-tasks", scanned: 0, touched: 0, errors: [] };
+      }
+
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+      // candidates: pending, or locked with stale lockedAt
+      const candidates = await ScheduledTask.find({
+        $or: [
+          { status: "pending" },
+          { status: "locked", lockedAt: { $lt: oneHourAgo } },
+        ],
+      })
+        .lean()
+        .exec();
+
+      // batch-fetch all referenced groups + periods to avoid n+1 lookups
+      const groupIds = new Set<string>();
+      const periodIds = new Set<string>();
+      for (const task of candidates) {
+        const payload = (task.payload ?? {}) as Record<string, unknown>;
+        if (typeof payload.groupId === "string") groupIds.add(payload.groupId);
+        if (typeof payload.billingPeriodId === "string") periodIds.add(payload.billingPeriodId);
+        const refs = Array.isArray(payload.payments) ? payload.payments : [];
+        for (const r of refs as Array<Record<string, unknown>>) {
+          if (typeof r.groupId === "string") groupIds.add(r.groupId);
+          if (typeof r.billingPeriodId === "string") periodIds.add(r.billingPeriodId);
+        }
+      }
+
+      const toObjectIds = (ids: Set<string>) => {
+        const out: Types.ObjectId[] = [];
+        for (const id of ids) {
+          if (Types.ObjectId.isValid(id)) out.push(new Types.ObjectId(id));
+        }
+        return out;
+      };
+
+      const liveGroups = await Group.find({ _id: { $in: toObjectIds(groupIds) } })
+        .select("_id")
+        .lean()
+        .exec();
+      const liveGroupIds = new Set(liveGroups.map((g) => String(g._id)));
+
+      const livePeriods = await BillingPeriod.find({ _id: { $in: toObjectIds(periodIds) } })
+        .lean()
+        .exec();
+      const periodById = new Map(livePeriods.map((p) => [String(p._id), p]));
+
+      const isPaymentActionable = (status: string | undefined): boolean =>
+        status === "pending" || status === "member_confirmed";
+
+      const isSingleRefOrphan = (payload: Record<string, unknown>): boolean => {
+        const groupId = typeof payload.groupId === "string" ? payload.groupId : null;
+        const periodId = typeof payload.billingPeriodId === "string" ? payload.billingPeriodId : null;
+        const paymentId = typeof payload.paymentId === "string" ? payload.paymentId : null;
+
+        if (groupId && !liveGroupIds.has(groupId)) return true;
+        if (periodId && !periodById.has(periodId)) return true;
+        if (periodId && paymentId) {
+          const period = periodById.get(periodId);
+          if (!period) return true;
+          const payment = (period.payments ?? []).find(
+            (p: { _id: Types.ObjectId; status: string }) => String(p._id) === paymentId
+          );
+          if (!payment) return true;
+          if (!isPaymentActionable(payment.status)) return true;
+        }
+        return false;
+      };
+
+      const orphanIds: string[] = [];
+      for (const task of candidates) {
+        const payload = (task.payload ?? {}) as Record<string, unknown>;
+
+        if (task.type === "aggregated_payment_reminder") {
+          // aggregated reminder is orphan only when every referenced payment
+          // is gone or no longer actionable — otherwise the worker still has
+          // useful work to do for the surviving refs.
+          const refs = Array.isArray(payload.payments)
+            ? (payload.payments as Array<Record<string, unknown>>)
+            : [];
+          if (refs.length === 0) {
+            orphanIds.push(String(task._id));
+            continue;
+          }
+          let anyAlive = false;
+          for (const ref of refs) {
+            const groupId = typeof ref.groupId === "string" ? ref.groupId : null;
+            const periodId = typeof ref.billingPeriodId === "string" ? ref.billingPeriodId : null;
+            const paymentId = typeof ref.paymentId === "string" ? ref.paymentId : null;
+            if (!groupId || !liveGroupIds.has(groupId)) continue;
+            if (!periodId) continue;
+            const period = periodById.get(periodId);
+            if (!period) continue;
+            const payment = (period.payments ?? []).find(
+              (p: { _id: Types.ObjectId; status: string }) =>
+                paymentId ? String(p._id) === paymentId : false
+            );
+            if (!payment) continue;
+            if (isPaymentActionable(payment.status)) {
+              anyAlive = true;
+              break;
+            }
+          }
+          if (!anyAlive) orphanIds.push(String(task._id));
+        } else {
+          if (isSingleRefOrphan(payload)) orphanIds.push(String(task._id));
+        }
+      }
+
+      const scanned = candidates.length;
+      const touched = orphanIds.length;
+
+      if (touched === 0) {
+        header(
+          "orphan-tasks",
+          `scanned ${scanned} candidate task(s); 0 orphans found.`
+        );
+        return { id: "orphan-tasks", scanned, touched: 0, errors: [] };
+      }
+
+      if (!ctx.apply) {
+        const sample = orphanIds.slice(0, 5).join(",");
+        const more = orphanIds.length > 5 ? "..." : "";
+        header(
+          "orphan-tasks",
+          `would cancel ${touched} of ${scanned} task(s) — sample: ${sample}${more} — pass --apply to execute.`
+        );
+        return { id: "orphan-tasks", scanned, touched, errors: [] };
+      }
+
+      // apply: status flip via raw collection driver — `cancellationReason`
+      // is not in the ScheduledTask schema, so strict mode would drop it.
+      const now = new Date();
+      const updateRes = await ScheduledTask.collection.updateMany(
+        { _id: { $in: orphanIds.map((id) => new Types.ObjectId(id)) } },
+        {
+          $set: {
+            status: "cancelled",
+            cancelledAt: now,
+            cancellationReason: "orphan-cleanup",
+            updatedAt: now,
+          },
+        }
+      );
+
+      // one batch audit row via raw collection — `scheduled_tasks_orphan_cleanup`
+      // is not in the AuditEvent action enum; bypassing strict mode keeps the
+      // schema unchanged while preserving the audit trail.
+      const sampleIds = orphanIds.slice(0, 10);
+      await AuditEvent.collection.insertOne({
+        actor: null,
+        actorName: "System (db-cleanup --orphan-tasks)",
+        action: "scheduled_tasks_orphan_cleanup",
+        group: null,
+        billingPeriod: null,
+        targetMember: null,
+        metadata: {
+          count: orphanIds.length,
+          scriptRunId: ctx.scriptRunId,
+          sampleIds,
+        },
+        createdAt: now,
+        updatedAt: now,
+      });
+
       header(
         "orphan-tasks",
-        ctx.apply
-          ? "(stub) would cancel scheduled tasks whose group/period is gone — implemented in phase 2"
-          : "(stub) would cancel scheduled tasks whose group/period is gone — pass --apply to execute (phase 2)"
+        `cancelled ${updateRes.modifiedCount} of ${scanned} task(s); audit event written (scriptRunId=${ctx.scriptRunId}).`
       );
-      return { id: "orphan-tasks", scanned: 0, touched: 0, errors: [] };
+
+      return {
+        id: "orphan-tasks",
+        scanned,
+        touched: updateRes.modifiedCount,
+        errors: [],
+      };
     },
   },
   {

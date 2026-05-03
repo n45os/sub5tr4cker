@@ -7,6 +7,8 @@ export interface AdminFollowUpTemplateParams {
   unverifiedMembers: Array<{
     memberNickname: string;
     amount: number;
+    // accepts Date when called fresh, string when rehydrated from persisted emailParams JSON
+    memberConfirmedAt: Date | string | null;
   }>;
   dashboardUrl?: string | null;
   /** optional; kept for consistency */
@@ -19,11 +21,36 @@ export const adminFollowUpSampleParams: AdminFollowUpTemplateParams = {
   periodLabel: "Mar 2026",
   currency: "EUR",
   unverifiedMembers: [
-    { memberNickname: "Alex", amount: 4.99 },
-    { memberNickname: "Sofia", amount: 4.99 },
+    {
+      memberNickname: "Alex",
+      amount: 4.99,
+      memberConfirmedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+    },
+    {
+      memberNickname: "Sofia",
+      amount: 4.99,
+      memberConfirmedAt: new Date(Date.now() - 30 * 60 * 1000),
+    },
   ],
   dashboardUrl: "https://substrack.example.com/dashboard/groups/group-1/billing",
 };
+
+const PENDING_LABEL = "(self-confirm pending)";
+
+function formatRelativeTime(value: Date | string | null): string {
+  if (value === null || value === undefined) return PENDING_LABEL;
+  const ts = typeof value === "string" ? new Date(value) : value;
+  const ms = ts.getTime();
+  if (Number.isNaN(ms)) return PENDING_LABEL;
+  const diffSec = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  if (diffSec < 60) return "just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `${diffDay}d ago`;
+}
 
 export function buildAdminFollowUpEmailHtml(
   params: AdminFollowUpTemplateParams
@@ -36,7 +63,7 @@ export function buildAdminFollowUpEmailHtml(
     .map(
       (member) => `
         <div class="row">
-          <span class="label">${member.memberNickname}</span>
+          <span class="label">${member.memberNickname} · ${formatRelativeTime(member.memberConfirmedAt)}</span>
           <span class="value">${params.currency} ${member.amount.toFixed(2)}</span>
         </div>
       `
@@ -75,7 +102,7 @@ export function buildAdminFollowUpTelegramText(
     params.unverifiedMembers
       .map(
         (member) =>
-          `• ${member.memberNickname} — ${member.amount.toFixed(2)}${params.currency}`
+          `• ${member.memberNickname} · ${member.amount.toFixed(2)}${params.currency} · ${formatRelativeTime(member.memberConfirmedAt)}`
       )
       .join("\n")
   );

@@ -39,9 +39,14 @@ export async function sendAdminConfirmationNudge(
     periodLabel: period.periodLabel,
     currency: period.currency,
     unverifiedMembers: unverified.map(
-      (payment: { memberNickname: string; amount: number }) => ({
+      (payment: {
+        memberNickname: string;
+        amount: number;
+        memberConfirmedAt: Date | null;
+      }) => ({
         memberNickname: payment.memberNickname,
         amount: payment.amount,
+        memberConfirmedAt: payment.memberConfirmedAt,
       })
     ),
     dashboardUrl,

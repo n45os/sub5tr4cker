@@ -112,7 +112,24 @@ export function isLocalMode(): boolean {
  * Get a single setting value from local config.
  * Maps settings service keys (e.g. "email.apiKey") to config fields.
  */
+// legal/operator keys have no slot in config.json, so in local mode they are
+// sourced from LEGAL_* env vars (the public legal pages fall back to placeholders)
+const LEGAL_SETTING_ENV: Record<string, string> = {
+  "legal.entityName": "LEGAL_ENTITY_NAME",
+  "legal.contactEmail": "LEGAL_CONTACT_EMAIL",
+  "legal.contactAddress": "LEGAL_CONTACT_ADDRESS",
+  "legal.jurisdiction": "LEGAL_JURISDICTION",
+  "legal.supervisoryAuthority": "LEGAL_SUPERVISORY_AUTHORITY",
+  "legal.hostingProvider": "LEGAL_HOSTING_PROVIDER",
+  "legal.lastUpdated": "LEGAL_LAST_UPDATED",
+};
+
 export function getLocalSetting(key: string): string | null {
+  const legalEnvVar = LEGAL_SETTING_ENV[key];
+  if (legalEnvVar) {
+    return process.env[legalEnvVar] ?? null;
+  }
+
   const config = readConfig();
   if (!config) return null;
 

@@ -46,6 +46,25 @@ export default function Home() {
           </Link>
         </div>
       </main>
+      <footer className="border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="mx-auto flex max-w-4xl flex-col gap-3 px-4 py-6 text-sm text-zinc-500 dark:text-zinc-400 sm:flex-row sm:items-center sm:justify-between">
+          <span>© {new Date().getFullYear()} sub5tr4cker</span>
+          <nav className="flex flex-wrap gap-x-5 gap-y-2">
+            <Link href="/privacy" className="hover:text-zinc-900 dark:hover:text-zinc-100">
+              Privacy
+            </Link>
+            <Link href="/cookies" className="hover:text-zinc-900 dark:hover:text-zinc-100">
+              Cookies
+            </Link>
+            <Link href="/terms" className="hover:text-zinc-900 dark:hover:text-zinc-100">
+              Terms
+            </Link>
+            <Link href="/docs" className="hover:text-zinc-900 dark:hover:text-zinc-100">
+              Docs
+            </Link>
+          </nav>
+        </div>
+      </footer>
     </div>
   );
 }

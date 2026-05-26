@@ -23,6 +23,7 @@ type SettingsCategory =
   | "notifications"
   | "security"
   | "cron"
+  | "legal"
   | "plugin"
   | "plugins";
 
@@ -41,7 +42,7 @@ interface SettingsPageClientProps {
   settings: SettingItem[];
 }
 
-type SettingsTabId = "general" | "security" | "plugins";
+type SettingsTabId = "general" | "security" | "legal" | "plugins";
 
 const tabs: Array<{
   id: SettingsTabId;
@@ -62,6 +63,13 @@ const tabs: Array<{
     description:
       "Secrets for confirmation links, Telegram account linking, and protected cron endpoints.",
     categoryKeys: ["security", "cron"],
+  },
+  {
+    id: "legal",
+    label: "Legal & privacy",
+    description:
+      "Operator details shown on the public Privacy Policy, Cookie Policy, and Terms pages — who runs this instance, the privacy contact, and the governing jurisdiction.",
+    categoryKeys: ["legal"],
   },
   {
     id: "plugins",
@@ -201,6 +209,31 @@ export function SettingsPageClient({ settings }: SettingsPageClientProps) {
                           header for protected scheduler routes.
                         </li>
                       </ul>
+                    </div>
+                  ) : null}
+
+                  {tab.id === "legal" ? (
+                    <div className="rounded-2xl border border-border/70 bg-muted/25 px-4 py-3 text-sm text-muted-foreground">
+                      <p className="font-medium text-foreground">
+                        These details appear on your public legal pages
+                      </p>
+                      <p className="mt-2">
+                        Fill these in so your{" "}
+                        <a href="/privacy" target="_blank" className="underline hover:text-foreground">
+                          Privacy Policy
+                        </a>
+                        ,{" "}
+                        <a href="/cookies" target="_blank" className="underline hover:text-foreground">
+                          Cookie Policy
+                        </a>
+                        , and{" "}
+                        <a href="/terms" target="_blank" className="underline hover:text-foreground">
+                          Terms
+                        </a>{" "}
+                        name a real data controller and contact. Until you set
+                        them, the pages show clearly-marked placeholders. They are
+                        informational templates, not a substitute for legal advice.
+                      </p>
                     </div>
                   ) : null}
 

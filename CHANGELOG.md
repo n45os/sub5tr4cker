@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.40.0] - 2026-05-26
+
+### Added
+
+- **Public legal pages** — `/privacy` (Privacy Policy), `/cookies` (Cookie Policy), and `/terms` (Terms of Service), served from a new `(legal)` route group with a shared reading layout and footer nav. The Privacy Policy covers EU GDPR (lawful bases, data-subject rights, supervisory authority), UK GDPR (ICO), and California CCPA/CPRA. The Cookie Policy documents that the app uses only strictly-necessary auth/session cookies plus a functional theme preference — no analytics or tracking — so no consent banner is required.
+- **Operator-editable legal details** — a new "Legal & privacy" settings category (`legal.entityName`, `legal.contactEmail`, `legal.contactAddress`, `legal.jurisdiction`, `legal.supervisoryAuthority`, `legal.hostingProvider`, `legal.lastUpdated`) surfaced as a tab in dashboard settings. The legal pages read these via `getLegalConfig()` and fall back to clearly-marked placeholders until the operator fills them in. Matching `LEGAL_*` env vars documented in `.env.example`.
+- **Footer links** to the legal pages on the landing page.
+
 ## [0.39.3] - 2026-05-04
 
 ### Fixed

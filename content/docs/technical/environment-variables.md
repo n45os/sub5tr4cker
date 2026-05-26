@@ -53,6 +53,20 @@ Copy `.env.example` to `.env.local` (or set in your host’s env) and fill in th
 | `AGGREGATE_REMINDERS` | No | When set to `true`, members with the same email across groups receive one combined reminder per run (DB setting `notifications.aggregateReminders` overrides this when set in the app). |
 | `NODE_ENV` | No | `development` or `production`. |
 
+## Legal / privacy pages
+
+Operator details shown on the public `/privacy`, `/cookies`, and `/terms` pages. In advanced mode these are easier to set from the dashboard (**Settings → Legal & privacy**); the env vars act as fallbacks (and are the way to set them in local mode). Any left empty render as clearly-marked placeholders.
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `LEGAL_ENTITY_NAME` | No | Legal entity / operator name acting as data controller. |
+| `LEGAL_CONTACT_EMAIL` | No | Email for privacy questions and data-subject requests. |
+| `LEGAL_CONTACT_ADDRESS` | No | Postal/registered address (omitted from the pages when empty). |
+| `LEGAL_JURISDICTION` | No | Governing law / country (e.g. `Greece`), used in Terms and the transfers note. |
+| `LEGAL_SUPERVISORY_AUTHORITY` | No | Data protection authority users can complain to (GDPR rights section). |
+| `LEGAL_HOSTING_PROVIDER` | No | Where the instance + database are hosted (data-storage / transfers note). |
+| `LEGAL_LAST_UPDATED` | No | ISO date (`YYYY-MM-DD`) shown as the policies' effective date. Defaults to today. |
+
 ## Example
 
 ```env

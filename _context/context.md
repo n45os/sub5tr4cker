@@ -16,7 +16,8 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 
 - `src/app/` — pages + API routes (auth, dashboard, groups, billing, telegram, cron)
 - `src/app/(auth)/` — login, register
-- `src/app/(dashboard)/` — dashboard home, group detail/edit/new, notifications hub, scheduled tasks (queue), activity, settings
+- `src/app/(legal)/` — public legal pages (`/privacy`, `/cookies`, `/terms`) reading operator-editable `legal.*` settings via `src/lib/legal/config.ts`
+- `src/app/(dashboard)/` — dashboard home, group detail/edit/new, notifications hub, scheduled tasks (queue), activity, settings (incl. **Legal & privacy** tab)
 - `src/app/api/` — groups CRUD, group notification toggles, billing, notifications, scheduled tasks (queue admin), settings, confirm, telegram webhook/link, cron, register
 - `src/lib/` — db, auth, settings service, tokens (confirmation + link), email, telegram, billing calculator, notifications, tasks (queue + worker)
 - `src/lib/storage/` — `StorageAdapter` interface, `MongooseAdapter`, `SqliteAdapter`, domain types, adapter factory

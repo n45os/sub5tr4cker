@@ -5,6 +5,7 @@ export type SettingsCategory =
   | "notifications"
   | "security"
   | "cron"
+  | "legal"
   | "plugin";
 
 export interface SettingsDefinition {
@@ -130,6 +131,69 @@ export const settingsDefinitions: SettingsDefinition[] = [
       "Your scheduler (cron, GitHub Actions, etc.) must send header x-cron-secret with this value when POSTing to /api/cron/* routes. Stops anonymous internet traffic from running billing, reminder enqueue, or the notification worker.",
     isSecret: true,
     envVar: "CRON_SECRET",
+  },
+  {
+    key: "legal.entityName",
+    category: "legal",
+    label: "Legal entity / operator name",
+    description:
+      "Name of the person or organisation that runs this deployment. This is the data controller shown on the Privacy Policy, Cookie Policy, and Terms pages. Leave empty to show a generic placeholder.",
+    isSecret: false,
+    envVar: "LEGAL_ENTITY_NAME",
+  },
+  {
+    key: "legal.contactEmail",
+    category: "legal",
+    label: "Privacy contact email",
+    description:
+      "Where users send privacy questions and data-subject requests (access, deletion, etc.). Shown on the legal pages. Use a mailbox you actually monitor.",
+    isSecret: false,
+    envVar: "LEGAL_CONTACT_EMAIL",
+  },
+  {
+    key: "legal.contactAddress",
+    category: "legal",
+    label: "Postal address",
+    description:
+      "Optional postal/registered address of the operator. Some regimes (e.g. GDPR) expect a contactable address for the controller. Leave empty to omit it from the legal pages.",
+    isSecret: false,
+    envVar: "LEGAL_CONTACT_ADDRESS",
+  },
+  {
+    key: "legal.jurisdiction",
+    category: "legal",
+    label: "Governing law / jurisdiction",
+    description:
+      "Country or region whose law governs these terms and where the operator is established (e.g. \"Greece\", \"the European Union\"). Used in the Terms and in the international-transfers note.",
+    isSecret: false,
+    envVar: "LEGAL_JURISDICTION",
+  },
+  {
+    key: "legal.supervisoryAuthority",
+    category: "legal",
+    label: "Supervisory authority",
+    description:
+      "Optional. The data protection authority users can complain to (e.g. \"the Hellenic Data Protection Authority (HDPA)\"). Shown in the GDPR rights section. Leave empty for a generic reference.",
+    isSecret: false,
+    envVar: "LEGAL_SUPERVISORY_AUTHORITY",
+  },
+  {
+    key: "legal.hostingProvider",
+    category: "legal",
+    label: "Hosting provider / data location",
+    description:
+      "Optional. Where this instance and its database are hosted (e.g. \"Hetzner, Germany\"). Used in the data-storage and international-transfers sections. Leave empty to show a generic note.",
+    isSecret: false,
+    envVar: "LEGAL_HOSTING_PROVIDER",
+  },
+  {
+    key: "legal.lastUpdated",
+    category: "legal",
+    label: "Policy last-updated date",
+    description:
+      "Optional ISO date (YYYY-MM-DD) shown as the effective/last-updated date on the legal pages. Update it whenever you change these policies. Leave empty to show today's date.",
+    isSecret: false,
+    envVar: "LEGAL_LAST_UPDATED",
   },
 ];
 

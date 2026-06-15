@@ -28,6 +28,34 @@ This skill is invoked by an autonomous scheduler. There is no human in the loop.
 
 The only acceptable end states are: phase committed (`complete`), phase blocked (`blocked` with reason), or eligibility refusal (one-line abort message). Nothing else.
 
+## Communicating status via `clowalky signal`
+
+When your phase cannot proceed autonomously, or when you want to surface progress information to the operator, use `clowalky signal` **from the project root** before setting the phase to `blocked` or stopping:
+
+```bash
+# Something is broken and the user must act before you can continue:
+clowalky signal blocked "describe exactly what the user needs to do"
+
+# You need a decision the brief did not answer:
+clowalky signal needs-input "describe the question and the options"
+
+# Long-running step — let the user know you're alive:
+clowalky signal info "running migration, ~4 min remaining"
+
+# Something looks wrong but you're proceeding with a fallback:
+clowalky signal warning "package-lock.json missing, using npm install --legacy-peer-deps"
+
+# Clear a previous signal once the issue is resolved:
+clowalky signal clear
+```
+
+The signal is written into `~/.clowalky/plan-runs.json` and surfaces in the TUI within 1 second. It is automatically cleared at the start of the next phase dispatch.
+
+**Rules:**
+- Always include the `signal blocked` call *before* setting `Status = blocked` in STATUS.md, so the user sees the reason immediately.
+- Keep messages short and actionable — one sentence, what to do, not what went wrong.
+- `clowalky signal` exits 1 if no in-progress run is found for the current project — this is a no-op from a correctness standpoint, so do not let it abort your script; check the exit code or wrap in `|| true` if you are running inside a script that uses `set -e`.
+
 ## Procedure
 
 1. Open `.clowalky/_plans/<plan-slug>/STATUS.md`. Locate the row whose `ID` cell matches `phase-id` (trim before compare).

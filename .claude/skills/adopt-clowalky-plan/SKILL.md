@@ -1,6 +1,6 @@
 ---
 name: adopt-clowalky-plan
-description: Convert an existing plan (markdown TODO, README section, pasted notes, GitHub issue, design doc, etc.) into a properly-shaped clowalky plan under .clowalky/_plans/<slug>/ with all rows pending. Use when the user asks to "adopt this plan", "import this plan", or "convert this into a clowalky plan".
+description: Convert an existing plan (markdown TODO, README section, pasted notes, GitHub issue, design doc, etc.) into a properly-shaped clowalky plan under `.clowalky/_plans/<slug>/` with all rows pending. Use when the user asks to "adopt this into clowalky", "import this as a clowalky plan", or "convert this into a clowalky plan" so the orchestrator daemon can drive it. Do NOT use for generic "adopt this plan" requests unrelated to clowalky.
 ---
 
 # adopt-clowalky-plan
@@ -27,7 +27,7 @@ If `source` is missing, abort with: `adopt-clowalky-plan: missing source`.
 2. Pick a kebab-case `slug`. Use the user-provided one if any; otherwise derive from the source title.
 3. Refuse if `<projectRoot>/.clowalky/_plans/<slug>/` already exists. Do not merge. Surface: `adopt-clowalky-plan: plan <slug> already exists; pick a different slug or remove the existing folder`. Do **not** create the directory.
 4. Refuse if the source contains in-progress / completed markers (✅, ☑, "DONE", "shipped", "complete", "[x]", check-marks, strikethrough). Surface: `adopt-clowalky-plan: source contains done/shipped markers; strip them or use author-clowalky-plan to draft fresh`. Do **not** create the directory.
-5. Decompose the source into 5–12 phases. Re-use existing structure where possible: numbered lists, headings, "Step N" lines, sub-bullets. If the source is a flat description, propose a sensible breakdown.
+5. Decompose the source into as few phases as it naturally requires. Re-use existing structure where possible (numbered lists, headings, "Step N" lines, sub-bullets) but **do not preserve structure for its own sake** — every phase boots a fresh `claude -p` and re-pays the cold-start cost, so collapse adjacent items that share files, vocabulary, and would land in a single commit. A 6-step list whose first three steps all touch the same module is 1 phase, not 3. A 4-step list whose steps each touch disjoint subsystems is 4 phases. If the source is a flat description, propose a breakdown that mirrors commit boundaries rather than narrative beats.
 6. For each phase assign: an `ID` (`0`, `1`, `2`, ... or `1a`, `1b` for siblings), a short `Phase` title, dependencies inferred from text cues ("after we ship X", "once Y is in place", "depends on"), and a brief filename `phase-NN-<short-name>.md`.
 7. Create `<projectRoot>/.clowalky/_plans/<slug>/` and write `STATUS.md` using the standard pipe-table header from `.clowalky/AGENT.md`. One row per phase. `Status = pending` for every row. Leave `Started`, `Completed`, and `Notes` empty — the runner and `clowalky reconcile` fill those in.
 8. Write each `phase-NN-<short-name>.md` with the standard sections (`## Goal`, `## Scope`, `## Files to touch`, `## Acceptance criteria`, `## Manual verification`). Where the source did not specify a section, write a one-line `TBD — derive from <source-section>` placeholder rather than inventing requirements.

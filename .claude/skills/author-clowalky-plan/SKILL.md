@@ -1,6 +1,6 @@
 ---
 name: author-clowalky-plan
-description: Draft a fresh clowalky plan (STATUS.md + phase briefs) under .clowalky/_plans/<slug>/. Use when the user asks to "create a plan", "draft a clowalky plan", or "scaffold phases".
+description: Draft a fresh clowalky plan (STATUS.md + phase briefs) under `.clowalky/_plans/<slug>/`. Use when the user asks to "draft a clowalky plan", "scaffold clowalky phases", "author a clowalky plan", or otherwise wants to create a multi-phase plan specifically for the clowalky orchestrator daemon to execute. Do NOT use for generic "create a plan" / Plan Mode / `plan-and-execute` work — those have their own skills.
 ---
 
 # author-clowalky-plan
@@ -34,6 +34,12 @@ If the user's goal naturally splits into two-or-more disjoint contexts, **say so
 
 Heuristic check: write the *one-line summary of the plan goal* in your head. If the most natural summary needs an "and" between two unrelated subjects, split.
 
+## `seed.md` — operator-authored shared context (the prepended-context pattern)
+
+If you can write down what every phase of the plan needs to know — relevant file paths, conventions, invariants, vocabulary, ASCII diagrams — drop it in `<plan-dir>/seed.md`. The runner prepends `seed.md` verbatim to every phase prompt. Same prefix on every phase = Anthropic prompt-cache hits across the plan, so the seed is paid for once and read for free thereafter.
+
+`seed.md` is optional and unstructured: write whatever helps the agent skip rediscovery. If absent, the runner behaves as before (no prepend). It's complementary to the phase-0 pattern below: use `seed.md` for context **you already know**, use phase-0 for context that needs to be **derived by an agent** (large summaries of unfamiliar code, gotcha lists discovered during exploration). Many plans benefit from both — `seed.md` points at the area, phase-0 distills what's there.
+
 ## Phase-0 as a context primer (the prefetched-context pattern)
 
 For plans that need heavy upfront exploration (large refactors, plans against unfamiliar code, plans whose later phases all depend on shared invariants), dedicate **phase 0 to writing a context document** the rest of the plan reads.
@@ -58,13 +64,16 @@ If you add a phase-0 primer, list `phase-00-context.md` in its "Files to touch",
 
 - **Phases share vocabulary.** If you find yourself re-explaining a concept in phase 3 that you already defined in phase 1, you are probably authoring two plans.
 - **One phase = one commit.** A "Files to touch" list spanning 25 files across 4 subsystems is two phases.
+- **Collapse adjacent phases that share files, vocabulary, and would land in one commit without bloating it.** If you cannot name a distinct context shift or a real dependency between phase N and phase N+1, they are the same phase. Two narrative beats in your head are not two phases.
 - **Each phase is independently testable.** "Acceptance criteria" must be checkable without depending on phases not in `Depends on`.
 - **Disjoint folders → mark the phases parallel** in the `Notes` cell so the orchestrator (or a human reviewer) can see the dependency graph at a glance.
 
 ## Sizing guidance
 
-- 5–12 phases is typical. Fewer than 4 phases usually doesn't need a plan — handle it inline.
-- A plan whose STATUS.md doesn't fit on one screen is suspect — split it.
+- **Every phase pays a fixed cold-start cost.** A fresh `claude -p` session boots, re-reads AGENT.md, re-opens the brief, and re-derives context the previous phase already had. That tax is paid per phase, not per file edited — a phase that exists only because "this step felt like its own thing" is pure tax with no payoff.
+- The right phase count is the smallest one that covers the work without any single phase exceeding a commit budget. Let the work decide; do not start from a target count and split to reach it.
+- A plan whose STATUS.md doesn't fit on one screen is suspect — split it or merge adjacent rows that share files and vocabulary.
+- A plan whose phases all touch wildly different files is also suspect — that is probably two or more plans (see "ONE plan vs SEPARATE plans" above).
 
 ## Execution mode: draft and stop
 
@@ -74,18 +83,19 @@ If you add a phase-0 primer, list `phase-00-context.md` in its "Files to touch",
 
 ## Procedure
 
-1. **Decide whether this is one plan or several.** Apply the "one-line summary needs an 'and'" check. If several, repeat steps 2–6 per slug and report all of them at the end.
-2. **Decide whether the plan needs a phase-0 context primer.** Apply the criteria above. If yes, phase 0's deliverable is `phase-00-context.md`; subsequent phases declare `Depends on: 0` and reference back to that file.
-3. **Pick a short kebab-case `<slug>`** from the user's intent. Refuse and stop if a folder by that name already exists in `.clowalky/_plans/`.
-4. **Create the directory.**
-5. **Write `STATUS.md`** with the standard pipe-table header:
+1. **Decide whether this is one plan or several.** Apply the "one-line summary needs an 'and'" check. If several, repeat steps 2–7 per slug and report all of them at the end.
+2. **Decide whether the plan needs a `seed.md`.** If you can already enumerate the file paths, conventions, vocabulary, or invariants that every phase will need to know, write them into `seed.md` at the plan root. The runner will prepend it to every phase prompt automatically. Skip if every brief is already self-contained.
+3. **Decide whether the plan needs a phase-0 context primer.** Apply the criteria above. If yes, phase 0's deliverable is `phase-00-context.md`; subsequent phases declare `Depends on: 0` and reference back to that file.
+4. **Pick a short kebab-case `<slug>`** from the user's intent. Refuse and stop if a folder by that name already exists in `.clowalky/_plans/`.
+5. **Create the directory.**
+6. **Write `STATUS.md`** with the standard pipe-table header:
    ```
    | ID | Phase | Status | Depends on | Brief | Started | Completed | Notes |
    |----|-------|--------|------------|-------|---------|-----------|-------|
    ```
    One row per phase, all `pending`. Leave `Started`, `Completed`, and `Notes` empty — the runner and `clowalky reconcile` fill those in.
-6. **Write one `phase-NN-<short-name>.md` per row.** Use sections: `## Goal`, `## Scope`, `## Files to touch`, `## Acceptance criteria`, `## Manual verification`. Be concrete — name exact file paths.
-7. **Stop.** Do **not** start executing any phase. The user (or clowalky) decides when.
+7. **Write one `phase-NN-<short-name>.md` per row.** Use sections: `## Goal`, `## Scope`, `## Files to touch`, `## Acceptance criteria`, `## Manual verification`. Be concrete — name exact file paths.
+8. **Stop.** Do **not** start executing any phase. The user (or clowalky) decides when.
 
 ## Dependency hygiene (lint before you ship)
 

@@ -1,0 +1,3 @@
+# Auto-managed git worktrees for plans flagged `parallel` (see AGENT.md).
+# The orchestrator creates and tears them down — never hand-edit.
+worktrees/

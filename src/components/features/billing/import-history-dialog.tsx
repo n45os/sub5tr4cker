@@ -41,6 +41,9 @@ interface ImportHistoryDialogProps {
   currency: string;
   /** custom trigger (e.g. dropdown menu item) — opens the same dialog */
   renderTrigger?: (props: { onClick: () => void }) => ReactNode;
+  /** controlled open state — when provided the component renders only the dialog */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 function emptyPeriod(): ImportPeriodRow {
@@ -58,8 +61,16 @@ export function ImportHistoryDialog({
   memberEmails,
   currency,
   renderTrigger,
+  open: controlledOpen,
+  onOpenChange,
 }: ImportHistoryDialogProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (next: boolean) => {
+    if (!isControlled) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
   const [rows, setRows] = useState<ImportPeriodRow[]>([emptyPeriod()]);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{ imported: number; skipped: number } | null>(null);
@@ -180,7 +191,7 @@ export function ImportHistoryDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       {renderTrigger ? (
         renderTrigger({ onClick: () => setOpen(true) })
-      ) : (
+      ) : isControlled ? null : (
         <DialogTrigger
           render={
             <Button variant="outline" size="sm">

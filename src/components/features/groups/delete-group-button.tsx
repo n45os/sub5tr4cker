@@ -23,6 +23,8 @@ export function DeleteGroupButton({
   buttonVariant = "destructive",
   label = "Delete group",
   renderTrigger,
+  open: controlledOpen,
+  onOpenChange,
 }: {
   groupId: string;
   groupName: string;
@@ -32,9 +34,18 @@ export function DeleteGroupButton({
   buttonVariant?: "destructive" | "outline";
   label?: string;
   renderTrigger?: (props: { onClick: () => void }) => ReactNode;
+  /** controlled open state — when provided the component renders only the dialog */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (next: boolean) => {
+    if (!isControlled) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,7 +82,7 @@ export function DeleteGroupButton({
             setOpen(true);
           },
         })
-      ) : (
+      ) : isControlled ? null : (
         <Button
           type="button"
           variant={buttonVariant}

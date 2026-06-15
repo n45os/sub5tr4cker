@@ -20,6 +20,9 @@ interface InitializeNotifyButtonProps {
   initializedAt: string | null;
   /** custom trigger (e.g. dropdown menu item) — opens the same dialog */
   renderTrigger?: (props: { onClick: () => void }) => ReactNode;
+  /** controlled open state — when provided the component renders only the dialog */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function InitializeNotifyButton({
@@ -27,9 +30,17 @@ export function InitializeNotifyButton({
   memberCount,
   initializedAt,
   renderTrigger,
+  open: controlledOpen,
+  onOpenChange,
 }: InitializeNotifyButtonProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (next: boolean) => {
+    if (!isControlled) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,7 +74,7 @@ export function InitializeNotifyButton({
     <>
       {renderTrigger ? (
         renderTrigger({ onClick: () => setOpen(true) })
-      ) : (
+      ) : isControlled ? null : (
         <Button
           type="button"
           variant={alreadyInitialized ? "outline" : "default"}

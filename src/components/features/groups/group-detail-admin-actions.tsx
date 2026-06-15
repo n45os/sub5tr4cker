@@ -57,6 +57,10 @@ export function GroupDetailAdminActions({
   const alreadyInitialized = !!initializedAt;
   const router = useRouter();
   const [status, setStatus] = useState<NotifyStatus>({ kind: "idle" });
+  // dialogs are rendered outside the dropdown so they survive the menu closing
+  const [openDialog, setOpenDialog] = useState<
+    "init" | "import" | "delete" | null
+  >(null);
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -152,47 +156,47 @@ export function GroupDetailAdminActions({
             <MoreHorizontal className="size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <InitializeNotifyButton
-              groupId={groupId}
-              memberCount={memberCount}
-              initializedAt={initializedAt}
-              renderTrigger={({ onClick }) => (
-                <DropdownMenuItem
-                  onClick={() => {
-                    onClick();
-                  }}
-                >
-                  <Bell className="size-4" />
-                  {alreadyInitialized ? "Re-notify group" : "Initialize & notify"}
-                </DropdownMenuItem>
-              )}
-            />
-            <ImportHistoryDialog
-              groupId={groupId}
-              memberEmails={memberEmails}
-              currency={currency}
-              renderTrigger={({ onClick }) => (
-                <DropdownMenuItem onClick={() => onClick()}>
-                  <Upload className="size-4" />
-                  Import history
-                </DropdownMenuItem>
-              )}
-            />
+            <DropdownMenuItem onClick={() => setOpenDialog("init")}>
+              <Bell className="size-4" />
+              {alreadyInitialized ? "Re-notify group" : "Initialize & notify"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setOpenDialog("import")}>
+              <Upload className="size-4" />
+              Import history
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DeleteGroupButton
-              groupId={groupId}
-              groupName={groupName}
-              label="Delete group"
-              renderTrigger={({ onClick }) => (
-                <DropdownMenuItem variant="destructive" onClick={() => onClick()}>
-                  <Trash2 className="size-4" />
-                  Delete group
-                </DropdownMenuItem>
-              )}
-            />
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => setOpenDialog("delete")}
+            >
+              <Trash2 className="size-4" />
+              Delete group
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <InitializeNotifyButton
+        groupId={groupId}
+        memberCount={memberCount}
+        initializedAt={initializedAt}
+        open={openDialog === "init"}
+        onOpenChange={(next) => setOpenDialog(next ? "init" : null)}
+      />
+      <ImportHistoryDialog
+        groupId={groupId}
+        memberEmails={memberEmails}
+        currency={currency}
+        open={openDialog === "import"}
+        onOpenChange={(next) => setOpenDialog(next ? "import" : null)}
+      />
+      <DeleteGroupButton
+        groupId={groupId}
+        groupName={groupName}
+        label="Delete group"
+        open={openDialog === "delete"}
+        onOpenChange={(next) => setOpenDialog(next ? "delete" : null)}
+      />
 
       <p
         role="status"

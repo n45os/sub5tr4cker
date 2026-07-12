@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.40.1] - 2026-07-12
+
+### Fixed
+
+- **Delete group from the ⋯ actions menu** — the delete/initialize/import dialogs were rendered inside the dropdown menu portal and unmounted the moment the menu closed, so "Delete group" appeared to do nothing. The dialogs are now controlled siblings of the menu.
+- **Adding a member / joining via invite crashed in advanced (MongoDB) mode** — `updateGroup` coerced newly-generated nanoid member ids into `ObjectId` and threw a `BSONError`. New member and payment rows now let Mongo assign ids, and the add/join routes resolve the persisted id before building invites, notifications, and audit entries. The same guard covers payment rows added by billing backfill/import/advance.
+- **Legal settings were a silent no-op in local mode** — "Legal & privacy" values now persist to a `legal` section of `~/.sub5tr4cker/config.json` (with the `LEGAL_*` env vars kept as a read fallback) instead of being dropped while the UI reported success.
+- **`legal` missing from the Settings model enum** — seeding the 0.40.0 legal settings in advanced mode threw a Mongoose validation error on the first settings read.
+- **Logout left the session alive** — `/api/auth/n450s/logout` cleared placeholder cookie names from an earlier phase; it now clears the real `s5_at`/`s5_rt` cookies plus the NextAuth credentials-fallback session cookie.
+- **Telegram magic-login links always failed** — `/invite-callback` calls `signIn("magic-invite")`, but that provider (and `verifyMagicLoginToken`) had been removed in 0.39.0 while the bot kept sending the links. Both are restored.
+- **Concurrent payment confirmations could overwrite each other** — web self-confirm, email confirm, admin confirm/reject/waive, bulk confirm, and overdue reconciliation replaced the entire payments array from a stale read; they now use targeted single-payment updates.
+- **Second same-day confirmation never nudged the admin** — the `admin_confirmation_request` idempotency key is now scoped per member for confirmation-triggered nudges (periodic follow-ups stay day-scoped).
+- **`reminderFrequency` preference was ignored** — members linked to a user account are now reminded per their profile setting (`once` / `every_3_days` / `daily`); previously everyone was reminded daily. Members without a linked account keep daily reminders.
+- **Un-waiving a payment** — `PATCH .../billing/[periodId]` accepted `status: "pending"` but silently dropped it; it now reverts the payment and clears its confirmation timestamps.
+- **Removed members retained access** — a member removed from a group but still linked by account could keep listing the group (advanced mode) and could message the admin; both paths now require an active membership.
+- **Notify-unpaid preview showed pre-adjustment amounts** — reminder eligibility now reports `adjustedAmount ?? amount`, matching what reminder sends actually charge.
+- **Misc hardening** — malformed JSON bodies now return a 400 `VALIDATION_ERROR` instead of a generic 500 across API routes; member-supplied text is HTML-escaped in the "message admin" email/Telegram notification; concurrent duplicate enqueues no longer 500 on the unique-index race; the SQLite adapter keeps the indexed `period_start` column in sync when a period is updated.
+
+### Security
+
+- **Cron endpoints fail closed** — `/api/cron/*` accepted unauthenticated requests when `security.cronSecret` was unset (`null !== null` passed the guard); they now reject all requests until a secret is configured.
+- **Telegram webhook fails closed** — updates are rejected unless `telegram.webhookSecret` is set and matches. Operators who registered a webhook without a secret must set one and re-register (the setup wizard already generates one).
+
+### Notes
+
+- **Email/password login (advanced mode)** — documenting a change that shipped without a release note: shortly after the 0.39.0 n450s_auth migration, NextAuth was re-mounted with a `Credentials` provider as an email/password fallback and `/api/register` returned. `auth()` prefers the n450s access token and falls back to the NextAuth session.
+- **pnpm 10 installs** — `package.json` now approves the required native build scripts (`better-sqlite3`, `esbuild`, `sharp`, `msw`, `unrs-resolver`) via `pnpm.onlyBuiltDependencies`, so fresh installs build the SQLite addon without an interactive `pnpm approve-builds`.
+
 ## [0.40.0] - 2026-05-26
 
 ### Added

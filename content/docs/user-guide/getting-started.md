@@ -10,14 +10,14 @@ SubsTrack helps you manage shared subscriptions — one person pays the bill, an
 ## What you need
 
 - A SubsTrack instance (self-hosted or the official deployment)
-- An account (sign up with email or Google)
+- An account (sign in through the instance's identity provider, or with email and password)
 - The subscription you want to share (e.g. YouTube Premium, Netflix) and its monthly price
 
 ## Sign up
 
 1. Open the SubsTrack URL (e.g. `https://substrack.example.com`).
 2. Click **Sign in** or **Get started**.
-3. Sign in with **Google** or create an account with your **email and password**.
+3. Continue with the instance's **sign-in provider**, or create an account with your **email and password**.
 
 You’re in. The next step is creating a group.
 

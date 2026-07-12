@@ -5,17 +5,25 @@ description: REST API endpoints, auth, and response formats.
 
 # API Reference
 
-All API routes live under `/api/`. Protected routes require a valid Auth.js session. Cron routes require the `x-cron-secret` header (value from app setting `security.cronSecret`).
+All API routes live under `/api/`. Protected routes require a valid session (n450s access token, the email/password fallback session, or the local-mode token cookie). Cron routes require the `x-cron-secret` header (value from app setting `security.cronSecret`) and fail closed when no secret is configured.
 
 **Flows:** Automatic reminders and admin follow-ups use the **ScheduledTask** queue + worker. Manual **Notify unpaid** (`POST /api/dashboard/notify-unpaid`) sends aggregated reminders inline (same channels, different pipeline) and updates period reminder metadata. Member “I paid” converges from email confirm, self-confirm API, and Telegram. See the full diagrams in the repo `docs/api-design.md` → Flows.
 
 ## Authentication
 
+Advanced mode signs in through **n450s_auth** (OAuth2/OIDC), with an email/password fallback via NextAuth.
+
+### `GET /api/auth/n450s/login`, `GET /api/auth/n450s/callback`, `GET/POST /api/auth/n450s/logout`
+
+OAuth flow against the n450s_auth service: login redirects to consent, the callback exchanges the code and stores tokens in HttpOnly cookies, logout clears the session and redirects to the provider's logout page.
+
 ### `GET/POST /api/auth/[...nextauth]`
 
-Auth.js catch-all. Handles sign-in, sign-out, session, and OAuth callbacks.
+NextAuth catch-all for the fallback providers: `credentials` (email/password) and `magic-invite` (Telegram invite magic-login tokens).
 
-Providers: Credentials (email/password), Google OAuth.
+### `POST /api/register`
+
+Email/password registration for the fallback flow.
 
 ## Groups
 

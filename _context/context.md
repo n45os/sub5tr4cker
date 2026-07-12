@@ -1,5 +1,5 @@
 <!-- context-status: active -->
-<!-- last-updated: 2026-05-04 -->
+<!-- last-updated: 2026-07-12 -->
 
 # sub5tr4cker — Project Context
 
@@ -16,7 +16,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 
 - `src/app/` — pages + API routes (auth, dashboard, groups, billing, telegram, cron)
 - `src/app/(auth)/` — login, register
-- `src/app/(legal)/` — public legal pages (`/privacy`, `/cookies`, `/terms`) reading operator-editable `legal.*` settings via `src/lib/legal/config.ts`
+- `src/app/(legal)/` — public legal pages (`/privacy`, `/cookies`, `/terms`) reading operator-editable `legal.*` settings via `src/lib/legal/config.ts` (persist to Mongo in advanced mode, to `config.json` in local mode since 0.40.1; `LEGAL_*` env vars as read fallback)
 - `src/app/(dashboard)/` — dashboard home, group detail/edit/new, notifications hub, scheduled tasks (queue), activity, settings (incl. **Legal & privacy** tab)
 - `src/app/api/` — groups CRUD, group notification toggles, billing, notifications, scheduled tasks (queue admin), settings, confirm, telegram webhook/link, cron, register
 - `src/lib/` — db, auth, settings service, tokens (confirmation + link), email, telegram, billing calculator, notifications, tasks (queue + worker)
@@ -44,7 +44,7 @@ Open-source Next.js app for managing shared subscriptions. Admin pays for a serv
 | Mode | Storage | Auth | Telegram | Setup |
 |------|---------|------|----------|-------|
 | **local** | SQLite (`~/.sub5tr4cker/data.db`) | Token cookie (auto-login) | Polling | `s54r init` |
-| **advanced** | MongoDB | **n450s_auth (OAuth2/OIDC) — sliding 7-day refresh tokens via middleware** | Webhook | `s54r setup` or env vars |
+| **advanced** | MongoDB | **n450s_auth (OAuth2/OIDC) — sliding 7-day refresh tokens via middleware** (+ email/password fallback) | Webhook | `s54r setup` or env vars |
 
 Switch: `SUB5TR4CKER_MODE=local` (set by `s54r start`).
 
@@ -58,11 +58,11 @@ Switch: `SUB5TR4CKER_MODE=local` (set by `s54r start`).
 - Notifications: GET /api/notifications (templates list/preview APIs exist but are deprecated for first-party UI — use `docs/api-design.md`)
 - Group preview: GET /api/groups/[groupId]/notification-preview (deprecated for first-party UI)
 - Settings: GET/PATCH /api/settings, POST /api/settings/test-email, POST /api/settings/test-telegram
-- Auth: GET /api/auth/n450s/login, GET /api/auth/n450s/callback, GET /api/auth/n450s/logout (advanced mode; NextAuth + `/api/register` removed in 0.39.0). OAuth callback stores tokens in HttpOnly cookies and links `User.authIdentityId` to the **verified access token `sub`** (same claim `auth()` uses), not a divergent `/oauth/userinfo` `sub`. Post-login redirects use `general.appUrl` / `APP_URL` then `X-Forwarded-*`, not raw container `Host`. Local mode unchanged: token cookie set by `s54r start`, no auth API.
+- Auth: GET /api/auth/n450s/login, GET /api/auth/n450s/callback, GET /api/auth/n450s/logout (advanced mode, primary). NextAuth was re-mounted after the 0.39.0 migration as an email/password fallback (`credentials` provider + `/api/register`), plus a `magic-invite` provider for Telegram invite magic-login links (restored in 0.40.1). OAuth callback stores tokens in HttpOnly cookies (`s5_at`/`s5_rt`) and links `User.authIdentityId` to the **verified access token `sub`** (same claim `auth()` uses), not a divergent `/oauth/userinfo` `sub`. Logout clears the real session cookies incl. the NextAuth fallback (fixed 0.40.1). Post-login redirects use `general.appUrl` / `APP_URL` then `X-Forwarded-*`, not raw container `Host`. Local mode unchanged: token cookie set by `s54r start`, no auth API.
 - Telegram: POST /api/telegram/webhook, POST /api/telegram/link, GET /api/groups/[groupId]/members/[memberId]/telegram-invite (admin copyable member deep link); bot `/services`, `/help`, rich invite welcome; new invite users persist `telegram.chatId`
 - Dashboard: GET /api/dashboard/quick-status (aligned `unpaidCount` rules with GET /api/groups; `groupsNeedingAttention` / `groupsEligibleForReminders`), GET/POST /api/dashboard/notify-unpaid (POST accepts optional groupIds, paymentIds, channelPreference; groups by linked user/email/member fallback so Telegram-only members can still receive one combined reminder; cron aggregation uses the notifications.aggregateReminders setting)
 - Scheduled tasks (admin): GET /api/scheduled-tasks, PATCH /api/scheduled-tasks/[taskId], POST /api/scheduled-tasks/bulk-cancel
-- Cron: POST /api/cron/billing, reminders, follow-ups, notification-tasks (x-cron-secret)
+- Cron: POST /api/cron/billing, reminders, follow-ups, notification-tasks (x-cron-secret; fail closed when `security.cronSecret` unset — 0.40.1). Reminder cadence honors the linked user's `reminderFrequency` (`once` / `every_3_days` / `daily`) via idempotency-key buckets since 0.40.1; unlinked members stay daily.
 - Confirm: GET /api/confirm/[token] (email "I paid")
 
 ## Context Files

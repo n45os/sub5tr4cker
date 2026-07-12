@@ -6,7 +6,7 @@
 
   <p>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="License: MIT" /></a>
-    <img src="https://img.shields.io/badge/v0.38.5-22c55e?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/v0.40.1-22c55e?style=flat-square" alt="Version" />
     <a href="https://github.com/n45os/sub5tr4cker/pulls"><img src="https://img.shields.io/badge/PRs-welcome-22c55e?style=flat-square" alt="PRs Welcome" /></a>
   </p>
 
@@ -95,7 +95,7 @@ sub5tr4cker ships a CLI called `s54r` (also available as `substrack`). Every com
 |-------|-----------|
 | Framework | [Next.js 16](https://nextjs.org) (App Router) |
 | Database | [SQLite](https://sqlite.org) (local mode) or [MongoDB](https://mongodb.com) + [Mongoose](https://mongoosejs.com) (advanced mode) |
-| Auth | [Auth.js v5](https://authjs.dev) (advanced) / token cookie (local) |
+| Auth | n450s_auth OAuth2/OIDC (advanced, with an email/password fallback) / token cookie (local) |
 | Email | [Resend](https://resend.com) + React Email templates |
 | Telegram | [grammy](https://grammy.dev) |
 | Cron / queue | [node-cron](https://github.com/node-cron/node-cron) + persisted task queue (ScheduledTask) |
@@ -109,10 +109,10 @@ sub5tr4cker runs in two modes. Start with **local** — you can always migrate l
 | | Local mode | Advanced mode |
 |---|-----------|--------------|
 | **Storage** | SQLite (`~/.sub5tr4cker/data.db`) | MongoDB |
-| **Auth** | Token cookie (auto-login) | Auth.js v5 / NextAuth |
+| **Auth** | Token cookie (auto-login) | n450s_auth OAuth2/OIDC (+ email/password fallback) |
 | **Telegram** | Polling | Webhook |
 | **Setup** | `s54r init` | `s54r setup` or env vars |
-| **Switch** | `SUB5TR4CKER_MODE=local` (set by `s54r start`) | Default when `MONGODB_URI` is set |
+| **Switch** | `SUB5TR4CKER_MODE=local` (set by `s54r start`) | Default — resolved from `SUB5TR4CKER_MODE`, then `~/.sub5tr4cker/config.json`, falling back to advanced if neither is set |
 
 ## Advanced Mode (MongoDB)
 
@@ -199,10 +199,14 @@ You can run sub5tr4cker as a standalone stack on a server (e.g. a VPS) using [Po
 | Variable | Description |
 |----------|-------------|
 | `MONGODB_URI` | MongoDB connection string (e.g. `mongodb://mongo:27017/substrack` when using the bundled Mongo) |
-| `NEXTAUTH_SECRET` | Random secret for Auth.js sessions |
-| `GOOGLE_CLIENT_ID` | Optional Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Optional Google OAuth client secret |
+| `AUTH_SERVICE_URL` | Base URL of the n450s_auth service |
+| `OAUTH_CLIENT_ID` | OAuth client id registered in n450s_auth |
+| `OAUTH_CLIENT_SECRET` | OAuth client secret |
+| `OAUTH_REDIRECT_URIS` | Comma-separated allowed redirect URIs (must include `https://your-domain/api/auth/n450s/callback`) |
+| `NEXTAUTH_SECRET` | Random secret for the email/password fallback session and settings encryption |
 | `NODE_ENV` | Set to `production` |
+
+Optional `LEGAL_*` variables prefill the public legal pages; see `.env.example`.
 
 </details>
 
@@ -229,7 +233,7 @@ You can run sub5tr4cker as a standalone stack on a server (e.g. a VPS) using [Po
 
 You can self-host sub5tr4cker on any machine that runs Docker:
 
-- **Docker Compose (recommended)** — Use the included `docker-compose.yml` (development) or `docker-compose.portainer.yml` (production-style with health checks). Copy `.env.example` to `.env.local`, set `MONGODB_URI`, `NEXTAUTH_SECRET`, and optionally Google OAuth, then run `docker compose up -d`. Configure the rest (APP_URL, email, Telegram, etc.) from the in-app settings after first login.
+- **Docker Compose (recommended)** — Use the included `docker-compose.yml` (development) or `docker-compose.portainer.yml` (production-style with health checks). Copy `.env.example` to `.env.local`, set `MONGODB_URI`, `NEXTAUTH_SECRET`, and the n450s_auth variables (`AUTH_SERVICE_URL`, `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, `OAUTH_REDIRECT_URIS`), then run `docker compose up -d`. Configure the rest (APP_URL, email, Telegram, etc.) from the in-app settings after first login.
 
 - **MongoDB elsewhere** — If you already run MongoDB (e.g. Atlas or another server), set `MONGODB_URI` to that connection string and run only the `app` and `cron` services. Use the same image for both; for cron, build with `docker build --target cron -t substrack-cron .` and run with the same env and `pnpm run cron` as the command.
 
@@ -249,10 +253,13 @@ Bootstrap variables:
 | Variable | Description |
 |----------|-------------|
 | `MONGODB_URI` | MongoDB connection string |
-| `NEXTAUTH_SECRET` | Random secret for Auth.js sessions |
-| `GOOGLE_CLIENT_ID` | Optional Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Optional Google OAuth client secret |
+| `AUTH_SERVICE_URL` | Base URL of the n450s_auth service (required in advanced mode) |
+| `OAUTH_CLIENT_ID` | OAuth client id registered in n450s_auth |
+| `OAUTH_CLIENT_SECRET` | OAuth client secret |
+| `OAUTH_REDIRECT_URIS` | Comma-separated allowed redirect URIs |
+| `NEXTAUTH_SECRET` | Random secret for the email/password fallback session and settings encryption |
 | `NODE_ENV` | Runtime mode (`development` or `production`) |
+| `LEGAL_*` | Optional prefills for the public legal pages (see `.env.example`) |
 
 ## Documentation
 
@@ -281,7 +288,7 @@ src/
 ├── lib/                    # Core business logic
 │   ├── storage/            # StorageAdapter interface + SQLite/Mongoose implementations
 │   ├── config/             # Config manager (~/.sub5tr4cker/config.json)
-│   ├── auth/               # Auth.js config + local-mode token auth
+│   ├── auth/               # local-mode token auth + n450s/ OAuth client (JWKS, session cookies)
 │   ├── email/              # Resend client + React Email templates
 │   ├── telegram/           # grammy bot, handlers, keyboards, send helpers
 │   ├── billing/            # Billing calculation, periods, collection window

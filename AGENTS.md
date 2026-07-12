@@ -4,7 +4,7 @@
 
 sub5tr4cker is an open-source web app for managing shared subscriptions. An admin pays for a service (YouTube Premium, Netflix, etc.) and splits the cost with members. The app automates reminders, tracks payments, and handles confirmations.
 
-**Tech**: Next.js 16 (App Router), MongoDB/Mongoose or SQLite (local mode), Auth.js v5, Resend (email), grammy (Telegram), node-cron, persisted notification task queue.
+**Tech**: Next.js 16 (App Router), MongoDB/Mongoose or SQLite (local mode), n450s_auth OAuth2/OIDC + NextAuth credentials fallback (advanced mode), Resend (email), grammy (Telegram), node-cron, persisted notification task queue.
 
 ## Architecture
 
@@ -21,11 +21,12 @@ Read `docs/PLAN.md` for the full architecture. Key concepts:
 ```
 src/
 ├── app/                    # pages and API routes (Next.js App Router)
-│   ├── (auth)/             # auth pages (login, register)
+│   ├── (auth)/             # auth pages (login, register, invite-callback)
 │   ├── (dashboard)/        # protected pages (groups, settings, etc.)
+│   ├── (legal)/            # public legal pages (/privacy, /cookies, /terms)
 │   ├── (public)/           # landing page
 │   └── api/                # REST endpoints
-│       ├── auth/           # Auth.js handler
+│       ├── auth/           # NextAuth catch-all + n450s/ (OAuth login/callback/logout)
 │       ├── groups/         # group CRUD + members + billing
 │       ├── confirm/        # email "I paid" token handler
 │       ├── telegram/       # Telegram webhook
@@ -47,7 +48,7 @@ src/
 │   └── features/           # feature components (groups, billing, etc.)
 ├── lib/
 │   ├── db/mongoose.ts      # MongoDB connection singleton
-│   ├── auth.ts             # Auth.js v5 configuration
+│   ├── auth.ts             # auth() wrapper: n450s token verify + NextAuth credentials fallback
 │   ├── email/              # Resend client + React Email templates
 │   ├── telegram/           # grammy bot, handlers, keyboards, send helpers
 │   ├── billing/            # split calculation, period management
@@ -55,7 +56,7 @@ src/
 │   ├── tasks/              # task queue (enqueue, claim, worker)
 │   ├── storage/            # StorageAdapter interface + SQLite/Mongoose implementations
 │   ├── config/             # Config manager (~/.sub5tr4cker/config.json)
-│   ├── auth/               # Auth.js + local-mode token auth (local.ts)
+│   ├── auth/               # local-mode token auth (local.ts) + n450s/ OAuth client, JWKS, session cookies
 │   ├── settings/           # DB-backed app settings service
 │   └── tokens.ts           # HMAC tokens for confirmation links
 ├── models/                 # Mongoose schemas (User, Group, BillingPeriod, ScheduledTask, etc.)
@@ -69,7 +70,9 @@ src/
 | File | Purpose |
 |------|---------|
 | `src/lib/db/mongoose.ts` | MongoDB connection with caching for serverless |
-| `src/lib/auth.ts` | Auth.js v5 config + local-mode auth wrapper (`auth()`) |
+| `src/lib/auth.ts` | `auth()` wrapper — n450s access token first, NextAuth credentials fallback, local-mode synthetic session |
+| `src/middleware.ts` | advanced mode: verifies/silently refreshes the n450s access token on every request; local mode: auto-auth cookie |
+| `src/lib/auth/n450s/` | n450s OAuth client, JWKS token verification, `s5_at`/`s5_rt` session cookies, session resolver |
 | `src/lib/auth/local.ts` | Local-mode token generation, cookie validation, synthetic session |
 | `src/lib/config/manager.ts` | Config manager for `~/.sub5tr4cker/config.json` (local mode settings) |
 | `src/lib/storage/adapter.ts` | `StorageAdapter` interface — all data operations |

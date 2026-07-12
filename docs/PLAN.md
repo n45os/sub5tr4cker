@@ -84,7 +84,7 @@ Members don't need to create accounts to receive reminders (email-only mode). Bu
 |-------|-----------|-----------|
 | Framework | Next.js 16 (App Router) | SSR, API routes, server actions, modern React |
 | Database | MongoDB + Mongoose | Flexible schema for subscription configs, self-hostable |
-| Auth | Auth.js v5 (NextAuth) | Mature, App Router support, multiple providers |
+| Auth | n450s_auth OAuth2/OIDC (advanced) + NextAuth credentials fallback | Persistent sessions via sliding refresh tokens; email/password kept as fallback |
 | Email | Resend (default) + pluggable | Developer-friendly, React Email templates, free tier |
 | Telegram | grammy | Same library as OpenClaw, battle-tested, good TypeScript support |
 | Cron | node-cron (self-hosted) / HTTP-triggered (hosted) | Flexible deployment |
@@ -432,9 +432,9 @@ subs-track/
 
 - **Confirmation tokens**: Signed with HMAC-SHA256, include userId + periodId + expiry
 - **Telegram bot**: Verify `X-Telegram-Bot-Api-Secret-Token` on webhooks
-- **Cron endpoints**: Protected by `CRON_SECRET` header
-- **API routes**: Auth.js session validation on all protected routes
-- **Rate limiting**: On confirmation endpoints to prevent abuse
+- **Cron endpoints**: Protected by the `x-cron-secret` header (`security.cronSecret` setting); fail closed when no secret is configured
+- **API routes**: `auth()` session validation on all protected routes (n450s token or credentials-fallback session)
+- **Rate limiting**: On confirmation endpoints to prevent abuse (planned — not implemented)
 - **CSRF**: Handled by Next.js server actions automatically
 
 ## Deployment Options

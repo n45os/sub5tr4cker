@@ -45,7 +45,7 @@ The same code runs against two storage backends, selected by `SUB5TR4CKER_MODE`:
 | | **local** mode | **advanced** mode |
 |---|---|---|
 | Storage | SQLite (`~/.sub5tr4cker/data.db`) | MongoDB / Mongoose |
-| Auth | Token cookie (auto-login, `src/lib/auth/local.ts`) | Auth.js v5 / NextAuth |
+| Auth | Token cookie (auto-login, `src/lib/auth/local.ts`) | n450s_auth OAuth2/OIDC (+ NextAuth credentials fallback) |
 | Telegram | Polling (`src/lib/telegram/polling.ts`) | Webhook |
 | Settings | `~/.sub5tr4cker/config.json` | `Settings` collection in Mongo |
 | Entry | `s54r init` then `s54r start` | `pnpm setup` then `pnpm dev` |

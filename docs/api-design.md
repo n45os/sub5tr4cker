@@ -1,6 +1,6 @@
 # API Design
 
-All API routes live under `src/app/api/`. Protected routes require a valid Auth.js session. Cron routes require the `x-cron-secret` header; the expected value is the `security.cronSecret` runtime setting (see workspace settings).
+All API routes live under `src/app/api/`. Protected routes require a valid session via `auth()` (n450s access token, credentials-fallback session, or the local-mode token cookie). Cron routes require the `x-cron-secret` header; the expected value is the `security.cronSecret` runtime setting (see workspace settings).
 
 ## Flows
 
@@ -34,14 +34,29 @@ These converge on the same enqueue + daily idempotency (one `admin_confirmation_
 
 ## Authentication
 
+Advanced mode uses **n450s_auth** (OAuth2/OIDC) as the primary identity provider, with a NextAuth email/password fallback. Local mode uses the token cookie set by `s54r start` and has no auth API.
+
+### `GET /api/auth/n450s/login`
+
+Starts the OAuth flow: sets the PKCE/state cookie and redirects to the n450s_auth consent page. Accepts an optional `callbackUrl` (same-origin only).
+
+### `GET /api/auth/n450s/callback`
+
+Exchanges the authorization code, verifies the access token against JWKS, links or creates the `User` (via `authIdentityId`), and stores tokens in HttpOnly cookies (`s5_at`, `s5_rt`). The middleware silently refreshes the access token on later requests.
+
+### `GET/POST /api/auth/n450s/logout`
+
+Clears the session cookies (including the NextAuth fallback session) and redirects to the n450s_auth logout page.
+
 ### `GET/POST /api/auth/[...nextauth]`
 
-Auth.js catch-all route. Handles sign-in, sign-out, session, and callback flows.
+NextAuth catch-all for the fallback providers:
+- `credentials` (email + password)
+- `magic-invite` (short-lived HMAC token from Telegram invite links; consumed by `/invite-callback`)
 
-Configured providers:
-- Credentials (email + password)
-- Google OAuth
-- Magic link (email)
+### `POST /api/register`
+
+Email/password registration for the fallback flow.
 
 ## Groups
 
@@ -411,18 +426,17 @@ Member confirms their own payment (session or `memberToken` in the body, same as
 
 ## Notifications
 
-### `POST /api/groups/[groupId]/notify`
+### `POST /api/groups/[groupId]/messages`
 
-Manually trigger notifications for a group. Admin only.
+Member → admin message. Authenticated via session (active member) or `memberToken` (member portal token) in the body. Sends the message to the admin over email/Telegram per their preferences.
 
-**Body:**
-```json
-{
-  "type": "payment_reminder" | "announcement" | "price_change",
-  "message": "Optional custom message",
-  "channels": ["email", "telegram"]
-}
-```
+### `POST /api/groups/[groupId]/notify-member-added`
+
+Admin only. Sends the credit-summary notification produced by a roster change (member added with backfill).
+
+### `POST /api/groups/[groupId]/initialize`
+
+Admin only. One-time group bootstrap: sends member invites and records `initializedAt`.
 
 ### `GET /api/notifications`
 
@@ -444,19 +458,7 @@ Return a single template preview with HTML, Telegram text, and variable metadata
 
 ## Price Changes
 
-### `POST /api/groups/[groupId]/price`
-
-Record a price change. Admin only.
-
-**Body:**
-```json
-{
-  "price": 24,
-  "effectiveFrom": "2026-04-01",
-  "note": "YouTube increased the family plan price",
-  "notifyMembers": true
-}
-```
+There is no dedicated price endpoint. A price change is a `PATCH /api/groups/[groupId]` with a new `billing.currentPrice`; the route records a `PriceHistory` entry and, when the group's notifications allow it, sends price-change notifications to members.
 
 ## Dashboard
 
@@ -539,7 +541,15 @@ On bot init (`getBot`), `setMyCommands` registers `start`, `services`, and `help
 
 ### `POST /api/telegram/webhook`
 
-Telegram webhook endpoint (alternative to polling). Receives updates from Telegram Bot API. Protected by `X-Telegram-Bot-Api-Secret-Token`.
+Telegram webhook endpoint (alternative to polling). Receives updates from Telegram Bot API. Protected by `X-Telegram-Bot-Api-Secret-Token`, checked against the `telegram.webhookSecret` setting; fails closed when the setting is unset.
+
+### `POST /api/telegram/set-webhook`
+
+Admin only. Registers the webhook URL with Telegram, passing `telegram.webhookSecret` as the secret token when set.
+
+### `GET /api/telegram/webhook-info`
+
+Admin only. Returns the bot's current webhook status from Telegram (for the notifications hub).
 
 ### `POST /api/telegram/link`
 
@@ -555,7 +565,7 @@ Generate a Telegram linking token for the authenticated user. Returns a deep lin
 
 ## Cron Jobs
 
-All cron routes require the `x-cron-secret` header to match the app setting `security.cronSecret`.
+All cron routes require the `x-cron-secret` header to match the app setting `security.cronSecret`. They fail closed: when no secret is configured, every request is rejected with 401.
 
 ### `POST /api/cron/billing`
 
@@ -613,7 +623,7 @@ Change or set the authenticated user's password (for credentials sign-in). If th
 
 ## App Settings
 
-Settings are key-value; keys include `general.appUrl`, `email.apiKey`, `email.fromAddress` (sender address for outgoing emails), optional `email.replyToAddress` (reply-to header), Telegram and security keys, etc. See the Settings UI or `src/lib/settings/definitions.ts` for the full list.
+Settings are key-value; keys include `general.appUrl`, `email.apiKey`, `email.fromAddress` (sender address for outgoing emails), optional `email.replyToAddress` (reply-to header), Telegram and security keys, and the `legal.*` category (entity name, contact details, jurisdiction — rendered on the public legal pages). See the Settings UI or `src/lib/settings/definitions.ts` for the full list. In local mode these are read from and written to `~/.sub5tr4cker/config.json` instead of MongoDB.
 
 ### `GET /api/settings`
 
@@ -713,5 +723,5 @@ Common codes:
 - `INVITE_INVALID` — invite code not found or revoked
 - `INVITE_DISABLED` — registration via invite link is currently locked
 - `GROUP_INACTIVE` — group is deactivated
-- `RATE_LIMITED` — too many requests
+- `RATE_LIMITED` — too many requests (reserved, unused)
 - `INTERNAL_ERROR` — server error

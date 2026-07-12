@@ -25,6 +25,7 @@ The person using the platform. Can be an instance admin (first user or promoted)
   emailVerified: Date | null,
   image: string | null,                   // avatar URL
   hashedPassword: string | null,          // null if using OAuth only
+  authIdentityId: string | null,          // n450s identity sub linked at OAuth login (sparse unique)
 
   // notification channels
   telegram: {
@@ -48,7 +49,7 @@ The person using the platform. Can be an instance admin (first user or promoted)
 }
 ```
 
-**Indexes**: `email` (unique), `telegram.chatId` (sparse unique), `telegramLinkCode.code` (sparse unique)
+**Indexes**: `email` (unique), `telegram.chatId` (sparse unique), `telegramLinkCode.code` (sparse unique), `authIdentityId` (sparse unique)
 
 ## Group
 
@@ -300,7 +301,7 @@ from the dashboard instead of editing env files.
   _id: ObjectId,
   key: string,                            // e.g. "email.apiKey"
   value: string | null,                   // encrypted for secret values when saved from the app
-  category: 'general' | 'email' | 'telegram' | 'notifications' | 'security' | 'cron',
+  category: 'general' | 'email' | 'telegram' | 'notifications' | 'security' | 'cron' | 'plugin' | 'legal',
   isSecret: boolean,
   label: string,
   description: string,
@@ -348,7 +349,9 @@ Audit trail for group operations, admin actions, and notification events.
         | 'member_added'
         | 'member_removed'
         | 'member_updated'
-        | 'billing_period_created',
+        | 'billing_period_created'
+        | 'period_dedup_hit'
+        | 'period_duplicate_merged',
   group: ObjectId | null,                 // ref: Group
   billingPeriod: ObjectId | null,         // ref: BillingPeriod
   targetMember: ObjectId | null,          // ref: Group.members

@@ -1,4 +1,4 @@
-<!-- last-updated: 2026-03-18 -->
+<!-- last-updated: 2026-07-12 -->
 
 # Tech Stack
 
@@ -16,9 +16,10 @@
 
 ## Auth
 
-- Auth.js v5 (next-auth@beta)
-- @auth/mongodb-adapter
-- Providers: Credentials, Google OAuth, Magic Link
+- **Advanced mode**: n450s_auth OAuth2/OIDC (primary since 0.39.0) — `src/lib/auth/n450s/` OAuth client, JWKS token verify, `s5_at`/`s5_rt` HttpOnly cookies, silent refresh in `src/middleware.ts`
+- NextAuth (Auth.js v5) kept as an email/password fallback: `Credentials` provider + `magic-invite` provider for Telegram invite magic-login links; `/api/register` active
+- **Local mode**: token cookie auto-login (`src/lib/auth/local.ts`)
+- `@auth/mongodb-adapter` removed in 0.39.0; no Google or magic-link email providers (Google sign-in is federated by n450s_auth)
 
 ## Email
 

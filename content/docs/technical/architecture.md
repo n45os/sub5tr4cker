@@ -23,7 +23,7 @@ SubsTrack is an open-source web app for managing shared subscriptions. One perso
 |-------|-------------|
 | Framework | Next.js 16 (App Router) |
 | Database | **Advanced:** MongoDB + Mongoose (via `MongooseAdapter`). **Local (`s54r`):** SQLite + `SqliteAdapter`. Both implement `StorageAdapter`; routes call `db()`. |
-| Auth | Auth.js v5 (NextAuth) |
+| Auth | **Advanced:** n450s_auth OAuth2/OIDC (+ NextAuth email/password fallback). **Local:** token cookie auto-login. |
 | Email | Resend (pluggable) |
 | Telegram | grammy |
 | Cron / queue | node-cron + persisted task queue (ScheduledTask) / HTTP-triggered |
@@ -85,10 +85,10 @@ Recipients have preferences (email on/off, Telegram on/off). The service checks 
 
 ## Security
 
-- Auth: Auth.js session (JWT or database session).
-- Cron: `CRON_SECRET` header.
+- Auth: n450s_auth access token (verified against JWKS) with silent refresh, or the NextAuth email/password fallback session.
+- Cron: `x-cron-secret` header checked against the `security.cronSecret` setting; requests are rejected until a secret is configured.
 - Confirmation links: HMAC with `CONFIRMATION_SECRET`.
-- Telegram webhook: optional secret token.
+- Telegram webhook: secret token required — updates are rejected when `telegram.webhookSecret` is unset or mismatched.
 - No secrets in client; all sensitive config via environment variables.
 
 For more detail, see the full [Architecture Plan](https://github.com/yourusername/subs-track/blob/main/docs/PLAN.md) in the repo.

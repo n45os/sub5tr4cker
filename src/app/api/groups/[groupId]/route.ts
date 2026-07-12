@@ -143,7 +143,7 @@ export async function PATCH(
     );
   }
 
-  const parsed = updateGroupSchema.safeParse(await request.json());
+  const parsed = updateGroupSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
       {

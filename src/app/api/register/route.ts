@@ -10,7 +10,7 @@ const registerSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const parsed = registerSchema.safeParse(await request.json());
+  const parsed = registerSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
       {

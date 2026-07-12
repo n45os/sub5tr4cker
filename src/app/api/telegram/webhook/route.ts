@@ -22,7 +22,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (expected && secretToken !== expected) {
+  // fail closed: without a configured secret we cannot authenticate updates
+  if (!expected || secretToken !== expected) {
     return NextResponse.json(
       { error: { code: "UNAUTHORIZED", message: "Invalid webhook secret" } },
       { status: 401 }

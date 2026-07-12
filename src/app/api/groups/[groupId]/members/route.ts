@@ -37,7 +37,7 @@ export async function POST(
     );
   }
 
-  const parsed = addMemberSchema.safeParse(await request.json());
+  const parsed = addMemberSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
       {
@@ -111,9 +111,17 @@ export async function POST(
     billingStartsAt: billingStartsAtDate,
   };
 
-  await store.updateGroup(groupId, { members: [...group.members, newMember] });
+  const groupAfterAdd = await store.updateGroup(groupId, {
+    members: [...group.members, newMember],
+  });
 
-  const memberBillingStart = newMember.billingStartsAt ?? newMember.joinedAt;
+  // the adapter may assign its own id for the new member (mongo ObjectId),
+  // so resolve the persisted member instead of trusting the pre-generated id
+  const existingIds = new Set(group.members.map((m: StorageGroupMember) => m.id));
+  const persistedMember =
+    groupAfterAdd.members.find((m: StorageGroupMember) => !existingIds.has(m.id)) ?? newMember;
+
+  const memberBillingStart = persistedMember.billingStartsAt ?? persistedMember.joinedAt;
 
   // backfill into existing periods when billing starts in the past
   let backfilledPeriods = 0;
@@ -131,14 +139,12 @@ export async function POST(
     }>;
   }> = [];
 
-  const groupAfterAdd = (await store.getGroup(groupId))!;
-
   if (
     memberBillingStart &&
     !Number.isNaN(memberBillingStart.getTime()) &&
     memberBillingStart.getTime() <= Date.now()
   ) {
-    const result = await backfillMemberIntoPeriods(groupAfterAdd, newMember);
+    const result = await backfillMemberIntoPeriods(groupAfterAdd, persistedMember);
     backfilledPeriods = result.backfilledCount;
     creditSummary = result.creditSummary;
   }
@@ -172,10 +178,10 @@ export async function POST(
     actorName,
     action: "member_added",
     groupId,
-    targetMemberId: newMember.id,
+    targetMemberId: persistedMember.id,
     metadata: {
-      email: newMember.email,
-      nickname: newMember.nickname,
+      email: persistedMember.email,
+      nickname: persistedMember.nickname,
       backfilledPeriods,
       creditSummaryCount: creditSummary.length,
       periodsReconciled,
@@ -184,11 +190,11 @@ export async function POST(
 
   return NextResponse.json({
     data: {
-      _id: newMember.id,
-      email: newMember.email,
-      nickname: newMember.nickname,
-      role: newMember.role,
-      isActive: newMember.isActive,
+      _id: persistedMember.id,
+      email: persistedMember.email,
+      nickname: persistedMember.nickname,
+      role: persistedMember.role,
+      isActive: persistedMember.isActive,
       backfilledPeriods,
       creditSummary,
       periodsReconciled,

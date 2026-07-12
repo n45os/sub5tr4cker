@@ -42,7 +42,7 @@ export async function PATCH(
     );
   }
 
-  const parsed = updatePeriodSchema.safeParse(await request.json());
+  const parsed = updatePeriodSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
       {
@@ -96,6 +96,12 @@ export async function PATCH(
       if (idx === -1) continue;
       const payment = { ...payments[idx]! };
       if (update.status === "waived") payment.status = "waived";
+      else if (update.status === "pending") {
+        // revert (e.g. un-waive) back to pending, clearing confirmation state
+        payment.status = "pending";
+        payment.memberConfirmedAt = null;
+        payment.adminConfirmedAt = null;
+      }
       if ("adjustedAmount" in update) payment.adjustedAmount = update.adjustedAmount ?? null;
       if ("adjustmentReason" in update) payment.adjustmentReason = update.adjustmentReason ?? null;
       if ("notes" in update) payment.notes = update.notes ?? null;

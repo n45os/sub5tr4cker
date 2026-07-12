@@ -32,7 +32,7 @@ export async function PATCH(
     );
   }
 
-  const parsed = updateNotificationsSchema.safeParse(await request.json());
+  const parsed = updateNotificationsSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
       {

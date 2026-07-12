@@ -255,6 +255,8 @@ export interface StorageTaskPayload {
   memberEmail?: string | null;
   recipientKey?: string;
   recipientLabel?: string;
+  /** replaces the day component of the idempotency key so the recipient's reminderFrequency is honored */
+  frequencyBucket?: string;
   payments?: Array<{
     groupId: string;
     billingPeriodId: string;

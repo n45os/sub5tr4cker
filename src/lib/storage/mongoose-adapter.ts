@@ -487,8 +487,10 @@ export class MongooseAdapter implements StorageAdapter {
       isActive: true,
       $or: [
         { admin: userId },
-        { "members.user": userId },
-        { "members.email": email, "members.isActive": true },
+        // membership only grants visibility while the member is still active,
+        // matching the sqlite adapter
+        { members: { $elemMatch: { user: userId, isActive: true } } },
+        { members: { $elemMatch: { email, isActive: true } } },
       ],
     }).lean<IGroup[]>().exec();
     return groups.map(groupToStorage);
@@ -518,7 +520,9 @@ export class MongooseAdapter implements StorageAdapter {
     if (data.initializedAt !== undefined) setFields.initializedAt = data.initializedAt;
     if (data.members !== undefined) {
       setFields.members = data.members.map((m) => ({
-        _id: m.id ? new Types.ObjectId(m.id) : undefined,
+        // new members arrive with adapter-agnostic ids (nanoid) — only reuse
+        // real ObjectId strings, otherwise let Mongo assign a fresh _id
+        _id: m.id && /^[0-9a-f]{24}$/i.test(m.id) ? new Types.ObjectId(m.id) : undefined,
         user: m.userId ? new Types.ObjectId(m.userId) : null,
         email: m.email,
         nickname: m.nickname,
@@ -682,7 +686,9 @@ export class MongooseAdapter implements StorageAdapter {
     if (data.reminders !== undefined) setFields.reminders = data.reminders;
     if (data.payments !== undefined) {
       setFields.payments = data.payments.map((p) => ({
-        _id: p.id ? new Types.ObjectId(p.id) : undefined,
+        // new payment rows arrive with adapter-agnostic ids (nanoid) — only
+        // reuse real ObjectId strings, otherwise let Mongo assign a fresh _id
+        _id: p.id && /^[0-9a-f]{24}$/i.test(p.id) ? new Types.ObjectId(p.id) : undefined,
         memberId: new Types.ObjectId(p.memberId),
         memberEmail: p.memberEmail,
         memberNickname: p.memberNickname,
@@ -866,15 +872,22 @@ export class MongooseAdapter implements StorageAdapter {
     await dbConnect();
     const existing = await ScheduledTask.findOne({ idempotencyKey: data.idempotencyKey });
     if (existing) return null;
-    const t = await ScheduledTask.create({
-      type: data.type,
-      status: "pending",
-      runAt: data.runAt,
-      payload: data.payload,
-      idempotencyKey: data.idempotencyKey,
-      maxAttempts: data.maxAttempts ?? 5,
-    });
-    return taskToStorage(t);
+    try {
+      const t = await ScheduledTask.create({
+        type: data.type,
+        status: "pending",
+        runAt: data.runAt,
+        payload: data.payload,
+        idempotencyKey: data.idempotencyKey,
+        maxAttempts: data.maxAttempts ?? 5,
+      });
+      return taskToStorage(t);
+    } catch (error) {
+      // concurrent enqueue with the same key hit the unique index — treat as
+      // already enqueued
+      if ((error as { code?: number }).code === 11000) return null;
+      throw error;
+    }
   }
 
   async claimTasks(

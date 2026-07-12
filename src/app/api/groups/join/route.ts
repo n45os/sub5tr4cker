@@ -14,7 +14,7 @@ const joinSchema = z.object({
  * Creates a new member with userId: null. Rejects if already an active member.
  */
 export async function POST(request: NextRequest) {
-  const parsed = joinSchema.safeParse(await request.json());
+  const parsed = joinSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
       {
@@ -107,17 +107,25 @@ export async function POST(request: NextRequest) {
     billingStartsAt: null,
   };
 
-  await store.updateGroup(group.id, { members: [...group.members, newMember] });
+  const updatedGroup = await store.updateGroup(group.id, {
+    members: [...group.members, newMember],
+  });
+
+  // the adapter may assign its own id for the new member (mongo ObjectId),
+  // so resolve the persisted member instead of trusting the pre-generated id
+  const existingIds = new Set(group.members.map((m: StorageGroupMember) => m.id));
+  const persistedMember =
+    updatedGroup.members.find((m: StorageGroupMember) => !existingIds.has(m.id)) ?? newMember;
 
   return NextResponse.json({
     data: {
       groupId: group.id,
       member: {
-        _id: newMember.id,
-        email: newMember.email,
-        nickname: newMember.nickname,
-        role: newMember.role,
-        isActive: newMember.isActive,
+        _id: persistedMember.id,
+        email: persistedMember.email,
+        nickname: persistedMember.nickname,
+        role: persistedMember.role,
+        isActive: persistedMember.isActive,
       },
     },
   });

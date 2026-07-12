@@ -223,6 +223,7 @@ async function handleMemberConfirm(
       payload: {
         groupId: group.id,
         billingPeriodId: periodId,
+        memberId,
       },
     });
     await runNotificationTasks({ limit: 5 });

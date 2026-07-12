@@ -700,9 +700,10 @@ export class SqliteAdapter implements StorageAdapter {
     const ts = now();
     this.db.prepare(`
       UPDATE billing_periods
-      SET collection_opens_at = ?, is_fully_paid = ?, data = ?, updated_at = ?
+      SET period_start = ?, collection_opens_at = ?, is_fully_paid = ?, data = ?, updated_at = ?
       WHERE id = ?
     `).run(
+      merged.periodStart.toISOString(),
       merged.collectionOpensAt?.toISOString() ?? null,
       merged.isFullyPaid ? 1 : 0,
       JSON.stringify(merged),
@@ -956,10 +957,17 @@ export class SqliteAdapter implements StorageAdapter {
       createdAt: new Date(ts),
       updatedAt: new Date(ts),
     };
-    this.db.prepare(`
-      INSERT INTO scheduled_tasks (id, type, status, run_at, idempotency_key, locked_at, locked_by, data, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, data.type, "pending", data.runAt.toISOString(), data.idempotencyKey, null, null, JSON.stringify(task), ts, ts);
+    try {
+      this.db.prepare(`
+        INSERT INTO scheduled_tasks (id, type, status, run_at, idempotency_key, locked_at, locked_by, data, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, data.type, "pending", data.runAt.toISOString(), data.idempotencyKey, null, null, JSON.stringify(task), ts, ts);
+    } catch (error) {
+      // concurrent enqueue with the same key hit the unique index — treat as
+      // already enqueued
+      if ((error as { code?: string }).code?.startsWith("SQLITE_CONSTRAINT")) return null;
+      throw error;
+    }
     return task;
   }
 

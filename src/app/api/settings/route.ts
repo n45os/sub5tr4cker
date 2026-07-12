@@ -40,7 +40,7 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  const parsed = updateSettingsSchema.safeParse(await request.json());
+  const parsed = updateSettingsSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
       {

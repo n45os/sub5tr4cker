@@ -133,11 +133,15 @@ export async function POST(
     );
   }
 
-  payment.status = "member_confirmed";
-  payment.memberConfirmedAt = new Date();
-
-  const payments = period.payments.map((p, i) => (i === payIdx ? payment : p));
-  await store.updateBillingPeriod(periodId, { payments });
+  // targeted single-payment update so concurrent confirms can't overwrite
+  // each other's status changes
+  const memberConfirmedAt = new Date();
+  const updated = await store.updatePaymentStatus(periodId, member.id, {
+    status: "member_confirmed",
+    memberConfirmedAt,
+  });
+  const updatedPayment =
+    updated.payments.find((p: StorageMemberPayment) => p.memberId === member.id) ?? payment;
 
   await enqueueTask({
     type: "admin_confirmation_request",
@@ -145,6 +149,7 @@ export async function POST(
     payload: {
       groupId,
       billingPeriodId: periodId,
+      memberId: member.id,
     },
   });
   await runNotificationTasks({ limit: 5 });
@@ -160,9 +165,9 @@ export async function POST(
 
   return NextResponse.json({
     data: {
-      memberId: payment.memberId,
-      status: payment.status,
-      memberConfirmedAt: payment.memberConfirmedAt?.toISOString() ?? null,
+      memberId: updatedPayment.memberId,
+      status: updatedPayment.status,
+      memberConfirmedAt: updatedPayment.memberConfirmedAt?.toISOString() ?? null,
     },
   });
 }

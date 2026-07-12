@@ -11,7 +11,7 @@ import { getSetting } from "@/lib/settings/service";
 export async function POST(request: NextRequest) {
   const secret = request.headers.get("x-cron-secret");
   const expectedSecret = await getSetting("security.cronSecret");
-  if (secret !== expectedSecret) {
+  if (!expectedSecret || secret !== expectedSecret) {
     return NextResponse.json(
       { error: { code: "UNAUTHORIZED", message: "Invalid cron secret" } },
       { status: 401 }

@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import {
   getFirstReminderEligibleAt,
   resolveCollectionOpensAt,
@@ -8,7 +9,44 @@ import {
   getRecipientLabel,
 } from "@/lib/notifications/member-email";
 import { enqueueTask } from "@/lib/tasks/queue";
-import { db, type StorageMemberPayment } from "@/lib/storage";
+import { db, type StorageAdapter, type StorageMemberPayment } from "@/lib/storage";
+
+type ReminderFrequency = "once" | "daily" | "every_3_days";
+
+/**
+ * Bucket string that replaces the day component of the reminder idempotency
+ * key. "daily" keeps the per-day key; "every_3_days" widens it to a 3-day
+ * window; "once" pins it to a stable value so the reminder fires only once
+ * (per payment, or per distinct set of unpaid payments when aggregated).
+ */
+function reminderBucket(
+  frequency: ReminderFrequency,
+  now: Date,
+  onceFingerprint: string
+): string {
+  if (frequency === "once") return `once:${onceFingerprint}`;
+  if (frequency === "every_3_days") {
+    const epochDays = Math.floor(now.getTime() / 86_400_000);
+    return `w3:${Math.floor(epochDays / 3)}`;
+  }
+  return now.toISOString().slice(0, 10);
+}
+
+/** resolve the linked user's reminderFrequency; unlinked members stay daily */
+async function getMemberFrequency(
+  store: StorageAdapter,
+  userId: string | null | undefined,
+  cache: Map<string, ReminderFrequency>
+): Promise<ReminderFrequency> {
+  if (!userId) return "daily";
+  const cached = cache.get(userId);
+  if (cached) return cached;
+  const user = await store.getUser(userId);
+  const frequency =
+    user?.notificationPreferences?.reminderFrequency ?? "every_3_days";
+  cache.set(userId, frequency);
+  return frequency;
+}
 
 type PaymentRef = {
   groupId: string;
@@ -34,6 +72,7 @@ export async function enqueueReminders(): Promise<number> {
   const now = new Date();
   const aggregateReminders =
     (await getSetting("notifications.aggregateReminders")) === "true";
+  const frequencyCache = new Map<string, ReminderFrequency>();
   let enqueued = 0;
 
   const periodsRaw = await store.getOpenBillingPeriods({
@@ -101,6 +140,18 @@ export async function enqueueReminders(): Promise<number> {
         memberId: r.memberId,
         paymentId: r.paymentId,
       }));
+      const frequency = await getMemberFrequency(
+        store,
+        firstRef.memberUserId,
+        frequencyCache
+      );
+      // for "once", fingerprint the payment set so a newly unpaid period still
+      // triggers a fresh aggregated reminder
+      const fingerprint = crypto
+        .createHash("sha256")
+        .update(payments.map((p) => p.paymentId).sort().join(","))
+        .digest("hex")
+        .slice(0, 12);
       const task = await enqueueTask({
         type: "aggregated_payment_reminder",
         runAt: now,
@@ -111,6 +162,7 @@ export async function enqueueReminders(): Promise<number> {
           recipientKey: firstRef.recipientKey,
           recipientLabel: firstRef.recipientLabel,
           payments,
+          frequencyBucket: reminderBucket(frequency, now, fingerprint),
         },
       });
       if (task) enqueued++;
@@ -136,6 +188,12 @@ export async function enqueueReminders(): Promise<number> {
         continue;
       }
 
+      const member = group.members.find((entry) => entry.id === payment.memberId);
+      const frequency = await getMemberFrequency(
+        store,
+        member?.userId,
+        frequencyCache
+      );
       const task = await enqueueTask({
         type: "payment_reminder",
         runAt: now,
@@ -144,6 +202,8 @@ export async function enqueueReminders(): Promise<number> {
           billingPeriodId,
           memberId: payment.memberId,
           paymentId: payment.id,
+          // the key already includes paymentId, so "once" needs no fingerprint
+          frequencyBucket: reminderBucket(frequency, now, ""),
         },
       });
       if (task) enqueued++;

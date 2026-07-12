@@ -256,9 +256,9 @@ function buildDispatcher() {
   }) {
     if (!callbackHandler) throw new Error("callback handler not registered");
     const calls = {
-      answerCallbackQuery: vi.fn(async () => undefined),
-      editMessageText: vi.fn(async () => undefined),
-      reply: vi.fn(async () => undefined),
+      answerCallbackQuery: vi.fn(async (..._args: unknown[]) => undefined),
+      editMessageText: vi.fn(async (..._args: unknown[]) => undefined),
+      reply: vi.fn(async (..._args: unknown[]) => undefined),
     };
     const ctx: Record<string, unknown> = {
       callbackQuery: { data: args.data },

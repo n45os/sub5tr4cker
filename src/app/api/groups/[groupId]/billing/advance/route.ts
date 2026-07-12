@@ -35,7 +35,7 @@ export async function POST(
     );
   }
 
-  const parsed = advanceSchema.safeParse(await request.json());
+  const parsed = advanceSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
       {

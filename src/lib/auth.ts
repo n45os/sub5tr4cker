@@ -9,6 +9,7 @@ import { ACCESS_COOKIE } from "@/lib/auth/n450s/session-cookies";
 import { verifyAccessToken } from "@/lib/auth/n450s/jwks";
 import { getCachedPayload, setCachedPayload } from "@/lib/auth/n450s/payload-cache";
 import { resolveSessionFromPayload, type ResolvedSession } from "@/lib/auth/n450s/session-resolver";
+import { verifyMagicLoginToken } from "@/lib/tokens";
 
 const SESSION_MAX_AGE = 30 * 24 * 60 * 60;
 const isLocalAuthMode = isLocalMode();
@@ -53,6 +54,31 @@ const {
             if (!user || !user.hashedPassword) return null;
             const match = await compare(credentials.password as string, user.hashedPassword);
             if (!match) return null;
+            return {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              image: user.image,
+              role: user.role ?? "user",
+            };
+          },
+        }),
+        // signs in a user from the short-lived magic-login token sent after
+        // accepting a telegram invite (see /invite-callback)
+        CredentialsProvider({
+          id: "magic-invite",
+          name: "magic-invite",
+          credentials: {
+            token: { label: "Token", type: "text" },
+          },
+          async authorize(credentials) {
+            const token = credentials?.token;
+            if (!token || typeof token !== "string") return null;
+            const payload = await verifyMagicLoginToken(token);
+            if (!payload) return null;
+            const store = await db();
+            const user = await store.getUser(payload.userId);
+            if (!user) return null;
             return {
               id: user.id,
               email: user.email,

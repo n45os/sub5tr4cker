@@ -18,7 +18,28 @@ describe("buildIdempotencyKey", () => {
       groupId: "g1",
       billingPeriodId: "p1",
     }, runAt);
-    expect(key).toBe("admin_confirmation_request:g1:p1:2026-03-18");
+    expect(key).toBe("admin_confirmation_request:g1:p1:period:2026-03-18");
+  });
+
+  it("scopes admin_confirmation_request per member when memberId is present", () => {
+    const runAt = new Date("2026-03-18T14:00:00Z");
+    const key = buildIdempotencyKey("admin_confirmation_request", {
+      groupId: "g1",
+      billingPeriodId: "p1",
+      memberId: "m1",
+    }, runAt);
+    expect(key).toBe("admin_confirmation_request:g1:p1:m1:2026-03-18");
+  });
+
+  it("prefers frequencyBucket over the run date for reminders", () => {
+    const runAt = new Date("2026-03-18T10:00:00Z");
+    const key = buildIdempotencyKey("payment_reminder", {
+      groupId: "g1",
+      billingPeriodId: "p1",
+      paymentId: "pay1",
+      frequencyBucket: "once:",
+    }, runAt);
+    expect(key).toBe("payment_reminder:p1:pay1:once:");
   });
 
   it("uses same date for same day regardless of time", () => {

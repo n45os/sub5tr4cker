@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getN450sAuthConfig } from "@/lib/auth/n450s/config";
 import { resolvePublicOrigin } from "@/lib/auth/n450s/request-origin";
+import { clearSessionTokens } from "@/lib/auth/n450s/session-cookies";
 
-// session cookies that phase 3 will start writing — clear them all here
-// so logout is forward-compatible without touching this file again
-const SESSION_COOKIES = [
-  "n450s.access_token",
-  "n450s.refresh_token",
-  "n450s.session",
+// transient oauth state plus the NextAuth credentials-fallback session cookies
+const EXTRA_COOKIES = [
   "n450s.oauth_state",
+  "authjs.session-token",
+  "__Secure-authjs.session-token",
 ];
 
 function sanitizePostLogout(raw: string | null, origin: string): string {
@@ -35,8 +34,13 @@ export async function GET(req: NextRequest) {
   target.searchParams.set("post_logout_redirect_uri", postLogoutRedirectUri);
 
   const res = NextResponse.redirect(target.toString());
-  for (const name of SESSION_COOKIES) {
-    res.cookies.delete(name);
+  clearSessionTokens(res);
+  for (const name of EXTRA_COOKIES) {
+    res.cookies.set(name, "", {
+      path: "/",
+      maxAge: 0,
+      secure: name.startsWith("__Secure-") || process.env.NODE_ENV === "production",
+    });
   }
   return res;
 }

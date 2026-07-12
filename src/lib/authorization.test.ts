@@ -67,8 +67,8 @@ describe("filterGroupForMember", () => {
       "admin"
     );
 
-    expect(payload.members[0]?.emailConnected).toBe(false);
-    expect(payload.members[0]?.telegramConnected).toBe(true);
+    expect(payload.members?.[0]?.emailConnected).toBe(false);
+    expect(payload.members?.[0]?.telegramConnected).toBe(true);
   });
 
   it("keeps email connected when workspace email is enabled", async () => {
@@ -124,7 +124,7 @@ describe("filterGroupForMember", () => {
       "admin"
     );
 
-    expect(payload.members[0]?.emailConnected).toBe(true);
-    expect(payload.members[0]?.telegramConnected).toBe(false);
+    expect(payload.members?.[0]?.emailConnected).toBe(true);
+    expect(payload.members?.[0]?.telegramConnected).toBe(false);
   });
 });

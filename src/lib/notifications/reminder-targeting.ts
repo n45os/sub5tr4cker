@@ -63,6 +63,7 @@ export type PaymentLike = {
   memberEmail: string | null;
   memberNickname: string;
   amount: number;
+  adjustedAmount?: number | null;
   status: string;
   confirmationToken?: string | null;
 };
@@ -180,7 +181,8 @@ export async function getReminderEligibility(params: {
     groupName: group.name,
     periodId: period.id ?? asId(period._id),
     periodLabel: period.periodLabel,
-    amount: payment.amount,
+    // match what the reminder send paths actually charge
+    amount: payment.adjustedAmount ?? payment.amount,
     currency: period.currency || "EUR",
     status: payment.status as "pending" | "overdue",
     sendEmail,

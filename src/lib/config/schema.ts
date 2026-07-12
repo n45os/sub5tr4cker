@@ -65,6 +65,9 @@ export const sub5tr4ckerConfigSchema = z.object({
       uri: z.string(),
     })
     .optional(),
+
+  /** operator-editable legal page details, keyed by short name (entityName, contactEmail, ...) */
+  legal: z.record(z.string(), z.string()).optional(),
 });
 
 export type Sub5tr4ckerConfig = z.infer<typeof sub5tr4ckerConfigSchema>;

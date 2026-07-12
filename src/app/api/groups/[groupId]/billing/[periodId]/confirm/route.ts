@@ -30,7 +30,7 @@ export async function POST(
     );
   }
 
-  const parsed = confirmSchema.safeParse(await request.json());
+  const parsed = confirmSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
       {

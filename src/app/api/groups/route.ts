@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const parsed = createGroupSchema.safeParse(await request.json());
+  const parsed = createGroupSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
       {

@@ -58,28 +58,22 @@ export async function applyAdminPaymentDecision(
     return { ok: false, code: "PAYMENT_NOT_FOUND" };
   }
 
-  const payment = { ...period.payments[payIdx]! };
-  if (action === "confirm") {
-    payment.status = "confirmed";
-    payment.adminConfirmedAt = new Date();
-  } else if (action === "waive") {
-    payment.status = "waived";
-    payment.adminConfirmedAt = new Date();
-  } else {
-    payment.status = "pending";
-    payment.adminConfirmedAt = null;
-    payment.memberConfirmedAt = null;
-  }
-  if (notes !== undefined) payment.notes = notes;
+  // targeted single-payment update (recomputes isFullyPaid in the adapter) so
+  // concurrent member confirms on other payments aren't overwritten
+  const decisionUpdate =
+    action === "confirm"
+      ? { status: "confirmed" as const, adminConfirmedAt: new Date() }
+      : action === "waive"
+        ? { status: "waived" as const, adminConfirmedAt: new Date() }
+        : {
+            status: "pending" as const,
+            adminConfirmedAt: null,
+            memberConfirmedAt: null,
+          };
 
-  const payments = period.payments.map((p, i) => (i === payIdx ? payment : p));
-  const isFullyPaid = payments.every(
-    (p) => p.status === "confirmed" || p.status === "waived"
-  );
-
-  const updated = await store.updateBillingPeriod(periodId, {
-    payments,
-    isFullyPaid,
+  const updated = await store.updatePaymentStatus(periodId, memberId, {
+    ...decisionUpdate,
+    ...(notes !== undefined ? { notes } : {}),
   });
 
   const auditAction =
@@ -99,7 +93,8 @@ export async function applyAdminPaymentDecision(
   });
 
   const updatedPayment =
-    updated.payments.find((p) => p.memberId === memberId) ?? payment;
+    updated.payments.find((p) => p.memberId === memberId) ??
+    period.payments[payIdx]!;
   return { ok: true, period: updated, payment: updatedPayment };
 }
 
@@ -142,25 +137,23 @@ export async function confirmAllMemberConfirmed(
   }
 
   const now = new Date();
-  const confirmedMemberIds: string[] = [];
-  const payments = period.payments.map((p) => {
-    if (p.status !== "member_confirmed") return p;
-    confirmedMemberIds.push(p.memberId);
-    return { ...p, status: "confirmed" as const, adminConfirmedAt: now };
-  });
+  const confirmedMemberIds = period.payments
+    .filter((p) => p.status === "member_confirmed")
+    .map((p) => p.memberId);
 
   if (confirmedMemberIds.length === 0) {
     return { ok: true, period, confirmedMemberIds: [] };
   }
 
-  const isFullyPaid = payments.every(
-    (p) => p.status === "confirmed" || p.status === "waived"
-  );
-
-  const updated = await store.updateBillingPeriod(periodId, {
-    payments,
-    isFullyPaid,
-  });
+  // targeted per-payment updates (isFullyPaid recomputed in the adapter) so
+  // concurrent confirms on other payments aren't overwritten
+  let updated = period;
+  for (const memberId of confirmedMemberIds) {
+    updated = await store.updatePaymentStatus(periodId, memberId, {
+      status: "confirmed",
+      adminConfirmedAt: now,
+    });
+  }
 
   for (const memberId of confirmedMemberIds) {
     await logAudit({

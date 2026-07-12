@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const parsed = changePasswordSchema.safeParse(await request.json());
+  const parsed = changePasswordSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
       {

@@ -87,8 +87,9 @@ export interface StorageAdapter {
   getGroupWithMemberUsers(id: string): Promise<StorageGroupWithUsers | null>;
 
   /**
-   * list all active groups where the given userId is admin or a member,
-   * or where memberEmail matches an active member.
+   * list all active groups where the given userId is admin, or where userId
+   * or memberEmail matches an active member (inactive/removed members lose
+   * visibility in both adapters).
    */
   listGroupsForUser(userId: string, email: string): Promise<StorageGroup[]>;
 

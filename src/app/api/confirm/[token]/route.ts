@@ -49,14 +49,12 @@ export async function GET(
     );
   }
 
-  const updatedPayment: StorageMemberPayment = {
-    ...payment,
+  // targeted single-payment update so concurrent confirms can't overwrite
+  // each other's status changes
+  await store.updatePaymentStatus(payload.periodId, payload.memberId, {
     status: "member_confirmed",
     memberConfirmedAt: new Date(),
-  };
-  const payments = period.payments.map((p, i) => (i === payIdx ? updatedPayment : p));
-
-  await store.updateBillingPeriod(payload.periodId, { payments });
+  });
 
   const group = await store.getGroup(payload.groupId);
   if (group) {
@@ -66,6 +64,7 @@ export async function GET(
       payload: {
         groupId: payload.groupId,
         billingPeriodId: payload.periodId,
+        memberId: payload.memberId,
       },
     });
     await runNotificationTasks({ limit: 5 });
